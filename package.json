@@ -1,0 +1,44 @@
+{
+  "name": "stagepv_1",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
+    "@gltf-transform/core": "^4.3.0",
+    "@gltf-transform/extensions": "^4.3.0",
+    "@gltf-transform/functions": "^4.3.0",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
+    "@react-three/postprocessing": "^3.0.4",
+    "@types/three": "^0.182.0",
+    "cloudinary": "^2.9.0",
+    "draco3dgltf": "^1.5.7",
+    "gltf-pipeline": "^4.3.0",
+    "hls.js": "^1.6.15",
+    "maath": "^0.10.8",
+    "meshoptimizer": "^1.0.1",
+    "next": "16.1.1",
+    "postprocessing": "^6.38.2",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "three": "^0.182.0",
+    "zustand": "^5.0.9"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.1",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
