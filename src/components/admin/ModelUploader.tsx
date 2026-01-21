@@ -29,7 +29,47 @@ export function ModelUploader() {
     const setLoading = useStore((state) => state.setLoading);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-    // ... (keep existing state)
+    const [parsedModels, setParsedModels] = useState<ParsedModel[]>([]);
+    const [modelUrl, setModelUrl] = useState<string>('');
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const deleteTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Compression state
+    const [enableCompression, setEnableCompression] = useState<boolean>(true);
+    const [compressionStats, setCompressionStats] = useState<CompressionStats | null>(null);
+
+    const materialOptions = getMaterialOptions();
+
+    const handleMaterialChange = (objectId: string, materialId: MaterialId) => {
+        updateObjectMaterial(objectId, materialId);
+    };
+
+    const getDefaultMaterial = (type: ModelType): MaterialId => {
+        switch (type) {
+            case 'venues':
+                return 'blackPlastic';
+            case 'stage':
+                return 'polishedAluminum';
+            case 'static_LED':
+            case 'moving_LED':
+                return 'emissive';
+            default:
+                return 'matteMetal';
+        }
+    };
+
+    // Map part names to model types
+    const getModelType = (name: string): ModelType | null => {
+        const lowerName = name.toLowerCase();
+
+        if (lowerName.includes('moving') && lowerName.includes('led')) return 'moving_LED';
+        if (lowerName.includes('static') && lowerName.includes('led')) return 'static_LED';
+        if (lowerName.includes('stage')) return 'stage';
+        if (lowerName.includes('venue')) return 'venues';
+
+        return null;
+    };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
