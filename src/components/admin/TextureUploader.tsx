@@ -121,34 +121,81 @@ export function TextureUploader() {
             return;
         }
 
-        setLoading(true, '上傳至雲端...');
+        setLoading(true, '上傳至雲端 (Cloudinary)...');
 
         try {
             // Generate thumbnail locally first
             const thumbnail = await generateThumbnail(file, fileType);
 
-            // Upload to Cloudinary via API
+            // Prepare params for signature
+            // For videos, we want HLS transcoding
+            const paramsToSign: Record<string, any> = {
+                folder: 'stagepv'
+            };
+
+            if (fileType === 'video') {
+                paramsToSign.eager = 'sp_full_hd/m3u8';
+                paramsToSign.eager_async = true;
+            }
+
+            // 1. Get Signature
+            const signResponse = await fetch('/api/sign-cloudinary', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paramsToSign })
+            });
+
+            if (!signResponse.ok) throw new Error('無法取得上傳授權');
+
+            const { signature, timestamp, cloudName, apiKey } = await signResponse.json();
+
+            // 2. Upload to Cloudinary
             const formData = new FormData();
             formData.append('file', file);
-            formData.append('type', fileType);
+            formData.append('api_key', apiKey);
+            formData.append('timestamp', timestamp.toString());
+            formData.append('signature', signature);
+            formData.append('folder', 'stagepv');
 
-            const response = await fetch('/api/upload', {
+            if (fileType === 'video') {
+                formData.append('eager', 'sp_full_hd/m3u8');
+                formData.append('eager_async', 'true');
+            }
+
+            const resourceType = fileType === 'video' ? 'video' : 'image';
+            const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
+
+            const response = await fetch(uploadUrl, {
                 method: 'POST',
                 body: formData,
             });
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.error || '上傳失敗');
+                throw new Error(error.error?.message || '上傳失敗');
             }
 
             const result = await response.json();
             console.log('Cloudinary upload result:', result);
 
+            // For videos, use the HLS URL if available (derived from secure_url)
+            // But Cloudinary upload response usually returns 'eager' array with HLS url if synchronous
+            // Since we used eager_async=true, the m3u8 might not be ready instantly, 
+            // but the URL pattern is predictable.
+            // However, useStore expects a direct URL. 
+            // We use the MP4 url (secure_url) primarily, VideoManager handles HLS checking if m3u8 is passed.
+            // Let's store secure_url. But if we want HLS, we should change extension to .m3u8
+
+            let filePath = result.secure_url;
+            if (fileType === 'video') {
+                // Construct HLS URL: replace extension with .m3u8
+                filePath = result.secure_url.replace(/\.[^.]+$/, '.m3u8');
+            }
+
             const newTexture: ContentTexture = {
                 id: `texture_${Date.now()}`,
                 name: file.name,
-                file_path: result.url, // Cloudinary URL (persistent!)
+                file_path: filePath, // Store cloud URL (HLS for video)
                 type: fileType,
                 thumbnail_url: thumbnail,
                 file_size: file.size

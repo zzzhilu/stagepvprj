@@ -208,23 +208,48 @@ export function ModelUploader() {
         setLoading(true, '上傳模型至雲端 (Cloudinary)...');
 
         try {
-            // Upload to Cloudinary
+            // 1. Get Signature from server
+            const signResponse = await fetch('/api/sign-cloudinary', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    paramsToSign: {
+                        folder: 'stagepv'
+                    }
+                })
+            });
+
+            if (!signResponse.ok) {
+                throw new Error('無法取得上傳授權');
+            }
+
+            const { signature, timestamp, cloudName, apiKey } = await signResponse.json();
+
+            // 2. Upload directly to Cloudinary
             const formData = new FormData();
             formData.append('file', selectedFile);
-            formData.append('type', 'model'); // 'model' type maps to 'raw' in API
+            formData.append('api_key', apiKey);
+            formData.append('timestamp', timestamp.toString());
+            formData.append('signature', signature);
+            formData.append('folder', 'stagepv');
 
-            const response = await fetch('/api/upload', {
+            // GLB files usually use 'raw' resource type, but sometimes 'image' works too.
+            // Using 'raw' is safer for binary files to avoid validation errors.
+            const resourceType = 'raw';
+            const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
+
+            const response = await fetch(uploadUrl, {
                 method: 'POST',
                 body: formData,
             });
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.error || '上傳失敗');
+                throw new Error(error.error?.message || '上傳失敗');
             }
 
             const result = await response.json();
-            const cloudUrl = result.url;
+            const cloudUrl = result.secure_url;
             console.log('Model uploaded to:', cloudUrl);
 
             // Create StageObject for each type using cloud URL
