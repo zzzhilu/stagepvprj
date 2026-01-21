@@ -27,47 +27,9 @@ export function ModelUploader() {
     const updateObjectMaterial = useStore((state) => state.updateObjectMaterial);
     const stageObjects = useStore((state) => state.stageObjects);
     const setLoading = useStore((state) => state.setLoading);
-    const [parsedModels, setParsedModels] = useState<ParsedModel[]>([]);
-    const [modelUrl, setModelUrl] = useState<string>('');
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [deletingId, setDeletingId] = useState<string | null>(null);
-    const deleteTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-    // Compression state
-    const [enableCompression, setEnableCompression] = useState<boolean>(true);
-    const [compressionStats, setCompressionStats] = useState<CompressionStats | null>(null);
-
-    const materialOptions = getMaterialOptions();
-
-    const handleMaterialChange = (objectId: string, materialId: MaterialId) => {
-        updateObjectMaterial(objectId, materialId);
-    };
-
-    const getDefaultMaterial = (type: ModelType): MaterialId => {
-        switch (type) {
-            case 'venues':
-                return 'blackPlastic';
-            case 'stage':
-                return 'polishedAluminum';
-            case 'static_LED':
-            case 'moving_LED':
-                return 'emissive';
-            default:
-                return 'matteMetal';
-        }
-    };
-
-    // Map part names to model types
-    const getModelType = (name: string): ModelType | null => {
-        const lowerName = name.toLowerCase();
-
-        if (lowerName.includes('moving') && lowerName.includes('led')) return 'moving_LED';
-        if (lowerName.includes('static') && lowerName.includes('led')) return 'static_LED';
-        if (lowerName.includes('stage')) return 'stage';
-        if (lowerName.includes('venue')) return 'venues';
-
-        return null;
-    };
+    // ... (keep existing state)
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -78,16 +40,18 @@ export function ModelUploader() {
             return;
         }
 
+        setSelectedFile(file); // Store file for upload later
+
         setLoading(true, enableCompression ? '壓縮模型中...' : '解析模型中...');
         setParsedModels([]);
         setCompressionStats(null);
 
         try {
-            // Validate GLB file by checking magic number
+            // ... (keep existing validation logic)
             let arrayBuffer = await file.arrayBuffer();
             const dataView = new DataView(arrayBuffer);
 
-            // GLB files start with the magic number 0x46546C67 ("glTF" in ASCII)
+            // GLB validation...
             if (dataView.byteLength < 4 || dataView.getUint32(0, true) !== 0x46546C67) {
                 alert('無效的 GLB 檔案格式！\n請確保上傳的是正確的 GLB 3D 模型檔案。');
                 setLoading(false);
@@ -99,6 +63,7 @@ export function ModelUploader() {
 
             // Compress if enabled
             if (enableCompression) {
+                // ... (keep existing compression logic)
                 setLoading(true, '使用 Draco 壓縮中...');
                 try {
                     const response = await fetch('/api/compress-glb', {
@@ -130,21 +95,28 @@ export function ModelUploader() {
                 }
             }
 
-            // Create object URL for the (possibly compressed) file
+            // Create object URL for local preview
             const blob = new Blob([arrayBuffer], { type: 'model/gltf-binary' });
             const url = URL.createObjectURL(blob);
             setModelUrl(url);
 
+            // NB: If we compressed the file, we should update selectedFile to be the compressed one
+            // so we upload the smaller version to Cloudinary!
+            if (enableCompression && arrayBuffer.byteLength !== originalSize) {
+                const compressedFile = new File([blob], file.name, { type: 'model/gltf-binary' });
+                setSelectedFile(compressedFile);
+            }
+
             setLoading(true, '載入 3D 模型...');
 
-            // Load and parse the GLB file with DRACOLoader
+            // Load and parse (keep existing)
             const loader = new GLTFLoader();
             loader.setDRACOLoader(getDRACOLoader());
 
             loader.load(
                 url,
                 (gltf) => {
-                    // Parse all meshes from the model
+                    // ... (keep parsing logic)
                     const categorizedMeshes: Map<ModelType, THREE.Mesh[]> = new Map();
 
                     gltf.scene.traverse((child) => {
@@ -190,34 +162,64 @@ export function ModelUploader() {
         }
     };
 
-    const handleConfirmUpload = () => {
-        if (!modelUrl || parsedModels.length === 0) return;
+    const handleConfirmUpload = async () => {
+        if (!selectedFile || parsedModels.length === 0) return;
 
-        // Create StageObject for each type
-        parsedModels.forEach(parsed => {
-            const newObject = {
-                id: `obj_${parsed.type}_${Date.now()}`,
-                model_path: modelUrl,
-                material_id: getDefaultMaterial(parsed.type),
-                type: parsed.type,
-                meshNames: parsed.meshes.map(m => m.name), // Store mesh names for filtering
-                instances: [
-                    {
-                        pos: [0, 0, 0] as [number, number, number],
-                        rot: [0, 0, 0] as [number, number, number],
-                        scale: [1, 1, -1] as [number, number, number]
-                    }
-                ]
-            };
+        setLoading(true, '上傳模型至雲端 (Cloudinary)...');
 
-            addObject(newObject);
-        });
+        try {
+            // Upload to Cloudinary
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('type', 'model'); // 'model' type maps to 'raw' in API
 
-        // Clear the UI
-        setParsedModels([]);
-        setModelUrl('');
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || '上傳失敗');
+            }
+
+            const result = await response.json();
+            const cloudUrl = result.url;
+            console.log('Model uploaded to:', cloudUrl);
+
+            // Create StageObject for each type using cloud URL
+            parsedModels.forEach(parsed => {
+                const newObject = {
+                    id: `obj_${parsed.type}_${Date.now()}`,
+                    model_path: cloudUrl, // Use Cloudinary URL!
+                    material_id: getDefaultMaterial(parsed.type),
+                    type: parsed.type,
+                    meshNames: parsed.meshes.map(m => m.name),
+                    instances: [
+                        {
+                            pos: [0, 0, 0] as [number, number, number],
+                            rot: [0, 0, 0] as [number, number, number],
+                            scale: [1, 1, -1] as [number, number, number]
+                        }
+                    ]
+                };
+
+                addObject(newObject);
+            });
+
+            // Clear the UI
+            setParsedModels([]);
+            setModelUrl('');
+            setSelectedFile(null);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+
+        } catch (error) {
+            console.error('Cloud upload failed:', error);
+            alert(`雲端上傳失敗: ${error instanceof Error ? error.message : '未知錯誤'}`);
+        } finally {
+            setLoading(false);
         }
     };
 

@@ -161,7 +161,7 @@ export async function transcodeToMP4(
         }
 
         // Create blob from Uint8Array
-        const mp4Blob = new Blob([outputArray], { type: 'video/mp4' });
+        const mp4Blob = new Blob([outputArray as unknown as BlobPart], { type: 'video/mp4' });
 
         // Cleanup
         try {

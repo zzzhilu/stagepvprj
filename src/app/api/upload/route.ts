@@ -25,7 +25,7 @@ export async function POST(request: Request) {
 
         // Upload to Cloudinary
         const result = await cloudinary.uploader.upload(dataUri, {
-            resource_type: type === 'video' ? 'video' : 'image',
+            resource_type: type === 'model' ? 'raw' : (type === 'video' ? 'video' : 'image'),
             folder: 'stagepv',
             // For videos, enable streaming
             ...(type === 'video' && {
