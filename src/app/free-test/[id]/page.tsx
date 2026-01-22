@@ -187,11 +187,11 @@ function ProjectEditorContent() {
 
     return (
         <main className="relative w-full h-full">
-            {/* Project Name Display - Share mode only */}
+            {/* Project Name Display - Share mode only - Bottom Right */}
             {isShareMode && projectName && (
-                <div className="absolute top-4 left-4 z-50 pointer-events-none">
-                    <div className="bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/10">
-                        <span className="text-white font-semibold">{decodeURIComponent(projectName)}</span>
+                <div className="absolute bottom-6 right-6 z-50 pointer-events-none">
+                    <div className="bg-black/40 backdrop-blur-md px-6 py-3 rounded-full border border-white/10 shadow-lg">
+                        <span className="text-white/90 font-medium tracking-wide text-lg">{decodeURIComponent(projectName)}</span>
                     </div>
                 </div>
             )}
