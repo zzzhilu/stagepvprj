@@ -1,21 +1,20 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import Hls from 'hls.js';
 
 export function useHlsTexture(src: string) {
-    const videoRef = useRef<HTMLVideoElement | null>(null);
+    const [videoElement] = useState<HTMLVideoElement | null>(() => {
+        if (typeof document === 'undefined') return null;
 
-    // Initialize video element once
-    if (!videoRef.current && typeof document !== 'undefined') {
         const vid = document.createElement('video');
         vid.crossOrigin = 'Anonymous';
         vid.loop = true;
         vid.muted = true;
         vid.playsInline = true;
-        videoRef.current = vid;
-    }
+        return vid;
+    });
 
     useEffect(() => {
-        const video = videoRef.current;
+        const video = videoElement;
         if (!video || !src) return;
 
         let hls: Hls | null = null;
@@ -38,7 +37,7 @@ export function useHlsTexture(src: string) {
         return () => {
             if (hls) hls.destroy();
         };
-    }, [src]);
+    }, [src, videoElement]);
 
-    return videoRef.current;
+    return videoElement;
 }

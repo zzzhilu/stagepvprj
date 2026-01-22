@@ -110,13 +110,46 @@ export default function AdminControls() {
     const [shareToast, setShareToast] = useState(false);
     const [shareName, setShareName] = useState('測試專案');
 
-    const handleShare = () => {
-        const encodedName = encodeURIComponent(shareName);
-        const shareUrl = `${window.location.origin}/simulation?share&name=${encodedName}`;
-        navigator.clipboard.writeText(shareUrl).then(() => {
+    const stageObjects = useStore((state) => state.stageObjects);
+    const views = useStore((state) => state.views);
+    const contentTextures = useStore((state) => state.contentTextures);
+    const activeViewId = useStore((state) => state.activeViewId);
+    const activeContentId = useStore((state) => state.activeContentId);
+    const setLoading = useStore((state) => state.setLoading);
+
+    const handleShare = async () => {
+        if (shareName.trim() === '') {
+            alert('請輸入專案名稱');
+            return;
+        }
+
+        setLoading(true, '正在建立分享連結 (儲存至雲端)...');
+
+        try {
+            // Dynamically import project service to avoid SSR issues if any
+            const { ProjectService } = await import('@/lib/project-service');
+
+            const projectId = await ProjectService.saveProject({
+                name: shareName,
+                stageObjects,
+                views,
+                contentTextures,
+                activeViewId,
+                activeContentId
+            });
+
+            const shareUrl = `${window.location.origin}/simulation?p=${projectId}&share=true`;
+
+            await navigator.clipboard.writeText(shareUrl);
             setShareToast(true);
             setTimeout(() => setShareToast(false), 2000);
-        });
+
+        } catch (error) {
+            console.error('Share failed:', error);
+            alert('分享失敗，請稍後再試。');
+        } finally {
+            setLoading(false);
+        }
     };
 
     if (mode !== 'admin') {

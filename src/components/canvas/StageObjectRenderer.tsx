@@ -10,8 +10,8 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
     const contentTextures = useStore((state) => state.contentTextures);
     const activeContentId = useStore((state) => state.activeContentId);
     const [videoTexture, setVideoTexture] = useState<THREE.VideoTexture | null>(null);
-    // Use useGLTF hook directly - error handling should be done via ErrorBoundary or pre-validation
-    const gltfData = useGLTF(object.model_path);
+    // Use useGLTF hook with Draco decoder path
+    const gltfData = useGLTF(object.model_path, 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 
     // Get active texture for emissive materials (using selected content)
     const activeTexture = useMemo(() => {

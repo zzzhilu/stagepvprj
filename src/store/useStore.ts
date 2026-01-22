@@ -98,6 +98,7 @@ interface State {
     setActiveView: (id: string | null) => void;
 
     setLoading: (loading: boolean, message?: string) => void;
+    loadState: (state: Partial<State>) => void;
 }
 
 export const useStore = create<State>()(
@@ -181,6 +182,11 @@ export const useStore = create<State>()(
             setActiveView: (id) => set({ activeViewId: id }),
 
             setLoading: (loading, message = '') => set({ isLoading: loading, loadingMessage: message }),
+            loadState: (newState) => set((state) => ({
+                ...state,
+                ...newState,
+                // Ensure we don't accidentally overwrite unrelated UI state if not provided
+            })),
         }),
         {
             name: 'stage-preview-storage', // localStorage key

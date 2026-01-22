@@ -12,7 +12,8 @@ export default function ClientControls() {
     const setMode = useStore((state) => state.setMode);
 
     const searchParams = useSearchParams();
-    const isShareMode = searchParams.get('share') === '1';
+    // Hide controls if 'share' param is present (regardless of value)
+    const isShareMode = searchParams.has('share');
 
     return (
         <>

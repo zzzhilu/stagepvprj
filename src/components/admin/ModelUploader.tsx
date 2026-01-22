@@ -87,11 +87,11 @@ export function ModelUploader() {
         setCompressionStats(null);
 
         try {
-            // ... (keep existing validation logic)
+            // Validate GLB file by checking magic number
             let arrayBuffer = await file.arrayBuffer();
             const dataView = new DataView(arrayBuffer);
 
-            // GLB validation...
+            // GLB files start with the magic number 0x46546C67 ("glTF" in ASCII)
             if (dataView.byteLength < 4 || dataView.getUint32(0, true) !== 0x46546C67) {
                 alert('無效的 GLB 檔案格式！\n請確保上傳的是正確的 GLB 3D 模型檔案。');
                 setLoading(false);
@@ -103,7 +103,6 @@ export function ModelUploader() {
 
             // Compress if enabled
             if (enableCompression) {
-                // ... (keep existing compression logic)
                 setLoading(true, '使用 Draco 壓縮中...');
                 try {
                     const response = await fetch('/api/compress-glb', {
@@ -135,7 +134,7 @@ export function ModelUploader() {
                 }
             }
 
-            // Create object URL for local preview
+            // Create object URL for the (possibly compressed) file
             const blob = new Blob([arrayBuffer], { type: 'model/gltf-binary' });
             const url = URL.createObjectURL(blob);
             setModelUrl(url);
@@ -149,14 +148,14 @@ export function ModelUploader() {
 
             setLoading(true, '載入 3D 模型...');
 
-            // Load and parse (keep existing)
+            // Load and parse the GLB file with DRACOLoader
             const loader = new GLTFLoader();
             loader.setDRACOLoader(getDRACOLoader());
 
             loader.load(
                 url,
                 (gltf) => {
-                    // ... (keep parsing logic)
+                    // Parse all meshes from the model
                     const categorizedMeshes: Map<ModelType, THREE.Mesh[]> = new Map();
 
                     gltf.scene.traverse((child) => {
@@ -205,58 +204,30 @@ export function ModelUploader() {
     const handleConfirmUpload = async () => {
         if (!selectedFile || parsedModels.length === 0) return;
 
-        setLoading(true, '上傳模型至雲端 (Cloudinary)...');
+        setLoading(true, '上傳模型至雲端 (Firebase)...');
 
         try {
-            // 1. Get Signature from server
-            const signResponse = await fetch('/api/sign-cloudinary', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    paramsToSign: {
-                        folder: 'stagepv'
-                    }
-                })
-            });
+            // Import Firebase functions dynamically to ensure clean SSR
+            const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+            const { storage } = await import('@/lib/firebase');
 
-            if (!signResponse.ok) {
-                throw new Error('無法取得上傳授權');
-            }
+            // Create reference
+            const fileName = `models/${Date.now()}_${selectedFile.name}`;
+            const storageRef = ref(storage, fileName);
 
-            const { signature, timestamp, cloudName, apiKey } = await signResponse.json();
+            // Upload directly
+            const snapshot = await uploadBytes(storageRef, selectedFile);
+            console.log('Uploaded a blob or file!', snapshot);
 
-            // 2. Upload directly to Cloudinary
-            const formData = new FormData();
-            formData.append('file', selectedFile);
-            formData.append('api_key', apiKey);
-            formData.append('timestamp', timestamp.toString());
-            formData.append('signature', signature);
-            formData.append('folder', 'stagepv');
-
-            // GLB files usually use 'raw' resource type, but sometimes 'image' works too.
-            // Using 'raw' is safer for binary files to avoid validation errors.
-            const resourceType = 'raw';
-            const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
-
-            const response = await fetch(uploadUrl, {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error?.message || '上傳失敗');
-            }
-
-            const result = await response.json();
-            const cloudUrl = result.secure_url;
+            // Get URL
+            const cloudUrl = await getDownloadURL(snapshot.ref);
             console.log('Model uploaded to:', cloudUrl);
 
             // Create StageObject for each type using cloud URL
             parsedModels.forEach(parsed => {
                 const newObject = {
                     id: `obj_${parsed.type}_${Date.now()}`,
-                    model_path: cloudUrl, // Use Cloudinary URL!
+                    model_path: cloudUrl,
                     material_id: getDefaultMaterial(parsed.type),
                     type: parsed.type,
                     meshNames: parsed.meshes.map(m => m.name),
@@ -281,8 +252,45 @@ export function ModelUploader() {
             }
 
         } catch (error) {
-            console.error('Cloud upload failed:', error);
+            console.error('Firebase upload failed:', error);
             alert(`雲端上傳失敗: ${error instanceof Error ? error.message : '未知錯誤'}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteFile = async (fileUrl: string) => {
+        if (!confirm('警告：這將會永久刪除此檔案以及所有相關的模型物件。確定要繼續嗎？')) return;
+
+        setLoading(true, '正在刪除雲端檔案...');
+
+        try {
+            // 1. Delete from Firebase Storage
+            const { ref, deleteObject } = await import('firebase/storage');
+            const { storage } = await import('@/lib/firebase');
+
+            // Extract path from URL roughly, or simply use refFromURL if available (Firebase SDK has ref(storage, url))
+            const fileRef = ref(storage, fileUrl);
+            await deleteObject(fileRef);
+
+            // 2. Remove all objects using this URL
+            const objectsToRemove = stageObjects.filter(obj => obj.model_path === fileUrl);
+            objectsToRemove.forEach(obj => removeObject(obj.id));
+
+            alert('檔案已成功刪除');
+
+        } catch (error) {
+            console.error('Delete failed:', error);
+            alert('刪除失敗，可能是檔案已不存在或權限不足。但會嘗試清理場景中的物件。');
+            // Even if cloud delete fails, we might want to clean up local references if desired, 
+            // but let's stick to safe behavior: only remove if confirm.
+            // For now, if cloud delete fails, we just alert. 
+            // EDIT: User might want to force remove objects if file is gone.
+            // Let's remove objects anyway if the user confirms "Force Remove" in a real scenario,
+            // but here we will just remove them to sync state if it's a "Object not found" error or similar.
+            // For simplicity, let's remove local objects even if cloud delete fails (maybe file is already gone).
+            const objectsToRemove = stageObjects.filter(obj => obj.model_path === fileUrl);
+            objectsToRemove.forEach(obj => removeObject(obj.id));
         } finally {
             setLoading(false);
         }
@@ -293,7 +301,7 @@ export function ModelUploader() {
         deleteTimerRef.current = setTimeout(() => {
             removeObject(id);
             setDeletingId(null);
-        }, 200);
+        }, 800);
     };
 
     const handleLongPressEnd = () => {
@@ -313,12 +321,35 @@ export function ModelUploader() {
         return acc;
     }, {} as Record<ModelType, typeof stageObjects>);
 
+    // Group objects by Source File URL
+    const groupedByFile = stageObjects.reduce((acc, obj) => {
+        const url = obj.model_path;
+        if (!acc[url]) {
+            acc[url] = [];
+        }
+        acc[url].push(obj);
+        return acc;
+    }, {} as Record<string, typeof stageObjects>);
+
     const typeLabels: Record<ModelType, string> = {
         'venues': '場館 (Venue)',
         'stage': '舞台 (Stage)',
         'static_LED': '靜態LED (Static LED)',
         'moving_LED': '移動LED (Moving LED)',
         'basic_camera': '攝影機 (Camera)'
+    };
+
+    const getFileNameFromUrl = (url: string) => {
+        try {
+            // Firebase URLs encode the path, usually '.../o/models%2F123_name.glb?alt=...'
+            // We can decode and extract
+            const decoded = decodeURIComponent(url);
+            const basename = decoded.split('/').pop()?.split('?')[0] || 'Unknown File';
+            // Remove 'models/' prefix if present
+            return basename.replace('models/', '');
+        } catch (e) {
+            return 'Unknown File';
+        }
     };
 
     return (
@@ -383,8 +414,6 @@ export function ModelUploader() {
                     </div>
                 )}
 
-                {/* Loading indicator removed as it's now global */}
-
                 {/* Parsed Models Preview */}
                 {parsedModels.length > 0 && (
                     <div className="bg-gray-900 rounded p-3 mb-3">
@@ -413,10 +442,38 @@ export function ModelUploader() {
                 </p>
             </div>
 
-            {/* Uploaded Models List */}
+            {/* Source Files Management */}
+            {Object.keys(groupedByFile).length > 0 && (
+                <div className="p-4 bg-gray-800 border-b border-gray-700">
+                    <h4 className="text-sm font-semibold text-gray-300 mb-2">🗑️ 來源檔案管理 (Source Files)</h4>
+                    <div className="space-y-2">
+                        {Object.entries(groupedByFile).map(([url, objects]) => (
+                            <div key={url} className="flex items-center justify-between bg-gray-900 p-2 rounded text-xs">
+                                <div className="flex flex-col overflow-hidden mr-2">
+                                    <span className="text-gray-300 truncate font-mono" title={getFileNameFromUrl(url)}>
+                                        {getFileNameFromUrl(url)}
+                                    </span>
+                                    <span className="text-gray-500">
+                                        包含 {objects.length} 個物件
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => handleDeleteFile(url)}
+                                    className="bg-red-900/50 hover:bg-red-800 text-red-200 px-2 py-1.5 rounded flex items-center gap-1 flex-shrink-0 transition-colors"
+                                    title="刪除檔案及所有相關物件"
+                                >
+                                    <span>🗑️ 刪除</span>
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Uploaded Objects List */}
             <div className="p-4 max-h-80 overflow-y-auto">
                 <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-semibold text-gray-300">已載入的模型</h4>
+                    <h4 className="text-sm font-semibold text-gray-300">已載入的模型物件</h4>
                     <span className="text-xs text-gray-500">
                         共 {Object.keys(groupedObjects).length} 種類型
                     </span>
@@ -443,7 +500,7 @@ export function ModelUploader() {
                                         return (
                                             <div key={obj.id} className="p-2 bg-gray-900/30 rounded hover:bg-gray-900/50 transition-colors group">
                                                 <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
-                                                    <span className="truncate flex-1">{displayName}</span>
+                                                    <span className="truncate flex-1" title={displayName}>{getFileNameFromUrl(obj.model_path)} ({obj.meshNames?.length || 0})</span>
                                                     <button
                                                         onMouseDown={() => handleLongPressStart(obj.id)}
                                                         onMouseUp={handleLongPressEnd}
@@ -452,7 +509,7 @@ export function ModelUploader() {
                                                         onTouchEnd={handleLongPressEnd}
                                                         className={`ml-2 opacity-0 group-hover:opacity-100 transition-all relative ${isDeleting ? 'text-red-500 scale-110' : 'text-red-400 hover:text-red-300'
                                                             }`}
-                                                        title="長按 1 秒刪除"
+                                                        title="長按 1 秒刪除單個物件"
                                                     >
                                                         {isDeleting && (
                                                             <div className="absolute inset-0 border-2 border-red-500 rounded animate-ping"></div>
