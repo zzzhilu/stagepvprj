@@ -5,6 +5,7 @@ import { ModelUploader } from './ModelUploader';
 import { TextureUploader } from './TextureUploader';
 import { LightingControls } from './LightingControls';
 import { useState, useRef } from 'react';
+import { useParams } from 'next/navigation';
 
 function ViewManager() {
     const triggerCapture = useStore((state) => state.triggerCapture);
@@ -103,65 +104,14 @@ function ViewManager() {
     )
 }
 
-export default function AdminControls() {
+export default function AdminControls({ projectName }: { projectName?: string }) {
+    const params = useParams();
+    const projectId = params.id as string;
+
     const mode = useStore((state) => state.mode);
     const startMode = useStore((state) => state.setMode);
     const [expandedSection, setExpandedSection] = useState<'models' | 'videos' | 'views' | 'lighting'>('models');
     const [shareToast, setShareToast] = useState(false);
-    const [shareName, setShareName] = useState('測試專案');
-
-    const stageObjects = useStore((state) => state.stageObjects);
-    const views = useStore((state) => state.views);
-    const contentTextures = useStore((state) => state.contentTextures);
-    const activeViewId = useStore((state) => state.activeViewId);
-    const activeContentId = useStore((state) => state.activeContentId);
-    const setLoading = useStore((state) => state.setLoading);
-
-    const handleShare = async () => {
-        if (shareName.trim() === '') {
-            alert('請輸入專案名稱');
-            return;
-        }
-
-        setLoading(true, '正在建立分享連結 (儲存至雲端)...');
-
-        try {
-            // Dynamically import project service to avoid SSR issues if any
-            const { ProjectService } = await import('@/lib/project-service');
-
-            const projectId = await ProjectService.saveProject({
-                name: shareName,
-                stageObjects,
-                views,
-                contentTextures,
-                activeViewId,
-                activeContentId
-            });
-
-            const shareUrl = `${window.location.origin}/simulation?p=${projectId}&share=true`;
-
-            await navigator.clipboard.writeText(shareUrl);
-            setShareToast(true);
-            setTimeout(() => setShareToast(false), 2000);
-
-        } catch (error) {
-            console.error('Share failed:', error);
-            alert('分享失敗，請稍後再試。');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (mode !== 'admin') {
-        return (
-            <button
-                onClick={() => startMode('admin')}
-                className="absolute bottom-4 right-4 bg-gray-800 text-white p-2 rounded opacity-50 hover:opacity-100 z-50 pointer-events-auto"
-            >
-                Enable Admin Mode
-            </button>
-        )
-    }
 
     const toggleSection = (section: 'models' | 'videos' | 'views' | 'lighting') => {
         setExpandedSection(expandedSection === section ? section : section);
@@ -181,10 +131,10 @@ export default function AdminControls() {
                     <h2 className="text-xl font-bold">Admin Panel</h2>
                     <div className="flex gap-2">
                         <a
-                            href="/"
-                            className="text-xs bg-gray-700 px-3 py-1 rounded hover:bg-gray-600"
+                            href="/free-test"
+                            className="text-xs bg-gray-700 px-3 py-1 rounded hover:bg-gray-600 flex items-center gap-1"
                         >
-                            🏠 首頁
+                            <span>📂</span> 專案列表
                         </a>
                         <button
                             onClick={() => startMode('client')}
@@ -195,16 +145,12 @@ export default function AdminControls() {
                     </div>
                 </div>
 
-                {/* Share Name Input */}
-                <div className="mb-3">
-                    <label className="text-xs text-gray-400 block mb-1">📝 分享專案名稱</label>
-                    <input
-                        type="text"
-                        value={shareName}
-                        onChange={(e) => setShareName(e.target.value)}
-                        placeholder="輸入專案名稱..."
-                        className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none"
-                    />
+                {/* Display Current Project Name */}
+                <div className="mb-3 px-3 py-2 bg-gray-800 rounded border border-gray-700">
+                    <label className="text-xs text-gray-400 block mb-1">目前專案</label>
+                    <div className="text-sm font-medium text-white truncate" title={projectName}>
+                        {projectName || '未命名專案'}
+                    </div>
                 </div>
 
                 {/* Share Button */}

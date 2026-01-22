@@ -91,6 +91,7 @@ function ProjectEditorContent() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isChecking, setIsChecking] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
+    const [currentProjectName, setCurrentProjectName] = useState('');
 
     // Get store methods
     const setStageObjects = useStore(state => state.setStageObjects);
@@ -132,6 +133,7 @@ function ProjectEditorContent() {
 
             if (data) {
                 // Load project state into store
+                if (data.name) setCurrentProjectName(data.name);
                 if (data.stageObjects) setStageObjects(data.stageObjects);
                 if (data.views) setViews(data.views);
                 if (data.contentTextures) setContentTextures(data.contentTextures);
@@ -188,16 +190,16 @@ function ProjectEditorContent() {
     return (
         <main className="relative w-full h-full">
             {/* Project Name Display - Share mode only - Bottom Right */}
-            {isShareMode && projectName && (
+            {isShareMode && currentProjectName && (
                 <div className="absolute bottom-6 right-6 z-50 pointer-events-none">
                     <div className="bg-black/40 backdrop-blur-md px-6 py-3 rounded-full border border-white/10 shadow-lg">
-                        <span className="text-white/90 font-medium tracking-wide text-lg">{decodeURIComponent(projectName)}</span>
+                        <span className="text-white/90 font-medium tracking-wide text-lg">{currentProjectName}</span>
                     </div>
                 </div>
             )}
 
             {/* Admin Controls - Hidden in share mode */}
-            {!isShareMode && <AdminControls />}
+            {!isShareMode && <AdminControls projectName={currentProjectName} />}
 
             {/* Client Controls */}
             <ClientControls />
