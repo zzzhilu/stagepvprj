@@ -214,51 +214,52 @@ export default function ProjectDashboard() {
                                             建立於 {formatDate(project.createdAt)}
                                         </p>
                                     </Link>
-                            ))}
                                 </div>
-                            )}
+                            ))}
                         </div>
+                    )}
+                </div>
             </div>
 
-                {/* Create Project Modal */}
-                {showNameModal && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-                        <div className="bg-gray-800 rounded-2xl p-8 w-full max-w-md mx-4 border border-gray-700 shadow-2xl">
-                            <h3 className="text-2xl font-bold text-white mb-2 text-center">建立新專案</h3>
-                            <p className="text-gray-400 text-sm text-center mb-6">請輸入專案名稱</p>
+            {/* Create Project Modal */}
+            {showNameModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                    <div className="bg-gray-800 rounded-2xl p-8 w-full max-w-md mx-4 border border-gray-700 shadow-2xl">
+                        <h3 className="text-2xl font-bold text-white mb-2 text-center">建立新專案</h3>
+                        <p className="text-gray-400 text-sm text-center mb-6">請輸入專案名稱</p>
 
-                            <input
-                                type="text"
-                                value={newProjectName}
-                                onChange={(e) => setNewProjectName(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleCreateProject()}
-                                placeholder="專案名稱..."
-                                autoFocus
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 mb-6"
-                            />
+                        <input
+                            type="text"
+                            value={newProjectName}
+                            onChange={(e) => setNewProjectName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleCreateProject()}
+                            placeholder="專案名稱..."
+                            autoFocus
+                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 mb-6"
+                        />
 
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => {
-                                        setShowNameModal(false);
-                                        setNewProjectName('');
-                                    }}
-                                    disabled={creating}
-                                    className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-lg transition-colors disabled:opacity-50"
-                                >
-                                    取消
-                                </button>
-                                <button
-                                    onClick={handleCreateProject}
-                                    disabled={creating || !newProjectName.trim()}
-                                    className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-3 rounded-lg font-semibold transition-colors disabled:opacity-50"
-                                >
-                                    {creating ? '建立中...' : '確認'}
-                                </button>
-                            </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setShowNameModal(false);
+                                    setNewProjectName('');
+                                }}
+                                disabled={creating}
+                                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={handleCreateProject}
+                                disabled={creating || !newProjectName.trim()}
+                                className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-3 rounded-lg font-semibold transition-colors disabled:opacity-50"
+                            >
+                                {creating ? '建立中...' : '確認'}
+                            </button>
                         </div>
                     </div>
-                )}
+                </div>
+            )}
         </main>
     );
 }

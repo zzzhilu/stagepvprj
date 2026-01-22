@@ -58,9 +58,4 @@ export async function POST(request: Request) {
     }
 }
 
-// Set max file size (100MB for videos)
-export const config = {
-    api: {
-        bodyParser: false,
-    },
-};
+
