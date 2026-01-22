@@ -12,6 +12,9 @@ export default function ProjectDashboard() {
     const [creating, setCreating] = useState(false);
     const [showNameModal, setShowNameModal] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+    const [longPressProgress, setLongPressProgress] = useState(0);
 
     useEffect(() => {
         loadProjects();
@@ -48,6 +51,52 @@ export default function ProjectDashboard() {
         } finally {
             setCreating(false);
         }
+    };
+
+    const handleDeleteProject = async (projectId: string) => {
+        if (!confirm('確定要刪除此專案嗎？此操作無法復原。')) {
+            return;
+        }
+
+        try {
+            await ProjectService.deleteProject(projectId);
+            await loadProjects(); // Reload the list
+        } catch (error) {
+            console.error('Failed to delete project:', error);
+            alert('刪除專案失敗');
+        }
+    };
+
+    const handleLongPressStart = (e: React.MouseEvent | React.TouchEvent, projectId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        setDeletingId(projectId);
+        setLongPressProgress(0);
+
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += 10;
+            setLongPressProgress(progress);
+
+            if (progress >= 100) {
+                clearInterval(interval);
+                handleDeleteProject(projectId);
+                setDeletingId(null);
+                setLongPressProgress(0);
+            }
+        }, 100); // Update every 100ms for smooth animation
+
+        setLongPressTimer(interval as any);
+    };
+
+    const handleLongPressEnd = () => {
+        if (longPressTimer) {
+            clearInterval(longPressTimer);
+            setLongPressTimer(null);
+        }
+        setDeletingId(null);
+        setLongPressProgress(0);
     };
 
     const formatDate = (timestamp: any) => {
@@ -115,69 +164,101 @@ export default function ProjectDashboard() {
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {projects.map((project) => (
-                                <Link
-                                    key={project.id}
-                                    href={`/free-test/${project.id}`}
-                                    className="group bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 hover:border-violet-500 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-violet-500/20"
-                                >
-                                    <div className="flex items-start justify-between mb-4">
-                                        <div className="text-4xl">🎬</div>
-                                        <div className="text-xs text-gray-500">
-                                            {formatDate(project.updatedAt || project.createdAt)}
+                                <div key={project.id} className="relative group">
+                                    {/* Delete Button with Long-press */}
+                                    <button
+                                        onMouseDown={(e) => handleLongPressStart(e, project.id)}
+                                        onMouseUp={handleLongPressEnd}
+                                        onMouseLeave={handleLongPressEnd}
+                                        onTouchStart={(e) => handleLongPressStart(e, project.id)}
+                                        onTouchEnd={handleLongPressEnd}
+                                        className="absolute top-4 right-4 z-20 w-10 h-10 bg-red-600/80 hover:bg-red-600 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+                                        title="長按一秒刪除"
+                                    >
+                                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+
+                                        {/* Progress Ring */}
+                                        {deletingId === project.id && (
+                                            <svg className="absolute inset-0 w-full h-full -rotate-90">
+                                                <circle
+                                                    cx="20"
+                                                    cy="20"
+                                                    r="18"
+                                                    stroke="white"
+                                                    strokeWidth="3"
+                                                    fill="none"
+                                                    strokeDasharray={`${2 * Math.PI * 18}`}
+                                                    strokeDashoffset={`${2 * Math.PI * 18 * (1 - longPressProgress / 100)}`}
+                                                    className="transition-all duration-100"
+                                                />
+                                            </svg>
+                                        )}
+                                    </button>
+
+                                    <Link
+                                        href={`/free-test/${project.id}`}
+                                        className="block bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 hover:border-violet-500 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-violet-500/20"
+                                    >
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="text-4xl">🎬</div>
+                                            <div className="text-xs text-gray-500">
+                                                {formatDate(project.updatedAt || project.createdAt)}
+                                            </div>
                                         </div>
-                                    </div>
-                                    <h3 className="text-xl font-bold text-white mb-2 group-hover:text-violet-400 transition-colors">
-                                        {project.name}
-                                    </h3>
-                                    <p className="text-sm text-gray-400">
-                                        建立於 {formatDate(project.createdAt)}
-                                    </p>
-                                </Link>
+                                        <h3 className="text-xl font-bold text-white mb-2 group-hover:text-violet-400 transition-colors">
+                                            {project.name}
+                                        </h3>
+                                        <p className="text-sm text-gray-400">
+                                            建立於 {formatDate(project.createdAt)}
+                                        </p>
+                                    </Link>
                             ))}
+                                </div>
+                            )}
                         </div>
-                    )}
-                </div>
             </div>
 
-            {/* Create Project Modal */}
-            {showNameModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-                    <div className="bg-gray-800 rounded-2xl p-8 w-full max-w-md mx-4 border border-gray-700 shadow-2xl">
-                        <h3 className="text-2xl font-bold text-white mb-2 text-center">建立新專案</h3>
-                        <p className="text-gray-400 text-sm text-center mb-6">請輸入專案名稱</p>
+                {/* Create Project Modal */}
+                {showNameModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                        <div className="bg-gray-800 rounded-2xl p-8 w-full max-w-md mx-4 border border-gray-700 shadow-2xl">
+                            <h3 className="text-2xl font-bold text-white mb-2 text-center">建立新專案</h3>
+                            <p className="text-gray-400 text-sm text-center mb-6">請輸入專案名稱</p>
 
-                        <input
-                            type="text"
-                            value={newProjectName}
-                            onChange={(e) => setNewProjectName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleCreateProject()}
-                            placeholder="專案名稱..."
-                            autoFocus
-                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 mb-6"
-                        />
+                            <input
+                                type="text"
+                                value={newProjectName}
+                                onChange={(e) => setNewProjectName(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleCreateProject()}
+                                placeholder="專案名稱..."
+                                autoFocus
+                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 mb-6"
+                            />
 
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => {
-                                    setShowNameModal(false);
-                                    setNewProjectName('');
-                                }}
-                                disabled={creating}
-                                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-lg transition-colors disabled:opacity-50"
-                            >
-                                取消
-                            </button>
-                            <button
-                                onClick={handleCreateProject}
-                                disabled={creating || !newProjectName.trim()}
-                                className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-3 rounded-lg font-semibold transition-colors disabled:opacity-50"
-                            >
-                                {creating ? '建立中...' : '確認'}
-                            </button>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowNameModal(false);
+                                        setNewProjectName('');
+                                    }}
+                                    disabled={creating}
+                                    className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    onClick={handleCreateProject}
+                                    disabled={creating || !newProjectName.trim()}
+                                    className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-3 rounded-lg font-semibold transition-colors disabled:opacity-50"
+                                >
+                                    {creating ? '建立中...' : '確認'}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
         </main>
     );
 }

@@ -1,6 +1,6 @@
 
 import { db } from './firebase';
-import { collection, addDoc, doc, getDoc, setDoc, updateDoc, query, orderBy, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, setDoc, updateDoc, deleteDoc, query, orderBy, getDocs, serverTimestamp } from 'firebase/firestore';
 import type { StageObject, CameraView, ContentTexture } from '@/store/useStore';
 
 export interface ProjectState {
@@ -127,6 +127,19 @@ export const ProjectService = {
             return projects;
         } catch (error) {
             console.error('Error listing projects:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Delete a project by ID
+     */
+    async deleteProject(id: string): Promise<void> {
+        try {
+            const docRef = doc(db, 'projects', id);
+            await deleteDoc(docRef);
+        } catch (error) {
+            console.error('Error deleting project:', error);
             throw error;
         }
     }
