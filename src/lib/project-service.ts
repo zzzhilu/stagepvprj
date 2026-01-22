@@ -1,6 +1,6 @@
 
 import { db } from './firebase';
-import { collection, addDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, setDoc, updateDoc, query, orderBy, getDocs, serverTimestamp } from 'firebase/firestore';
 import type { StageObject, CameraView, ContentTexture } from '@/store/useStore';
 
 export interface ProjectState {
@@ -11,9 +11,43 @@ export interface ProjectState {
     activeViewId: string | null;
     activeContentId: string | null;
     createdAt?: any;
+    updatedAt?: any;
+}
+
+export interface ProjectSummary {
+    id: string;
+    name: string;
+    createdAt: any;
+    updatedAt: any;
 }
 
 export const ProjectService = {
+    /**
+     * Create a new project with a given name
+     * @returns The ID of the created project
+     */
+    async createProject(name: string): Promise<string> {
+        try {
+            const projectsRef = collection(db, 'projects');
+            const initialState: ProjectState = {
+                name,
+                stageObjects: [],
+                views: [],
+                contentTextures: [],
+                activeViewId: null,
+                activeContentId: null,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            };
+
+            const docRef = await addDoc(projectsRef, initialState);
+            return docRef.id;
+        } catch (error) {
+            console.error('Error creating project:', error);
+            throw error;
+        }
+    },
+
     /**
      * Save the current project state to Firestore
      * @returns The ID of the created document
@@ -24,10 +58,27 @@ export const ProjectService = {
             const docRef = await addDoc(projectsRef, {
                 ...state,
                 createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
             });
             return docRef.id;
         } catch (error) {
             console.error('Error saving project:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Update an existing project
+     */
+    async updateProject(id: string, state: Partial<ProjectState>): Promise<void> {
+        try {
+            const docRef = doc(db, 'projects', id);
+            await updateDoc(docRef, {
+                ...state,
+                updatedAt: serverTimestamp(),
+            });
+        } catch (error) {
+            console.error('Error updating project:', error);
             throw error;
         }
     },
@@ -42,7 +93,6 @@ export const ProjectService = {
 
             if (docSnap.exists()) {
                 const data = docSnap.data() as ProjectState;
-                // Convert timestamps if necessary, but for our state pure JSON is fine
                 return data;
             } else {
                 console.warn('No such project document!');
@@ -50,6 +100,33 @@ export const ProjectService = {
             }
         } catch (error) {
             console.error('Error loading project:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * List all projects (returns summary info only)
+     */
+    async listProjects(): Promise<ProjectSummary[]> {
+        try {
+            const projectsRef = collection(db, 'projects');
+            const q = query(projectsRef, orderBy('createdAt', 'desc'));
+            const querySnapshot = await getDocs(q);
+
+            const projects: ProjectSummary[] = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                projects.push({
+                    id: doc.id,
+                    name: data.name || 'Unnamed Project',
+                    createdAt: data.createdAt,
+                    updatedAt: data.updatedAt,
+                });
+            });
+
+            return projects;
+        } catch (error) {
+            console.error('Error listing projects:', error);
             throw error;
         }
     }

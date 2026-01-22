@@ -99,6 +99,11 @@ interface State {
 
     setLoading: (loading: boolean, message?: string) => void;
     loadState: (state: Partial<State>) => void;
+
+    // Batch setters for loading project data
+    setStageObjects: (objects: StageObject[]) => void;
+    setViews: (views: CameraView[]) => void;
+    setContentTextures: (textures: ContentTexture[]) => void;
 }
 
 export const useStore = create<State>()(
@@ -187,6 +192,11 @@ export const useStore = create<State>()(
                 ...newState,
                 // Ensure we don't accidentally overwrite unrelated UI state if not provided
             })),
+
+            // Batch setters for loading project data
+            setStageObjects: (objects) => set({ stageObjects: objects }),
+            setViews: (views) => set({ views }),
+            setContentTextures: (textures) => set({ contentTextures: textures }),
         }),
         {
             name: 'stage-preview-storage', // localStorage key
