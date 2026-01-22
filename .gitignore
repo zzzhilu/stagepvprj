@@ -29,6 +29,9 @@ yarn-error.log*
 # Vercel
 .vercel
 
+# User uploaded models (stored in cloud)
+public/models/
+
 # IDE
 .idea/
 .vscode/
