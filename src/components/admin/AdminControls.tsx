@@ -113,6 +113,30 @@ export default function AdminControls({ projectName }: { projectName?: string })
     const [expandedSection, setExpandedSection] = useState<'models' | 'videos' | 'views' | 'lighting'>('models');
     const [shareToast, setShareToast] = useState(false);
 
+    const setLoading = useStore((state) => state.setLoading);
+
+    const handleShare = async () => {
+        setLoading(true, '正在建立分享連結...');
+
+        try {
+            // Since we are already in a persistent project (free-test/[id]), 
+            // we just generate a link to the current project ID.
+            // The name will be loaded dynamically from the DB by the viewer.
+
+            const shareUrl = `${window.location.origin}/free-test/${projectId}?share=1`;
+
+            await navigator.clipboard.writeText(shareUrl);
+            setShareToast(true);
+            setTimeout(() => setShareToast(false), 2000);
+
+        } catch (error) {
+            console.error('Share failed:', error);
+            alert('分享失敗，請稍後再試。');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const toggleSection = (section: 'models' | 'videos' | 'views' | 'lighting') => {
         setExpandedSection(expandedSection === section ? section : section);
     };
