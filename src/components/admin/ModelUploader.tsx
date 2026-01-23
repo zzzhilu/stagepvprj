@@ -53,6 +53,7 @@ export function ModelUploader() {
                 return 'polishedAluminum';
             case 'static_LED':
             case 'moving_LED':
+            case 'moving_prop':
                 return 'emissive';
             default:
                 return 'matteMetal';
@@ -64,6 +65,7 @@ export function ModelUploader() {
         const lowerName = name.toLowerCase();
 
         if (lowerName.includes('moving') && lowerName.includes('led')) return 'moving_LED';
+        if (lowerName.includes('moving') && lowerName.includes('prop')) return 'moving_prop';
         if (lowerName.includes('static') && lowerName.includes('led')) return 'static_LED';
         if (lowerName.includes('stage')) return 'stage';
         if (lowerName.includes('venue')) return 'venues';
@@ -224,23 +226,45 @@ export function ModelUploader() {
             console.log('Model uploaded to:', cloudUrl);
 
             // Create StageObject for each type using cloud URL
+            // Create StageObject for each type using cloud URL
             parsedModels.forEach(parsed => {
-                const newObject = {
-                    id: `obj_${parsed.type}_${Date.now()}`,
-                    model_path: cloudUrl,
-                    material_id: getDefaultMaterial(parsed.type),
-                    type: parsed.type,
-                    meshNames: parsed.meshes.map(m => m.name),
-                    instances: [
-                        {
-                            pos: [0, 0, 0] as [number, number, number],
-                            rot: [0, 0, 0] as [number, number, number],
-                            scale: [1, 1, -1] as [number, number, number]
-                        }
-                    ]
-                };
-
-                addObject(newObject);
+                // For moving objects (LEDs or props), create individual controllable objects for EACH mesh
+                if (parsed.type === 'moving_LED' || parsed.type === 'moving_prop') {
+                    parsed.meshes.forEach(mesh => {
+                        const newObject = {
+                            id: mesh.name, // Use the actual mesh name (e.g., "moving led 1") as ID
+                            model_path: cloudUrl,
+                            material_id: getDefaultMaterial(parsed.type),
+                            type: parsed.type,
+                            meshNames: [mesh.name], // Filter to ONLY show this specific mesh
+                            instances: [
+                                {
+                                    pos: [0, 0, 0] as [number, number, number],
+                                    rot: [0, 0, 0] as [number, number, number],
+                                    scale: [1, 1, -1] as [number, number, number]
+                                }
+                            ]
+                        };
+                        addObject(newObject);
+                    });
+                } else {
+                    // For static objects (venues, stage), keep them aggregated as one object
+                    const newObject = {
+                        id: `obj_${parsed.type}_${Date.now()}`,
+                        model_path: cloudUrl,
+                        material_id: getDefaultMaterial(parsed.type),
+                        type: parsed.type,
+                        meshNames: parsed.meshes.map(m => m.name),
+                        instances: [
+                            {
+                                pos: [0, 0, 0] as [number, number, number],
+                                rot: [0, 0, 0] as [number, number, number],
+                                scale: [1, 1, -1] as [number, number, number]
+                            }
+                        ]
+                    };
+                    addObject(newObject);
+                }
             });
 
             // Clear the UI
@@ -336,6 +360,7 @@ export function ModelUploader() {
         'stage': '舞台 (Stage)',
         'static_LED': '靜態LED (Static LED)',
         'moving_LED': '移動LED (Moving LED)',
+        'moving_prop': '移動道具 (Moving Prop)',
         'basic_camera': '攝影機 (Camera)'
     };
 

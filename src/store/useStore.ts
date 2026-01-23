@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import type { MaterialId } from '@/lib/materials';
 
 // Types based on SAD 5.1 & 5.2
-export type ModelType = 'venues' | 'stage' | 'static_LED' | 'moving_LED' | 'basic_camera';
+export type ModelType = 'venues' | 'stage' | 'static_LED' | 'moving_LED' | 'moving_prop' | 'basic_camera';
 
 export interface Instance {
     pos: [number, number, number];
