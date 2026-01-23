@@ -49,7 +49,10 @@ function computeWorldTransform(
     return { pos: worldPos, rot: worldRot, scale: inst.scale };
 }
 
-export const StageObjectRenderer = forwardRef<THREE.Group, { object: StageObject }>(({ object }, forwardedRef) => {
+export const StageObjectRenderer = forwardRef<THREE.Group, {
+    object: StageObject;
+    onClick?: (e: any) => void;
+}>(({ object, onClick }, forwardedRef) => {
     const renderMode = useStore((state) => state.renderMode);
     const contentTextures = useStore((state) => state.contentTextures);
     const activeContentId = useStore((state) => state.activeContentId);
@@ -279,7 +282,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, { object: StageObject
     });
 
     return (
-        <group ref={groupRef} scale={worldTransform.scale}>
+        <group ref={groupRef} scale={worldTransform.scale} onClick={onClick}>
             {meshNodes.map((node) => {
                 const geometry = node.geometry.clone();
 

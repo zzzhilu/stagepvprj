@@ -157,16 +157,16 @@ export function SceneGraph() {
                             </mesh>
                         }
                     >
-                        <group
+                        <StageObjectRenderer
+                            ref={objRef}
+                            object={obj}
                             onClick={(e: ThreeEvent<MouseEvent>) => {
                                 if (mode === 'admin') {
                                     e.stopPropagation();
                                     setSelectedObject(obj.id);
                                 }
                             }}
-                        >
-                            <StageObjectRenderer ref={objRef} object={obj} />
-                        </group>
+                        />
                     </ErrorBoundary>
                 );
             })}
