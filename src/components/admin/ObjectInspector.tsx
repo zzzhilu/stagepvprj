@@ -61,7 +61,17 @@ export function ObjectInspector() {
 
     // Get object display name
     const getObjectName = (obj: StageObject) => {
-        return obj.model_path.split('/').pop()?.replace('.glb', '') || `Object ${obj.id.slice(0, 6)}`;
+        // If ID is not an auto-generated one (starting with obj_), use it as the name
+        // This covers the case of "moving led 1" etc.
+        if (!obj.id.startsWith('obj_')) {
+            return obj.id;
+        }
+        // Fallback to filename from URL for generic objects
+        try {
+            return decodeURIComponent(obj.model_path).split('/').pop()?.split('?')[0].replace('.glb', '') || `Object ${obj.id.slice(0, 6)}`;
+        } catch (e) {
+            return `Object ${obj.id.slice(0, 6)}`;
+        }
     };
 
     if (stageObjects.length === 0) {
