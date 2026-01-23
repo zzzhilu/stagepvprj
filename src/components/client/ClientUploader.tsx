@@ -198,8 +198,11 @@ export function ClientUploader() {
                 {/* Tooltip - Below and to the right */}
                 {showTooltip && (
                     <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-gray-900/95 text-white text-xs rounded-lg shadow-lg whitespace-nowrap backdrop-blur-sm border border-gray-700/50">
-                        <div className="font-medium mb-1">格式：PNG / JPG / MP4 / M4V</div>
-                        <div className="text-gray-400">檔案只存於本地，不上傳雲端</div>
+                        <div className="font-medium mb-1">Format: PNG/JPG/MP4/M4V</div>
+                        <div className="text-gray-400 leading-tight">
+                            Local processing only. No file uploads.<br />
+                            檔案僅在本地處理，不會上傳。
+                        </div>
                         {/* Arrow - Points up */}
                         <div className="absolute bottom-full left-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-gray-900/95" />
                     </div>
