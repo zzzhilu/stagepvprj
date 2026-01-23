@@ -10,6 +10,7 @@ export interface ProjectState {
     contentTextures: ContentTexture[];
     activeViewId: string | null;
     activeContentId: string | null;
+    cues?: any[]; // Store cues
     createdAt?: any;
     updatedAt?: any;
 }

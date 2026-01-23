@@ -100,6 +100,7 @@ function ProjectEditorContent() {
     const setContentTextures = useStore(state => state.setContentTextures);
     const setActiveView = useStore(state => state.setActiveView);
     const setActiveContent = useStore(state => state.setActiveContent);
+    const setCues = useStore(state => state.setCues); // [NEW]
 
     // Current state for auto-save
     const stageObjects = useStore(state => state.stageObjects);
@@ -107,6 +108,7 @@ function ProjectEditorContent() {
     const contentTextures = useStore(state => state.contentTextures);
     const activeViewId = useStore(state => state.activeViewId);
     const activeContentId = useStore(state => state.activeContentId);
+    const cues = useStore(state => state.cues); // [NEW]
 
     useEffect(() => {
         // Share mode bypasses auth
@@ -140,6 +142,7 @@ function ProjectEditorContent() {
                 if (data.contentTextures) setContentTextures(data.contentTextures);
                 if (data.activeViewId) setActiveView(data.activeViewId);
                 if (data.activeContentId) setActiveContent(data.activeContentId);
+                if (data.cues) setCues(data.cues); // [NEW]
             }
         } catch (error) {
             console.error('Failed to load project:', error);
@@ -161,6 +164,7 @@ function ProjectEditorContent() {
                     contentTextures,
                     activeViewId,
                     activeContentId,
+                    cues, // [NEW]
                 });
             } catch (error) {
                 console.error('Auto-save failed:', error);
@@ -168,7 +172,7 @@ function ProjectEditorContent() {
         }, 2000); // Debounce 2 seconds
 
         return () => clearTimeout(timeoutId);
-    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, isAuthenticated, isShareMode, isLoading, projectId]);
+    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, isAuthenticated, isShareMode, isLoading, projectId]);
 
     // Show loading while checking auth
     if (isChecking) {
@@ -193,8 +197,8 @@ function ProjectEditorContent() {
             {/* Project Name Display - Share mode only - Bottom Right */}
             {isShareMode && currentProjectName && (
                 <div className="absolute bottom-6 right-6 z-50 pointer-events-none">
-                    <div className="bg-black/40 backdrop-blur-md px-6 py-3 rounded-full border border-white/10 shadow-lg">
-                        <span className="text-white/90 font-medium tracking-wide text-lg">{currentProjectName}</span>
+                    <div className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-lg">
+                        <span className="text-white/90 font-medium tracking-wide text-sm">{currentProjectName}</span>
                     </div>
                 </div>
             )}
