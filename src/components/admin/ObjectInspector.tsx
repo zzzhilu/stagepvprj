@@ -49,169 +49,204 @@ function LinkToParentDropdown({
     );
 }
 
-export default function ObjectInspector() {
-    const selectedObjectId = useStore((state) => state.selectedObjectId);
+export function ObjectInspector() {
     const stageObjects = useStore((state) => state.stageObjects);
-    const updateObjectTransform = useStore((state) => state.updateObjectTransform);
+    const selectedObjectId = useStore((state) => state.selectedObjectId);
+    const setSelectedObject = useStore((state) => state.setSelectedObject);
     const transformMode = useStore((state) => state.transformMode);
     const setTransformMode = useStore((state) => state.setTransformMode);
+    const updateObjectTransform = useStore((state) => state.updateObjectTransform);
 
-    // Local state for inputs to avoid stuttering while typing
-    const [localTransform, setLocalTransform] = useState<{
-        pos: [number, number, number];
-        rot: [number, number, number];
-        scale: [number, number, number];
-    } | null>(null);
+    const selectedObject = stageObjects.find(o => o.id === selectedObjectId);
 
-    const selectedObject = stageObjects.find(obj => obj.id === selectedObjectId);
+    // Get object display name
+    const getObjectName = (obj: StageObject) => {
+        return obj.model_path.split('/').pop()?.replace('.glb', '') || `Object ${obj.id.slice(0, 6)}`;
+    };
 
-    // Sync local state when selection changes or store updates (if not editing)
-    useEffect(() => {
-        if (selectedObject && selectedObject.instances[0]) {
-            const inst = selectedObject.instances[0];
-            setLocalTransform({
-                pos: [...inst.pos],
-                rot: [...inst.rot],
-                scale: [...inst.scale]
-            });
-        } else {
-            setLocalTransform(null);
-        }
-    }, [selectedObject, selectedObjectId]); // Depend on selectedObject deep change? No, just reference.
-
-    // We also need to listen to store updates if gizmo moves it. 
-    // Since useStore returns a new object reference on update, useEffect [selectedObject] should handle it.
-
-    if (!selectedObjectId || !selectedObject || !localTransform) {
+    if (stageObjects.length === 0) {
         return (
-            <div className="p-4 text-gray-500 text-sm italic text-center">
-                尚未選取物件
-                <br />
-                請點擊場景中的模型
+            <div className="bg-gray-900 rounded-lg p-4 space-y-3">
+                <h3 className="text-sm font-bold text-white">物件屬性 (Object Inspector)</h3>
+                <p className="text-xs text-gray-500">尚未載入任何模型</p>
             </div>
         );
     }
 
-    const handleChange = (type: 'pos' | 'rot' | 'scale', axis: 0 | 1 | 2, value: string) => {
-        const numVal = parseFloat(value);
-        if (isNaN(numVal)) return;
-
-        const newTrans = { ...localTransform };
-
-        if (type === 'rot') {
-            // Convert degrees to radians for storage? 
-            // The store likely uses radians for Three.js. 
-            // Wait, existing code usually works with radians in Three.js but degrees in UI.
-            // Let's assume store uses Radians (standard). UI shows Degrees.
-            const rad = numVal * (Math.PI / 180);
-            newTrans[type][axis] = rad;
-        } else {
-            newTrans[type][axis] = numVal;
-        }
-
-        setLocalTransform(newTrans);
-        updateObjectTransform(selectedObjectId, newTrans.pos, newTrans.rot, newTrans.scale);
-    };
-
-    const toDegrees = (rad: number) => Math.round(rad * (180 / Math.PI));
-
     return (
-        <div className="p-4 space-y-6 bg-gray-900 rounded-lg border border-gray-700">
-            <div>
-                <h3 className="text-white font-bold mb-1 truncate" title={selectedObject.id}>
-                    {selectedObject.model_path.split('/').pop()?.replace('.glb', '') || '未命名物件'}
-                </h3>
-                <p className="text-xs text-gray-500">ID: {selectedObject.id.slice(0, 8)}</p>
-            </div>
+        <div className="bg-gray-900 rounded-lg p-4 space-y-3">
+            <h3 className="text-sm font-bold text-white">物件屬性 (Object Inspector)</h3>
 
-            {/* Transform Modes */}
-            <div className="flex gap-2 p-1 bg-gray-800 rounded-lg">
-                <button
-                    onClick={() => setTransformMode('translate')}
-                    className={`flex-1 py-1 text-xs font-semibold rounded ${transformMode === 'translate' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-white'
-                        }`}
-                >
-                    移動 (T)
-                </button>
-                <button
-                    onClick={() => setTransformMode('rotate')}
-                    className={`flex-1 py-1 text-xs font-semibold rounded ${transformMode === 'rotate' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-white'
-                        }`}
-                >
-                    旋轉 (R)
-                </button>
-                <button
-                    onClick={() => setTransformMode('scale')}
-                    className={`flex-1 py-1 text-xs font-semibold rounded ${transformMode === 'scale' ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-white'
-                        }`}
-                >
-                    縮放 (S)
-                </button>
-            </div>
-
-            {/* Position */}
+            {/* Object List */}
             <div className="space-y-2">
-                <label className="text-xs text-gray-400 font-bold">位置 (Position)</label>
-                <div className="grid grid-cols-3 gap-2">
-                    {['X', 'Y', 'Z'].map((axis, i) => (
-                        <div key={axis} className="relative">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 font-bold">{axis}</span>
-                            <input
-                                type="number"
-                                step={1}
-                                value={Math.round(localTransform.pos[i] * 100) / 100} // Round for display
-                                onChange={(e) => handleChange('pos', i as 0 | 1 | 2, e.target.value)}
-                                className="w-full bg-gray-800 border border-gray-600 rounded px-2 pl-6 py-1 text-xs text-white focus:border-violet-500 outline-none"
-                            />
-                        </div>
+                <label className="text-xs text-gray-400 font-bold">選擇物件 (Select Object)</label>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {stageObjects.map((obj) => (
+                        <button
+                            key={obj.id}
+                            onClick={() => setSelectedObject(obj.id)}
+                            className={`w-full text-left px-3 py-2 rounded text-xs transition-colors ${selectedObjectId === obj.id
+                                ? 'bg-violet-600 text-white'
+                                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                                }`}
+                        >
+                            <div className="flex items-center justify-between">
+                                <span className="font-medium">{getObjectName(obj)}</span>
+                                {obj.parentId && (
+                                    <span className="text-[10px] opacity-60">🔗 已連結</span>
+                                )}
+                            </div>
+                        </button>
                     ))}
                 </div>
             </div>
 
-            {/* Rotation */}
-            <div className="space-y-2">
-                <label className="text-xs text-gray-400 font-bold">旋轉 (Rotation °)</label>
-                <div className="grid grid-cols-3 gap-2">
-                    {['X', 'Y', 'Z'].map((axis, i) => (
-                        <div key={axis} className="relative">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 font-bold">{axis}</span>
-                            <input
-                                type="number"
-                                step={1}
-                                value={toDegrees(localTransform.rot[i])}
-                                onChange={(e) => handleChange('rot', i as 0 | 1 | 2, e.target.value)}
-                                className="w-full bg-gray-800 border border-gray-600 rounded px-2 pl-6 py-1 text-xs text-white focus:border-violet-500 outline-none"
-                            />
+            {/* Selected Object Details */}
+            {selectedObject && selectedObject.instances[0] && (
+                <>
+                    <div className="border-t border-gray-700 pt-3 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-bold text-violet-400">
+                                {getObjectName(selectedObject)}
+                            </h4>
                         </div>
-                    ))}
-                </div>
-            </div>
 
-            {/* Scale */}
-            <div className="space-y-2">
-                <label className="text-xs text-gray-400 font-bold">縮放 (Scale)</label>
-                <div className="grid grid-cols-3 gap-2">
-                    {['X', 'Y', 'Z'].map((axis, i) => (
-                        <div key={axis} className="relative">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 font-bold">{axis}</span>
-                            <input
-                                type="number"
-                                step={0.1}
-                                value={Math.round(localTransform.scale[i] * 100) / 100}
-                                onChange={(e) => handleChange('scale', i as 0 | 1 | 2, e.target.value)}
-                                className="w-full bg-gray-800 border border-gray-600 rounded px-2 pl-6 py-1 text-xs text-white focus:border-violet-500 outline-none"
-                            />
+                        {/* Transform Mode Toggle */}
+                        <div className="flex gap-1 bg-gray-800 p-1 rounded">
+                            <button
+                                onClick={() => setTransformMode('translate')}
+                                className={`flex-1 px-2 py-1 text-[10px] rounded transition-colors ${transformMode === 'translate'
+                                    ? 'bg-violet-600 text-white'
+                                    : 'text-gray-400 hover:text-white'
+                                    }`}
+                            >
+                                移動
+                            </button>
+                            <button
+                                onClick={() => setTransformMode('rotate')}
+                                className={`flex-1 px-2 py-1 text-[10px] rounded transition-colors ${transformMode === 'rotate'
+                                    ? 'bg-violet-600 text-white'
+                                    : 'text-gray-400 hover:text-white'
+                                    }`}
+                            >
+                                旋轉
+                            </button>
+                            <button
+                                onClick={() => setTransformMode('scale')}
+                                className={`flex-1 px-2 py-1 text-[10px] rounded transition-colors ${transformMode === 'scale'
+                                    ? 'bg-violet-600 text-white'
+                                    : 'text-gray-400 hover:text-white'
+                                    }`}
+                            >
+                                縮放
+                            </button>
                         </div>
-                    ))}
-                </div>
-            </div>
 
-            {/* Link to Parent */}
-            <LinkToParentDropdown
-                selectedObjectId={selectedObjectId}
-                stageObjects={stageObjects}
-                currentParentId={selectedObject.parentId}
-            />
+                        {/* Position Controls */}
+                        <div className="space-y-2">
+                            <label className="text-xs text-gray-400 font-bold">位置 (Position)</label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {(['X', 'Y', 'Z'] as const).map((axis, idx) => (
+                                    <div key={axis} className="space-y-1">
+                                        <label className="text-[10px] text-gray-500">{axis}</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            value={selectedObject.instances[0].pos[idx].toFixed(2)}
+                                            onChange={(e) => {
+                                                const newPos = [...selectedObject.instances[0].pos] as [number, number, number];
+                                                newPos[idx] = parseFloat(e.target.value) || 0;
+                                                updateObjectTransform(
+                                                    selectedObject.id,
+                                                    newPos,
+                                                    selectedObject.instances[0].rot,
+                                                    selectedObject.instances[0].scale
+                                                );
+                                            }}
+                                            className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-violet-500 outline-none"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Rotation Controls */}
+                        <div className="space-y-2">
+                            <label className="text-xs text-gray-400 font-bold">旋轉 (Rotation °)</label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {(['X', 'Y', 'Z'] as const).map((axis, idx) => (
+                                    <div key={axis} className="space-y-1">
+                                        <label className="text-[10px] text-gray-500">{axis}</label>
+                                        <input
+                                            type="number"
+                                            step="1"
+                                            value={((selectedObject.instances[0].rot[idx] * 180) / Math.PI).toFixed(1)}
+                                            onChange={(e) => {
+                                                const degrees = parseFloat(e.target.value) || 0;
+                                                const radians = (degrees * Math.PI) / 180;
+                                                const newRot = [...selectedObject.instances[0].rot] as [number, number, number];
+                                                newRot[idx] = radians;
+                                                updateObjectTransform(
+                                                    selectedObject.id,
+                                                    selectedObject.instances[0].pos,
+                                                    newRot,
+                                                    selectedObject.instances[0].scale
+                                                );
+                                            }}
+                                            className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-violet-500 outline-none"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Scale Controls */}
+                        <div className="space-y-2">
+                            <label className="text-xs text-gray-400 font-bold">縮放 (Scale)</label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {(['X', 'Y', 'Z'] as const).map((axis, idx) => (
+                                    <div key={axis} className="space-y-1">
+                                        <label className="text-[10px] text-gray-500">{axis}</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            value={selectedObject.instances[0].scale[idx].toFixed(2)}
+                                            onChange={(e) => {
+                                                const newScale = [...selectedObject.instances[0].scale] as [number, number, number];
+                                                newScale[idx] = parseFloat(e.target.value) || 1;
+                                                updateObjectTransform(
+                                                    selectedObject.id,
+                                                    selectedObject.instances[0].pos,
+                                                    selectedObject.instances[0].rot,
+                                                    newScale
+                                                );
+                                            }}
+                                            className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-violet-500 outline-none"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Link to Parent */}
+                        <LinkToParentDropdown
+                            selectedObjectId={selectedObject.id}
+                            stageObjects={stageObjects}
+                            currentParentId={selectedObject.parentId}
+                        />
+                    </div>
+                </>
+            )}
+
+            {!selectedObject && (
+                <p className="text-xs text-gray-500 text-center py-4">
+                    請從上方列表選擇一個物件
+                </p>
+            )}
         </div>
     );
 }
+
+
+
+export default ObjectInspector;
