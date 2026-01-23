@@ -15,6 +15,8 @@ function ViewManager() {
     const removeView = useStore((state) => state.removeView);
     const setActiveView = useStore((state) => state.setActiveView);
     const activeViewId = useStore((state) => state.activeViewId);
+    const fov = useStore((state) => state.fov);
+    const setFov = useStore((state) => state.setFov);
 
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const deleteTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -43,6 +45,22 @@ function ViewManager() {
             >
                 📷 擷取當前視角
             </button>
+
+            {/* FOV Control */}
+            <div className="bg-gray-800 p-3 rounded mb-4">
+                <label className="text-xs text-gray-400 block mb-1 flex justify-between">
+                    <span>Field of View (FOV)</span>
+                    <span className="text-white">{Math.round(fov)}°</span>
+                </label>
+                <input
+                    type="range"
+                    min="10"
+                    max="120"
+                    value={fov}
+                    onChange={(e) => setFov(Number(e.target.value))}
+                    className="w-full accent-violet-500 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                />
+            </div>
 
             <div className="space-y-2">
                 {views.map((view, index) => (

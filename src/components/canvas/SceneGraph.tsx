@@ -31,6 +31,8 @@ export function SceneGraph() {
     const views = useStore((state) => state.views);
     const setActiveView = useStore((state) => state.setActiveView);
     const cameraRef = useRef<THREE.PerspectiveCamera>(null);
+    const fov = useStore((state) => state.fov);
+    const setFov = useStore((state) => state.setFov);
 
     // Create/update refs for all objects (using mutable ref objects)
     useEffect(() => {
@@ -60,6 +62,8 @@ export function SceneGraph() {
         endPos: THREE.Vector3;
         startTarget: THREE.Vector3;
         endTarget: THREE.Vector3;
+        startFov: number;
+        endFov: number;
     } | null>(null);
 
     // Initialize camera animation when view changes
@@ -77,7 +81,11 @@ export function SceneGraph() {
             endPos: new THREE.Vector3(...view.camera.position),
             startTarget: controlsRef.current.target.clone(),
             endTarget: new THREE.Vector3(...view.camera.target),
+            startFov: cameraRef.current.fov,
+            endFov: view.camera.fov,
         };
+        // Update store FOV immediately so UI reflects target
+        setFov(view.camera.fov);
     }, [activeViewId, views]);
 
     // Run animation in useFrame for sync with render loop
@@ -93,6 +101,11 @@ export function SceneGraph() {
 
         cameraRef.current.position.lerpVectors(anim.startPos, anim.endPos, ease);
         controlsRef.current.target.lerpVectors(anim.startTarget, anim.endTarget, ease);
+
+        // Lerp FOV
+        cameraRef.current.fov = THREE.MathUtils.lerp(anim.startFov, anim.endFov, ease);
+        cameraRef.current.updateProjectionMatrix();
+
         controlsRef.current.update();
 
         // Request next frame (for demand frameloop)
@@ -109,7 +122,7 @@ export function SceneGraph() {
                 ref={cameraRef}
                 makeDefault
                 position={[0, 5, 20]}
-                fov={50}
+                fov={fov}
             />
 
             {/* Free OrbitControls - full rotation freedom */}

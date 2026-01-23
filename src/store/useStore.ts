@@ -79,6 +79,7 @@ interface State {
     directionalIntensity: number;
     bloomIntensity: number;
     bloomThreshold: number;
+    fov: number; // [NEW] Global FOV state
 
     // Loading State
     isLoading: boolean;
@@ -122,6 +123,7 @@ interface State {
     setDirectionalIntensity: (intensity: number) => void;
     setBloomIntensity: (intensity: number) => void;
     setBloomThreshold: (threshold: number) => void;
+    setFov: (fov: number) => void; // [NEW]
     setVideoPlaying: (playing: boolean) => void;
     setVideoVolume: (volume: number) => void;
     setVideoCurrentTime: (time: number) => void;
@@ -161,6 +163,7 @@ export const useStore = create<State>()(
             directionalIntensity: 1.2,
             bloomIntensity: 0.3,
             bloomThreshold: 0.5,
+            fov: 50, // Default FOV
 
             selectedObjectId: null,
             transformMode: 'translate',
@@ -313,6 +316,7 @@ export const useStore = create<State>()(
             setDirectionalIntensity: (intensity) => set({ directionalIntensity: intensity }),
             setBloomIntensity: (intensity) => set({ bloomIntensity: intensity }),
             setBloomThreshold: (threshold) => set({ bloomThreshold: threshold }),
+            setFov: (fov) => set({ fov }),
             setVideoPlaying: (playing) => set({ videoPlaying: playing }),
             setVideoVolume: (volume) => set({ videoVolume: volume }),
             setVideoCurrentTime: (time) => set({ videoCurrentTime: time }),
@@ -362,6 +366,7 @@ export const useStore = create<State>()(
                 activeContentId: state.activeContentId,
                 cues: state.cues, // [NEW]
                 activeCueId: state.activeCueId, // [NEW]
+                fov: state.fov, // [NEW]
             }),
         }
     )
