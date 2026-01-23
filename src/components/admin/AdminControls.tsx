@@ -112,7 +112,7 @@ export default function AdminControls({ projectName }: { projectName?: string })
 
     const mode = useStore((state) => state.mode);
     const startMode = useStore((state) => state.setMode);
-    const [expandedSection, setExpandedSection] = useState<'models' | 'videos' | 'views' | 'lighting' | 'cues' | 'inspector'>('models');
+    const [expandedSections, setExpandedSections] = useState<string[]>(['models']);
     const [shareToast, setShareToast] = useState(false);
 
     const setLoading = useStore((state) => state.setLoading);
@@ -139,8 +139,12 @@ export default function AdminControls({ projectName }: { projectName?: string })
         }
     };
 
-    const toggleSection = (section: 'models' | 'videos' | 'views' | 'lighting' | 'cues' | 'inspector') => {
-        setExpandedSection(expandedSection === section ? section : section);
+    const toggleSection = (section: string) => {
+        setExpandedSections(prev =>
+            prev.includes(section)
+                ? prev.filter(s => s !== section)
+                : [...prev, section]
+        );
     };
 
     return (
@@ -200,7 +204,7 @@ export default function AdminControls({ projectName }: { projectName?: string })
                     >
                         <span className="font-semibold">📦 模型上傳</span>
                         <svg
-                            className={`w-5 h-5 transition-transform ${expandedSection === 'models' ? 'rotate-180' : ''}`}
+                            className={`w-5 h-5 transition-transform ${expandedSections.includes('models') ? 'rotate-180' : ''}`}
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -208,7 +212,7 @@ export default function AdminControls({ projectName }: { projectName?: string })
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    {expandedSection === 'models' && <ModelUploader />}
+                    {expandedSections.includes('models') && <ModelUploader />}
                 </div>
 
                 {/* Texture Uploader Section */}
@@ -219,7 +223,7 @@ export default function AdminControls({ projectName }: { projectName?: string })
                     >
                         <span className="font-semibold">🎨 內容輸入</span>
                         <svg
-                            className={`w-5 h-5 transition-transform ${expandedSection === 'videos' ? 'rotate-180' : ''}`}
+                            className={`w-5 h-5 transition-transform ${expandedSections.includes('videos') ? 'rotate-180' : ''}`}
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -227,7 +231,7 @@ export default function AdminControls({ projectName }: { projectName?: string })
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    {expandedSection === 'videos' && <TextureUploader />}
+                    {expandedSections.includes('videos') && <TextureUploader />}
                 </div>
 
                 {/* View Management Section */}
@@ -238,7 +242,7 @@ export default function AdminControls({ projectName }: { projectName?: string })
                     >
                         <span className="font-semibold">📷 視角管理</span>
                         <svg
-                            className={`w-5 h-5 transition-transform ${expandedSection === 'views' ? 'rotate-180' : ''}`}
+                            className={`w-5 h-5 transition-transform ${expandedSections.includes('views') ? 'rotate-180' : ''}`}
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -246,7 +250,7 @@ export default function AdminControls({ projectName }: { projectName?: string })
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    {expandedSection === 'views' && (
+                    {expandedSections.includes('views') && (
                         <div className="bg-gray-900 text-white rounded-lg p-4">
                             <ViewManager />
                         </div>
@@ -261,7 +265,7 @@ export default function AdminControls({ projectName }: { projectName?: string })
                     >
                         <span className="font-semibold">🎬 場景 (Cues)</span>
                         <svg
-                            className={`w-5 h-5 transition-transform ${expandedSection === 'cues' ? 'rotate-180' : ''}`}
+                            className={`w-5 h-5 transition-transform ${expandedSections.includes('cues') ? 'rotate-180' : ''}`}
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -269,7 +273,7 @@ export default function AdminControls({ projectName }: { projectName?: string })
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    {expandedSection === 'cues' && (
+                    {expandedSections.includes('cues') && (
                         <div className="bg-gray-900 text-white rounded-lg">
                             <CueManager />
                         </div>
@@ -284,7 +288,7 @@ export default function AdminControls({ projectName }: { projectName?: string })
                     >
                         <span className="font-semibold">🔧 物件屬性</span>
                         <svg
-                            className={`w-5 h-5 transition-transform ${expandedSection === 'inspector' ? 'rotate-180' : ''}`}
+                            className={`w-5 h-5 transition-transform ${expandedSections.includes('inspector') ? 'rotate-180' : ''}`}
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -292,7 +296,7 @@ export default function AdminControls({ projectName }: { projectName?: string })
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    {expandedSection === 'inspector' && (
+                    {expandedSections.includes('inspector') && (
                         <div className="bg-gray-900 text-white rounded-lg">
                             <ObjectInspector />
                         </div>
@@ -307,7 +311,7 @@ export default function AdminControls({ projectName }: { projectName?: string })
                     >
                         <span className="font-semibold">💡 全域照明</span>
                         <svg
-                            className={`w-5 h-5 transition-transform ${expandedSection === 'lighting' ? 'rotate-180' : ''}`}
+                            className={`w-5 h-5 transition-transform ${expandedSections.includes('lighting') ? 'rotate-180' : ''}`}
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -315,7 +319,7 @@ export default function AdminControls({ projectName }: { projectName?: string })
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    {expandedSection === 'lighting' && <LightingControls />}
+                    {expandedSections.includes('lighting') && <LightingControls />}
                 </div>
             </div>
         </div>

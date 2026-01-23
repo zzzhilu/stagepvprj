@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export type MaterialId = 'matteMetal' | 'blackPlastic' | 'polishedAluminum' | 'emissive';
+export type MaterialId = 'matteMetal' | 'blackPlastic' | 'polishedAluminum' | 'emissive' | 'matteGray' | 'matteLightGray' | 'reflectiveWhite' | 'translucentRefractive' | 'matteRed';
 
 export interface MaterialDefinition {
     id: MaterialId;
@@ -10,6 +10,8 @@ export interface MaterialDefinition {
     metalness: number;
     emissive?: string;
     emissiveIntensity?: number;
+    transparent?: boolean;
+    opacity?: number;
 }
 
 // 參數化 PBR 材質庫
@@ -43,6 +45,43 @@ export const MATERIAL_LIBRARY: Record<MaterialId, MaterialDefinition> = {
         metalness: 0.0,
         emissive: '#ffaa00',
         emissiveIntensity: 2.0
+    },
+    matteGray: {
+        id: 'matteGray',
+        name: 'Matte Gray',
+        color: '#666666',
+        roughness: 1.0,
+        metalness: 0.0
+    },
+    matteLightGray: {
+        id: 'matteLightGray',
+        name: 'Matte Light Gray',
+        color: '#cccccc',
+        roughness: 1.0,
+        metalness: 0.0
+    },
+    reflectiveWhite: {
+        id: 'reflectiveWhite',
+        name: 'Reflective White',
+        color: '#ffffff',
+        roughness: 0.1,
+        metalness: 0.5
+    },
+    translucentRefractive: {
+        id: 'translucentRefractive',
+        name: 'Translucent Refractive',
+        color: '#ffffff',
+        roughness: 0.1,
+        metalness: 0.1,
+        transparent: true,
+        opacity: 0.5
+    },
+    matteRed: {
+        id: 'matteRed',
+        name: 'Matte Red',
+        color: '#cc0000',
+        roughness: 1.0,
+        metalness: 0.0
     }
 };
 
@@ -57,6 +96,8 @@ export function createMaterial(materialId: MaterialId): THREE.MeshStandardMateri
         side: THREE.DoubleSide, // 雙面渲染，避免背面簍空
         emissive: def.emissive ? new THREE.Color(def.emissive) : new THREE.Color(0x000000),
         emissiveIntensity: def.emissiveIntensity || 0,
+        transparent: def.transparent || false,
+        opacity: def.opacity !== undefined ? def.opacity : 1.0
     });
 }
 
