@@ -2,7 +2,7 @@ import { useGLTF, Instances, Instance } from '@react-three/drei';
 import { StageObject, useStore } from '@/store/useStore';
 import * as THREE from 'three';
 import { createMaterial, MATERIAL_LIBRARY } from '@/lib/materials';
-import { useMemo, useEffect, useState, useRef } from 'react';
+import { useMemo, useEffect, useState, useRef, forwardRef } from 'react';
 import { globalVideoElement } from './VideoManager';
 import { useFrame } from '@react-three/fiber';
 
@@ -49,7 +49,7 @@ function computeWorldTransform(
     return { pos: worldPos, rot: worldRot, scale: inst.scale };
 }
 
-export function StageObjectRenderer({ object }: { object: StageObject }) {
+export const StageObjectRenderer = forwardRef<THREE.Group, { object: StageObject }>(({ object }, forwardedRef) => {
     const renderMode = useStore((state) => state.renderMode);
     const contentTextures = useStore((state) => state.contentTextures);
     const activeContentId = useStore((state) => state.activeContentId);
@@ -61,6 +61,17 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
     const currentPos = useRef(new THREE.Vector3());
     const currentRot = useRef(new THREE.Euler());
     const isInitialized = useRef(false);
+
+    // Merge forwarded ref with internal ref
+    useEffect(() => {
+        if (forwardedRef) {
+            if (typeof forwardedRef === 'function') {
+                forwardedRef(groupRef.current);
+            } else {
+                forwardedRef.current = groupRef.current;
+            }
+        }
+    }, [forwardedRef]);
 
     // Use useGLTF hook with Draco decoder path
     const gltfData = useGLTF(object.model_path, 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
@@ -285,4 +296,6 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
             })}
         </group>
     );
-}
+});
+
+StageObjectRenderer.displayName = 'StageObjectRenderer';

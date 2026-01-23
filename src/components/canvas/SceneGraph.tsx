@@ -5,7 +5,7 @@ import { CameraCapture } from './CameraCapture';
 import { VideoManager } from './VideoManager';
 import { EffectComposer, Bloom, SMAA } from '@react-three/postprocessing';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, createRef } from 'react';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
@@ -26,10 +26,30 @@ export function SceneGraph() {
 
     const controlsRef = useRef<OrbitControlsImpl>(null);
     const transformRef = useRef<any>(null);
+    const objectRefsRef = useRef<Map<string, { current: THREE.Group | null }>>(new Map());
     const activeViewId = useStore((state) => state.activeViewId);
     const views = useStore((state) => state.views);
     const setActiveView = useStore((state) => state.setActiveView);
     const cameraRef = useRef<THREE.PerspectiveCamera>(null);
+
+    // Create/update refs for all objects (using mutable ref objects)
+    useEffect(() => {
+        stageObjects.forEach(obj => {
+            if (!objectRefsRef.current.has(obj.id)) {
+                objectRefsRef.current.set(obj.id, { current: null });
+            }
+        });
+
+        // Clean up removed objects
+        const currentIds = new Set(stageObjects.map(o => o.id));
+        const keysToDelete: string[] = [];
+        objectRefsRef.current.forEach((_, key) => {
+            if (!currentIds.has(key)) {
+                keysToDelete.push(key);
+            }
+        });
+        keysToDelete.forEach(key => objectRefsRef.current.delete(key));
+    }, [stageObjects]);
 
     // Animation state refs (to avoid re-renders during animation)
     const animationRef = useRef<{
@@ -124,57 +144,55 @@ export function SceneGraph() {
             <hemisphereLight intensity={0.4} groundColor="#444" />
 
             {/* Stage Objects from Store */}
-            {stageObjects.map((obj) => (
-                <ErrorBoundary
-                    key={obj.id}
-                    fallback={
-                        <mesh position={obj.instances[0]?.pos || [0, 0, 0]}>
-                            <boxGeometry args={[1, 1, 1]} />
-                            <meshStandardMaterial color="red" wireframe />
-                        </mesh>
-                    }
-                >
-                    <group
-                        onClick={(e: ThreeEvent<MouseEvent>) => {
-                            if (mode === 'admin') {
-                                e.stopPropagation();
-                                setSelectedObject(obj.id);
-                            }
-                        }}
+            {stageObjects.map((obj) => {
+                const objRef = objectRefsRef.current.get(obj.id);
+
+                return (
+                    <ErrorBoundary
+                        key={obj.id}
+                        fallback={
+                            <mesh position={obj.instances[0]?.pos || [0, 0, 0]}>
+                                <boxGeometry args={[1, 1, 1]} />
+                                <meshStandardMaterial color="red" wireframe />
+                            </mesh>
+                        }
                     >
-                        <StageObjectRenderer object={obj} />
-                    </group>
-                </ErrorBoundary>
-            ))}
+                        <group
+                            onClick={(e: ThreeEvent<MouseEvent>) => {
+                                if (mode === 'admin') {
+                                    e.stopPropagation();
+                                    setSelectedObject(obj.id);
+                                }
+                            }}
+                        >
+                            <StageObjectRenderer ref={objRef} object={obj} />
+                        </group>
+                    </ErrorBoundary>
+                );
+            })}
 
             {/* TransformControls for Admin Mode */}
             {mode === 'admin' && selectedObjectId && (() => {
-                const selectedObj = stageObjects.find(o => o.id === selectedObjectId);
-                if (!selectedObj || !selectedObj.instances[0]) return null;
-
-                const inst = selectedObj.instances[0];
+                const objRef = objectRefsRef.current.get(selectedObjectId);
+                if (!objRef || !objRef.current) return null;
 
                 return (
                     <TransformControls
                         ref={transformRef}
+                        object={objRef.current}
                         mode={transformMode}
                         translationSnap={1}
                         rotationSnap={Math.PI / 180} // 1 degree
                         scaleSnap={0.1}
-                        position={inst.pos}
-                        rotation={inst.rot}
-                        scale={inst.scale}
                         onObjectChange={() => {
-                            if (transformRef.current) {
-                                const obj = transformRef.current.object;
-                                if (obj) {
-                                    updateObjectTransform(
-                                        selectedObjectId,
-                                        [obj.position.x, obj.position.y, obj.position.z],
-                                        [obj.rotation.x, obj.rotation.y, obj.rotation.z],
-                                        [obj.scale.x, obj.scale.y, obj.scale.z]
-                                    );
-                                }
+                            if (objRef.current) {
+                                const obj = objRef.current;
+                                updateObjectTransform(
+                                    selectedObjectId,
+                                    [obj.position.x, obj.position.y, obj.position.z],
+                                    [obj.rotation.x, obj.rotation.y, obj.rotation.z],
+                                    [obj.scale.x, obj.scale.y, obj.scale.z]
+                                );
                             }
                         }}
                         onMouseDown={() => {
