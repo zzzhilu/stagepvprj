@@ -13,7 +13,7 @@ export function CueSelector() {
     }
 
     return (
-        <div className="fixed bottom-40 left-4 z-40">
+        <div className="fixed bottom-32 left-4 z-40">
             {/* Label */}
             <div className="text-xs text-gray-500 mb-1 ml-1 font-medium">Cues</div>
 
