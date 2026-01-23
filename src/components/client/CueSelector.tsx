@@ -13,18 +13,22 @@ export function CueSelector() {
     }
 
     return (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
-            <div className="flex gap-2 bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
+        <div className="fixed bottom-28 left-4 z-40">
+            {/* Label */}
+            <div className="text-xs text-gray-500 mb-1 ml-1 font-medium">Cues</div>
+
+            <div className="flex gap-1">
                 {cues.map((cue) => (
                     <button
                         key={cue.id}
                         onClick={() => applyCue(cue.id)}
                         className={`
-                            min-w-[40px] h-10 px-3 rounded-full 
-                            text-sm font-medium transition-all duration-200
+                            min-w-[32px] h-8 px-2 rounded 
+                            text-xs font-medium transition-all duration-200
+                            backdrop-blur-sm
                             ${activeCueId === cue.id
-                                ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/30'
-                                : 'bg-white/10 text-white/80 hover:bg-white/20 hover:text-white'
+                                ? 'bg-gray-500/80 text-white ring-1 ring-white/20'
+                                : 'bg-gray-800/40 text-gray-400 hover:bg-gray-700/60 hover:text-white'
                             }
                         `}
                         title={`Cue ${cue.order}: ${cue.name}`}
