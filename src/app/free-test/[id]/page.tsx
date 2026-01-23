@@ -9,6 +9,7 @@ import { VideoControls } from '@/components/client/VideoControls';
 import { ViewSwitcher } from '@/components/client/ViewSwitcher';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ClientUploader } from '@/components/client/ClientUploader';
+import { CueSelector } from '@/components/client/CueSelector';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
 
@@ -209,6 +210,9 @@ function ProjectEditorContent() {
 
             {/* View Switcher - Always visible */}
             <ViewSwitcher />
+
+            {/* Cue Selector - Always visible */}
+            <CueSelector />
 
             {/* Client Uploader for Share Mode */}
             {isShareMode && <ClientUploader />}

@@ -1,11 +1,11 @@
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import { useStore } from '@/store/useStore';
+import { OrbitControls, PerspectiveCamera, TransformControls } from '@react-three/drei';
+import { useStore, StageObject } from '@/store/useStore';
 import { StageObjectRenderer } from './StageObjectRenderer';
 import { CameraCapture } from './CameraCapture';
 import { VideoManager } from './VideoManager';
 import { EffectComposer, Bloom, SMAA } from '@react-three/postprocessing';
-import { useFrame } from '@react-three/fiber';
-import { useRef, useEffect } from 'react';
+import { useFrame, ThreeEvent } from '@react-three/fiber';
+import { useRef, useEffect, useCallback } from 'react';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
@@ -17,7 +17,15 @@ export function SceneGraph() {
     const bloomIntensity = useStore((state) => state.bloomIntensity);
     const bloomThreshold = useStore((state) => state.bloomThreshold);
 
+    // Editor state for TransformControls
+    const mode = useStore((state) => state.mode);
+    const selectedObjectId = useStore((state) => state.selectedObjectId);
+    const setSelectedObject = useStore((state) => state.setSelectedObject);
+    const transformMode = useStore((state) => state.transformMode);
+    const updateObjectTransform = useStore((state) => state.updateObjectTransform);
+
     const controlsRef = useRef<OrbitControlsImpl>(null);
+    const transformRef = useRef<any>(null);
     const activeViewId = useStore((state) => state.activeViewId);
     const views = useStore((state) => state.views);
     const setActiveView = useStore((state) => state.setActiveView);
@@ -126,9 +134,60 @@ export function SceneGraph() {
                         </mesh>
                     }
                 >
-                    <StageObjectRenderer object={obj} />
+                    <group
+                        onClick={(e: ThreeEvent<MouseEvent>) => {
+                            if (mode === 'admin') {
+                                e.stopPropagation();
+                                setSelectedObject(obj.id);
+                            }
+                        }}
+                    >
+                        <StageObjectRenderer object={obj} />
+                    </group>
                 </ErrorBoundary>
             ))}
+
+            {/* TransformControls for Admin Mode */}
+            {mode === 'admin' && selectedObjectId && (() => {
+                const selectedObj = stageObjects.find(o => o.id === selectedObjectId);
+                if (!selectedObj || !selectedObj.instances[0]) return null;
+
+                const inst = selectedObj.instances[0];
+
+                return (
+                    <TransformControls
+                        ref={transformRef}
+                        mode={transformMode}
+                        translationSnap={1}
+                        rotationSnap={Math.PI / 180} // 1 degree
+                        scaleSnap={0.1}
+                        position={inst.pos}
+                        rotation={inst.rot}
+                        scale={inst.scale}
+                        onObjectChange={() => {
+                            if (transformRef.current) {
+                                const obj = transformRef.current.object;
+                                if (obj) {
+                                    updateObjectTransform(
+                                        selectedObjectId,
+                                        [obj.position.x, obj.position.y, obj.position.z],
+                                        [obj.rotation.x, obj.rotation.y, obj.rotation.z],
+                                        [obj.scale.x, obj.scale.y, obj.scale.z]
+                                    );
+                                }
+                            }
+                        }}
+                        onMouseDown={() => {
+                            // Disable OrbitControls while dragging
+                            if (controlsRef.current) controlsRef.current.enabled = false;
+                        }}
+                        onMouseUp={() => {
+                            // Re-enable OrbitControls
+                            if (controlsRef.current) controlsRef.current.enabled = true;
+                        }}
+                    />
+                );
+            })()}
 
             {/* Ground plane */}
             <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>

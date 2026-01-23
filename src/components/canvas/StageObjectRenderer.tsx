@@ -2,14 +2,66 @@ import { useGLTF, Instances, Instance } from '@react-three/drei';
 import { StageObject, useStore } from '@/store/useStore';
 import * as THREE from 'three';
 import { createMaterial, MATERIAL_LIBRARY } from '@/lib/materials';
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useState, useRef } from 'react';
 import { globalVideoElement } from './VideoManager';
+import { useFrame } from '@react-three/fiber';
+
+// Calculate lerp speed based on distance (0.5s - 1.5s)
+function calculateLerpSpeed(distance: number): number {
+    const minDuration = 0.5;
+    const maxDuration = 1.5;
+    const duration = Math.min(maxDuration, Math.max(minDuration, distance * 0.1));
+    return 1 / duration;
+}
+
+// Helper to compute final position with parent offset
+function computeWorldTransform(
+    object: StageObject,
+    allObjects: StageObject[]
+): { pos: [number, number, number]; rot: [number, number, number]; scale: [number, number, number] } {
+    const inst = object.instances[0] || { pos: [0, 0, 0], rot: [0, 0, 0], scale: [1, 1, 1] };
+
+    if (!object.parentId) {
+        return { pos: inst.pos, rot: inst.rot, scale: inst.scale };
+    }
+
+    const parent = allObjects.find(o => o.id === object.parentId);
+    if (!parent || !parent.instances[0]) {
+        return { pos: inst.pos, rot: inst.rot, scale: inst.scale };
+    }
+
+    const parentInst = parent.instances[0];
+
+    // Add parent offset to child position
+    const worldPos: [number, number, number] = [
+        parentInst.pos[0] + inst.pos[0],
+        parentInst.pos[1] + inst.pos[1],
+        parentInst.pos[2] + inst.pos[2]
+    ];
+
+    // Add parent rotation to child rotation
+    const worldRot: [number, number, number] = [
+        parentInst.rot[0] + inst.rot[0],
+        parentInst.rot[1] + inst.rot[1],
+        parentInst.rot[2] + inst.rot[2]
+    ];
+
+    return { pos: worldPos, rot: worldRot, scale: inst.scale };
+}
 
 export function StageObjectRenderer({ object }: { object: StageObject }) {
     const renderMode = useStore((state) => state.renderMode);
     const contentTextures = useStore((state) => state.contentTextures);
     const activeContentId = useStore((state) => state.activeContentId);
+    const stageObjects = useStore((state) => state.stageObjects);
     const [videoTexture, setVideoTexture] = useState<THREE.VideoTexture | null>(null);
+
+    // Animation refs for smooth lerping
+    const groupRef = useRef<THREE.Group>(null);
+    const currentPos = useRef(new THREE.Vector3());
+    const currentRot = useRef(new THREE.Euler());
+    const isInitialized = useRef(false);
+
     // Use useGLTF hook with Draco decoder path
     const gltfData = useGLTF(object.model_path, 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 
@@ -175,34 +227,59 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
         );
     }
 
-    return (
-        <group>
-            {meshNodes.map((node) => {
-                // Clone the geometry to ensure UV attributes are preserved
-                const geometry = node.geometry.clone();
+    // Compute target transform
+    const worldTransform = useMemo(() =>
+        computeWorldTransform(object, stageObjects),
+        [object, stageObjects]
+    );
 
-                // Log UV information for debugging
-                if (geometry.attributes.uv) {
-                    console.log(`Mesh ${node.name} has UV coordinates`);
-                } else {
-                    console.warn(`Mesh ${node.name} is missing UV coordinates`);
-                }
+    // Animate position/rotation using useFrame
+    useFrame((_, delta) => {
+        if (!groupRef.current) return;
+
+        const targetPos = new THREE.Vector3(...worldTransform.pos);
+        const targetRot = new THREE.Euler(...worldTransform.rot);
+
+        // Initialize on first frame
+        if (!isInitialized.current) {
+            currentPos.current.copy(targetPos);
+            currentRot.current.copy(targetRot);
+            groupRef.current.position.copy(targetPos);
+            groupRef.current.rotation.copy(targetRot);
+            isInitialized.current = true;
+            return;
+        }
+
+        // Calculate distance for speed adjustment
+        const distance = currentPos.current.distanceTo(targetPos);
+        const speed = calculateLerpSpeed(distance);
+        const lerpFactor = Math.min(1, speed * delta * 5);
+
+        // Lerp position
+        currentPos.current.lerp(targetPos, lerpFactor);
+        groupRef.current.position.copy(currentPos.current);
+
+        // Slerp rotation (using quaternion)
+        const currentQuat = new THREE.Quaternion().setFromEuler(currentRot.current);
+        const targetQuat = new THREE.Quaternion().setFromEuler(targetRot);
+        currentQuat.slerp(targetQuat, lerpFactor);
+        groupRef.current.quaternion.copy(currentQuat);
+        currentRot.current.setFromQuaternion(currentQuat);
+    });
+
+    return (
+        <group ref={groupRef} scale={worldTransform.scale}>
+            {meshNodes.map((node) => {
+                const geometry = node.geometry.clone();
 
                 return (
                     <Instances
                         key={node.uuid}
-                        range={object.instances.length}
+                        range={1}
                         geometry={geometry}
                         material={material}
                     >
-                        {object.instances.map((inst, i) => (
-                            <Instance
-                                key={i}
-                                position={inst.pos}
-                                rotation={inst.rot}
-                                scale={inst.scale}
-                            />
-                        ))}
+                        <Instance />
                     </Instances>
                 );
             })}

@@ -4,6 +4,8 @@ import { useStore } from '@/store/useStore';
 import { ModelUploader } from './ModelUploader';
 import { TextureUploader } from './TextureUploader';
 import { LightingControls } from './LightingControls';
+import ObjectInspector from './ObjectInspector';
+import CueManager from './CueManager';
 import { useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 
@@ -110,7 +112,7 @@ export default function AdminControls({ projectName }: { projectName?: string })
 
     const mode = useStore((state) => state.mode);
     const startMode = useStore((state) => state.setMode);
-    const [expandedSection, setExpandedSection] = useState<'models' | 'videos' | 'views' | 'lighting'>('models');
+    const [expandedSection, setExpandedSection] = useState<'models' | 'videos' | 'views' | 'lighting' | 'cues' | 'inspector'>('models');
     const [shareToast, setShareToast] = useState(false);
 
     const setLoading = useStore((state) => state.setLoading);
@@ -137,7 +139,7 @@ export default function AdminControls({ projectName }: { projectName?: string })
         }
     };
 
-    const toggleSection = (section: 'models' | 'videos' | 'views' | 'lighting') => {
+    const toggleSection = (section: 'models' | 'videos' | 'views' | 'lighting' | 'cues' | 'inspector') => {
         setExpandedSection(expandedSection === section ? section : section);
     };
 
@@ -247,6 +249,52 @@ export default function AdminControls({ projectName }: { projectName?: string })
                     {expandedSection === 'views' && (
                         <div className="bg-gray-900 text-white rounded-lg p-4">
                             <ViewManager />
+                        </div>
+                    )}
+                </div>
+
+                {/* Cue Management Section [NEW] */}
+                <div>
+                    <button
+                        onClick={() => toggleSection('cues')}
+                        className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
+                    >
+                        <span className="font-semibold">🎬 場景 (Cues)</span>
+                        <svg
+                            className={`w-5 h-5 transition-transform ${expandedSection === 'cues' ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    {expandedSection === 'cues' && (
+                        <div className="bg-gray-900 text-white rounded-lg">
+                            <CueManager />
+                        </div>
+                    )}
+                </div>
+
+                {/* Object Inspector Section [NEW] */}
+                <div>
+                    <button
+                        onClick={() => toggleSection('inspector')}
+                        className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
+                    >
+                        <span className="font-semibold">🔧 物件屬性</span>
+                        <svg
+                            className={`w-5 h-5 transition-transform ${expandedSection === 'inspector' ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    {expandedSection === 'inspector' && (
+                        <div className="bg-gray-900 text-white rounded-lg">
+                            <ObjectInspector />
                         </div>
                     )}
                 </div>

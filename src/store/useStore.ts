@@ -11,6 +11,21 @@ export interface Instance {
     scale: [number, number, number];
 }
 
+export interface ObjectTransform {
+    id: string;
+    pos: [number, number, number];
+    rot: [number, number, number];
+    scale: [number, number, number];
+}
+
+export interface StageCue {
+    id: string;
+    name: string;
+    transforms: ObjectTransform[];
+    thumbnail_url?: string;
+    order: number;
+}
+
 export interface StageObject {
     id: string; // unique ID for internal tracking
     model_path: string;
@@ -18,6 +33,7 @@ export interface StageObject {
     instances: Instance[];
     type: ModelType; // Model category type
     meshNames?: string[]; // Optional: specific mesh names to filter from the GLB
+    parentId?: string; // [NEW] ID of parent object for linked movement
 }
 
 
@@ -51,10 +67,13 @@ interface State {
     isMobile: boolean;
     stageObjects: StageObject[];
     views: CameraView[];
+    cues: StageCue[];          // [NEW] List of saved cues
+    activeCueId: string | null; // [NEW] Current applied cue
+
     capturePending: boolean;
     activeViewId: string | null;
     contentTextures: ContentTexture[];
-    activeContentId: string | null; // Currently selected content for display
+    activeContentId: string | null;
     renderMode: RenderMode;
     ambientIntensity: number;
     directionalIntensity: number;
@@ -69,13 +88,30 @@ interface State {
     videoVolume: number;
     videoCurrentTime: number;
     videoDuration: number;
-    isRecordingMode: boolean; // Recording checkbox state
+    isRecordingMode: boolean;
+
+    // Editor State [NEW]
+    selectedObjectId: string | null;
+    transformMode: 'translate' | 'rotate' | 'scale';
 
     setMode: (mode: 'admin' | 'client') => void;
     setIsMobile: (isMobile: boolean) => void;
     addObject: (obj: StageObject) => void;
     updateObjectInstances: (id: string, instances: Instance[]) => void;
     updateObjectMaterial: (id: string, materialId: MaterialId) => void;
+
+    // Cue Actions [NEW]
+    addCue: (name: string) => void;
+    updateCue: (id: string) => void;
+    removeCue: (id: string) => void;
+    applyCue: (id: string) => void;
+
+    // Editor Actions [NEW]
+    setSelectedObject: (id: string | null) => void;
+    setTransformMode: (mode: 'translate' | 'rotate' | 'scale') => void;
+    updateObjectTransform: (id: string, pos: [number, number, number], rot: [number, number, number], scale: [number, number, number]) => void;
+    linkObject: (childId: string, parentId: string | null) => void; // [NEW] Link/unlink parent
+
     addView: (view: CameraView) => void;
     removeObject: (id: string) => void;
     addContentTexture: (texture: ContentTexture) => void;
@@ -104,15 +140,18 @@ interface State {
     setStageObjects: (objects: StageObject[]) => void;
     setViews: (views: CameraView[]) => void;
     setContentTextures: (textures: ContentTexture[]) => void;
+    setCues: (cues: StageCue[]) => void; // [NEW]
 }
 
 export const useStore = create<State>()(
     persist(
-        (set) => ({
+        (set, get) => ({
             mode: 'client',
             isMobile: false,
             stageObjects: [],
             views: [],
+            cues: [],
+            activeCueId: null,
             capturePending: false,
             activeViewId: null,
             contentTextures: [],
@@ -123,6 +162,8 @@ export const useStore = create<State>()(
             bloomIntensity: 0.3,
             bloomThreshold: 0.5,
 
+            selectedObjectId: null,
+            transformMode: 'translate',
 
             // Loading State
             isLoading: false,
@@ -136,13 +177,121 @@ export const useStore = create<State>()(
 
             setMode: (mode) => set({ mode }),
             setIsMobile: (isMobile) => set({ isMobile }),
-            addObject: (obj) => set((state) => ({ stageObjects: [...state.stageObjects, obj] })),
+            addObject: (obj) => set((state) => ({
+                stageObjects: [...state.stageObjects, obj],
+                // When adding object, if Cue 0 exists, maybe we should update it? 
+                // For now, let's keep it simple. User needs to update Cue 0 manually or we auto-update on save.
+            })),
             updateObjectInstances: (id, instances) => set((state) => ({
                 stageObjects: state.stageObjects.map(obj => obj.id === id ? { ...obj, instances } : obj)
             })),
             updateObjectMaterial: (id, materialId) => set((state) => ({
                 stageObjects: state.stageObjects.map(obj => obj.id === id ? { ...obj, material_id: materialId } : obj)
             })),
+
+            // --- Cue Actions ---
+            addCue: (name) => set((state) => {
+                const transforms: ObjectTransform[] = state.stageObjects.map(obj => {
+                    // Assuming instances[0] is the main transform for now as per current requirement (simpler model)
+                    // If we have multiple instances per object, we might need a more complex structure.
+                    // Based on "updateObjectTransform" below, we seem to be treating the first instance as THE object.
+                    const inst = obj.instances[0] || { pos: [0, 0, 0], rot: [0, 0, 0], scale: [1, 1, 1] };
+                    return {
+                        id: obj.id,
+                        pos: inst.pos,
+                        rot: inst.rot,
+                        scale: inst.scale
+                    };
+                });
+
+                const newCue: StageCue = {
+                    id: `cue_${Date.now()}`,
+                    name,
+                    transforms,
+                    order: state.cues.length
+                };
+
+                return {
+                    cues: [...state.cues, newCue],
+                    activeCueId: newCue.id
+                };
+            }),
+
+            updateCue: (id) => set((state) => {
+                const transforms: ObjectTransform[] = state.stageObjects.map(obj => {
+                    const inst = obj.instances[0] || { pos: [0, 0, 0], rot: [0, 0, 0], scale: [1, 1, 1] };
+                    return {
+                        id: obj.id,
+                        pos: inst.pos,
+                        rot: inst.rot,
+                        scale: inst.scale
+                    };
+                });
+
+                return {
+                    cues: state.cues.map(c => c.id === id ? { ...c, transforms } : c)
+                };
+            }),
+
+            removeCue: (id) => set((state) => ({
+                cues: state.cues.filter(c => c.id !== id),
+                activeCueId: state.activeCueId === id ? null : state.activeCueId
+            })),
+
+            applyCue: (id) => set((state) => {
+                const cue = state.cues.find(c => c.id === id);
+                if (!cue) return {};
+
+                // Update all stage objects based on cue data
+                const newObjects = state.stageObjects.map(obj => {
+                    const transform = cue.transforms.find(t => t.id === obj.id);
+                    if (transform) {
+                        return {
+                            ...obj,
+                            instances: [{
+                                pos: transform.pos,
+                                rot: transform.rot,
+                                scale: transform.scale
+                            }]
+                        };
+                    }
+                    return obj;
+                });
+
+                return {
+                    stageObjects: newObjects,
+                    activeCueId: id
+                };
+            }),
+
+            // --- Editor Actions ---
+            setSelectedObject: (id) => set({ selectedObjectId: id }),
+            setTransformMode: (mode) => set({ transformMode: mode }),
+
+            updateObjectTransform: (id, pos, rot, scale) => set((state) => ({
+                stageObjects: state.stageObjects.map(obj => {
+                    if (obj.id === id) {
+                        return {
+                            ...obj,
+                            instances: [{ pos, rot, scale }]
+                        };
+                    }
+                    return obj;
+                })
+            })),
+
+            linkObject: (childId, parentId) => set((state) => ({
+                stageObjects: state.stageObjects.map(obj => {
+                    if (obj.id === childId) {
+                        return {
+                            ...obj,
+                            parentId: parentId ?? undefined
+                        };
+                    }
+                    return obj;
+                })
+            })),
+
             addView: (view) => set((state) => ({ views: [...state.views, view] })),
 
             removeObject: (id) => set((state) => ({
@@ -190,13 +339,16 @@ export const useStore = create<State>()(
             loadState: (newState) => set((state) => ({
                 ...state,
                 ...newState,
-                // Ensure we don't accidentally overwrite unrelated UI state if not provided
+                // Ensure activeCueId is reset if not loading it? 
+                // Actually if loading project, we might want to preserve it or reset to null.
+                // Let's trust newState.
             })),
 
             // Batch setters for loading project data
             setStageObjects: (objects) => set({ stageObjects: objects }),
             setViews: (views) => set({ views }),
             setContentTextures: (textures) => set({ contentTextures: textures }),
+            setCues: (cues) => set({ cues }), // [NEW]
         }),
         {
             name: 'stage-preview-storage', // localStorage key
@@ -208,6 +360,8 @@ export const useStore = create<State>()(
                 activeViewId: state.activeViewId,
                 contentTextures: state.contentTextures,
                 activeContentId: state.activeContentId,
+                cues: state.cues, // [NEW]
+                activeCueId: state.activeCueId, // [NEW]
             }),
         }
     )
