@@ -49,11 +49,11 @@ export default function Scene() {
     const activeContentId = useStore((state) => state.activeContentId);
     const isRecordingMode = useStore((state) => state.isRecordingMode);
 
-    // Check if active content is a video
+    // Check if active content is a video (support both 'video' and 'r2_video')
     const activeContent = activeContentId
         ? contentTextures.find(t => t.id === activeContentId)
         : null;
-    const isVideoActive = activeContent?.type === 'video';
+    const isVideoActive = activeContent?.type === 'video' || activeContent?.type === 'r2_video';
 
     // Use 'always' frameloop when video is playing or in recording mode
     const frameloop = (isVideoActive && videoPlaying) || isRecordingMode ? 'always' : 'demand';

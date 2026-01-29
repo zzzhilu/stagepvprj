@@ -28,14 +28,14 @@ export function VideoControls() {
     const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
     const isLongPressingRef = useRef(false);
 
-    // Check if there's any video content
-    const hasVideo = contentTextures.some(t => t.type === 'video');
+    // Check if there's any video content (support both 'video' and 'r2_video')
+    const hasVideo = contentTextures.some(t => t.type === 'video' || t.type === 'r2_video');
 
-    // Check if active content is a video
+    // Check if active content is a video (support both 'video' and 'r2_video')
     const activeContent = activeContentId
         ? contentTextures.find(t => t.id === activeContentId)
         : null;
-    const isVideoActive = activeContent?.type === 'video';
+    const isVideoActive = activeContent?.type === 'video' || activeContent?.type === 'r2_video';
 
     // Handle recording complete - direct download
     const handleRecordingComplete = useCallback((blob: Blob, mimeType: string) => {

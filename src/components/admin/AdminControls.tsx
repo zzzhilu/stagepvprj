@@ -6,8 +6,16 @@ import { TextureUploader } from './TextureUploader';
 import { LightingControls } from './LightingControls';
 import ObjectInspector from './ObjectInspector';
 import CueManager from './CueManager';
+import { R2VideoManager } from '@/components/client/R2VideoManager';
 import { useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
+
+interface AdminControlsProps {
+    projectName?: string;
+    mode?: 'free-test' | 'video-progress';
+    projectId?: string;
+    onSave?: () => void;
+}
 
 function ViewManager() {
     const triggerCapture = useStore((state) => state.triggerCapture);
@@ -124,13 +132,14 @@ function ViewManager() {
     )
 }
 
-export default function AdminControls({ projectName }: { projectName?: string }) {
+export default function AdminControls({ projectName, mode = 'free-test', projectId: propProjectId, onSave }: AdminControlsProps) {
     const params = useParams();
-    const projectId = params.id as string;
+    const projectId = propProjectId || (params.id as string);
+    const isVideoProgress = mode === 'video-progress';
 
-    const mode = useStore((state) => state.mode);
+    const storeMode = useStore((state) => state.mode);
     const startMode = useStore((state) => state.setMode);
-    const [expandedSections, setExpandedSections] = useState<string[]>(['models']);
+    const [expandedSections, setExpandedSections] = useState<string[]>(isVideoProgress ? ['videos'] : ['models']);
     const [shareToast, setShareToast] = useState(false);
 
     const setLoading = useStore((state) => state.setLoading);
@@ -179,7 +188,7 @@ export default function AdminControls({ projectName }: { projectName?: string })
                     <h2 className="text-xl font-bold">Admin Panel</h2>
                     <div className="flex gap-2">
                         <a
-                            href="/free-test"
+                            href={isVideoProgress ? '/video-progress' : '/free-test'}
                             className="text-xs bg-gray-700 px-3 py-1 rounded hover:bg-gray-600 flex items-center gap-1"
                         >
                             <span>📂</span> 專案列表
@@ -214,32 +223,34 @@ export default function AdminControls({ projectName }: { projectName?: string })
             </div>
 
             <div className="p-4 space-y-4">
-                {/* Model Uploader Section */}
-                <div>
-                    <button
-                        onClick={() => toggleSection('models')}
-                        className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
-                    >
-                        <span className="font-semibold">📦 模型上傳</span>
-                        <svg
-                            className={`w-5 h-5 transition-transform ${expandedSections.includes('models') ? 'rotate-180' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                {/* Model Uploader Section - Hidden in video-progress mode */}
+                {!isVideoProgress && (
+                    <div>
+                        <button
+                            onClick={() => toggleSection('models')}
+                            className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
                         >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedSections.includes('models') && <ModelUploader />}
-                </div>
+                            <span className="font-semibold">📦 模型上傳</span>
+                            <svg
+                                className={`w-5 h-5 transition-transform ${expandedSections.includes('models') ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {expandedSections.includes('models') && <ModelUploader />}
+                    </div>
+                )}
 
-                {/* Texture Uploader Section */}
+                {/* Content Input Section - R2VideoManager for video-progress, TextureUploader for free-test */}
                 <div>
                     <button
                         onClick={() => toggleSection('videos')}
                         className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
                     >
-                        <span className="font-semibold">🎨 內容輸入</span>
+                        <span className="font-semibold">{isVideoProgress ? '🎬 R2 影片' : '🎨 內容輸入'}</span>
                         <svg
                             className={`w-5 h-5 transition-transform ${expandedSections.includes('videos') ? 'rotate-180' : ''}`}
                             fill="none"
@@ -249,7 +260,11 @@ export default function AdminControls({ projectName }: { projectName?: string })
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
-                    {expandedSections.includes('videos') && <TextureUploader />}
+                    {expandedSections.includes('videos') && (
+                        isVideoProgress
+                            ? <R2VideoManager projectId={projectId} onSave={onSave} />
+                            : <TextureUploader />
+                    )}
                 </div>
 
                 {/* View Management Section */}
@@ -298,28 +313,30 @@ export default function AdminControls({ projectName }: { projectName?: string })
                     )}
                 </div>
 
-                {/* Object Inspector Section [NEW] */}
-                <div>
-                    <button
-                        onClick={() => toggleSection('inspector')}
-                        className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
-                    >
-                        <span className="font-semibold">🔧 物件屬性</span>
-                        <svg
-                            className={`w-5 h-5 transition-transform ${expandedSections.includes('inspector') ? 'rotate-180' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                {/* Object Inspector Section - Hidden in video-progress mode */}
+                {!isVideoProgress && (
+                    <div>
+                        <button
+                            onClick={() => toggleSection('inspector')}
+                            className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
                         >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedSections.includes('inspector') && (
-                        <div className="bg-gray-900 text-white rounded-lg">
-                            <ObjectInspector />
-                        </div>
-                    )}
-                </div>
+                            <span className="font-semibold">🔧 物件屬性</span>
+                            <svg
+                                className={`w-5 h-5 transition-transform ${expandedSections.includes('inspector') ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {expandedSections.includes('inspector') && (
+                            <div className="bg-gray-900 text-white rounded-lg">
+                                <ObjectInspector />
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Lighting Controls Section */}
                 <div>

@@ -9,7 +9,6 @@ import { VideoControls } from '@/components/client/VideoControls';
 import { ViewSwitcher } from '@/components/client/ViewSwitcher';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { CueSelector } from '@/components/client/CueSelector';
-import { R2VideoManager } from '@/components/client/R2VideoManager';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
 
@@ -90,7 +89,6 @@ export default function VideoProgressEditorPage() {
     const [isChecking, setIsChecking] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
     const [currentProjectName, setCurrentProjectName] = useState('');
-    const [showR2Manager, setShowR2Manager] = useState(false);
 
     // Get store methods
     const setStageObjects = useStore(state => state.setStageObjects);
@@ -205,8 +203,13 @@ export default function VideoProgressEditorPage() {
 
     return (
         <main className="relative w-full h-full">
-            {/* Admin Controls */}
-            <AdminControls projectName={currentProjectName} />
+            {/* Admin Controls with video-progress mode */}
+            <AdminControls
+                projectName={currentProjectName}
+                mode="video-progress"
+                projectId={projectId}
+                onSave={handleSaveProject}
+            />
 
             {/* Client Controls */}
             <ClientControls />
@@ -219,35 +222,6 @@ export default function VideoProgressEditorPage() {
 
             {/* Cue Selector */}
             <CueSelector />
-
-            {/* R2 Video Manager Toggle Button */}
-            <div className="absolute top-4 left-4 z-40">
-                <button
-                    onClick={() => setShowR2Manager(!showR2Manager)}
-                    className={`
-                        px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2
-                        ${showR2Manager
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-black/60 backdrop-blur-md text-white hover:bg-blue-600/80'
-                        }
-                    `}
-                >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
-                    </svg>
-                    R2 影片
-                </button>
-            </div>
-
-            {/* R2 Video Manager Panel */}
-            {showR2Manager && (
-                <div className="absolute top-16 left-4 z-40 w-80">
-                    <R2VideoManager
-                        projectId={projectId}
-                        onSave={handleSaveProject}
-                    />
-                </div>
-            )}
 
             {/* 3D Scene */}
             <ErrorBoundary>

@@ -93,7 +93,8 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
 
     // Create and manage video texture using global video element
     useEffect(() => {
-        if (!activeTexture || activeTexture.type !== 'video') {
+        // Support both 'video' and 'r2_video' types
+        if (!activeTexture || (activeTexture.type !== 'video' && activeTexture.type !== 'r2_video')) {
             if (videoTexture) {
                 videoTexture.dispose();
                 setVideoTexture(null);
@@ -161,8 +162,8 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     }, [activeTexture]);
 
 
-    // Select active texture map
-    const textureMap = activeTexture?.type === 'video' ? videoTexture : imageTexture;
+    // Select active texture map - support both 'video' and 'r2_video' types
+    const textureMap = (activeTexture?.type === 'video' || activeTexture?.type === 'r2_video') ? videoTexture : imageTexture;
 
     // Create material based on render mode
     const material = useMemo(() => {
