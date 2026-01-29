@@ -1,7 +1,7 @@
 
 import { db } from './firebase';
 import { collection, addDoc, doc, getDoc, setDoc, updateDoc, deleteDoc, query, orderBy, getDocs, serverTimestamp } from 'firebase/firestore';
-import type { StageObject, CameraView, ContentTexture } from '@/store/useStore';
+import type { StageObject, CameraView, ContentTexture, R2Video } from '@/store/useStore';
 
 export interface ProjectState {
     name: string;
@@ -11,6 +11,7 @@ export interface ProjectState {
     activeViewId: string | null;
     activeContentId: string | null;
     cues?: any[]; // Store cues
+    r2Videos?: R2Video[]; // R2 videos for Image Progress
     createdAt?: any;
     updatedAt?: any;
 }

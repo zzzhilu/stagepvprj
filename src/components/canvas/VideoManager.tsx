@@ -21,8 +21,9 @@ export function VideoManager() {
     const hlsRef = useRef<Hls | null>(null);
 
     // Find active video texture using activeContentId
+    // Support both local 'video' and cloud 'r2_video' types
     const activeVideo = activeContentId
-        ? contentTextures.find(t => t.id === activeContentId && t.type === 'video')
+        ? contentTextures.find(t => t.id === activeContentId && (t.type === 'video' || t.type === 'r2_video'))
         : null;
 
     useEffect(() => {

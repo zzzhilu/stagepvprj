@@ -37,15 +37,23 @@ export interface StageObject {
 }
 
 
-export type TextureType = 'image' | 'video';
+export type TextureType = 'image' | 'video' | 'r2_video';
 
 export interface ContentTexture {
     id: string;
     name: string;
     file_path: string;
-    type: TextureType; // 'image' or 'video'
+    type: TextureType; // 'image', 'video', or 'r2_video'
     thumbnail_url?: string;
     file_size?: number; // bytes
+}
+
+// R2 Video for Image Progress feature
+export interface R2Video {
+    id: string;           // Unique video ID (for share links)
+    filename: string;     // Original filename (for watermark)
+    r2_url: string;       // Full R2 URL
+    uploadedAt: number;   // Timestamp
 }
 
 export interface CameraView {
@@ -69,6 +77,7 @@ interface State {
     views: CameraView[];
     cues: StageCue[];          // [NEW] List of saved cues
     activeCueId: string | null; // [NEW] Current applied cue
+    r2Videos: R2Video[];        // [NEW] R2 videos for Image Progress
 
     capturePending: boolean;
     activeViewId: string | null;
@@ -143,6 +152,11 @@ interface State {
     setViews: (views: CameraView[]) => void;
     setContentTextures: (textures: ContentTexture[]) => void;
     setCues: (cues: StageCue[]) => void; // [NEW]
+
+    // R2 Video Actions [NEW]
+    setR2Videos: (videos: R2Video[]) => void;
+    addR2Video: (video: R2Video) => void;
+    removeR2Video: (id: string) => void;
 }
 
 export const useStore = create<State>()(
@@ -154,6 +168,7 @@ export const useStore = create<State>()(
             views: [],
             cues: [],
             activeCueId: null,
+            r2Videos: [],
             capturePending: false,
             activeViewId: null,
             contentTextures: [],
@@ -353,6 +368,15 @@ export const useStore = create<State>()(
             setViews: (views) => set({ views }),
             setContentTextures: (textures) => set({ contentTextures: textures }),
             setCues: (cues) => set({ cues }), // [NEW]
+
+            // R2 Video Actions [NEW]
+            setR2Videos: (videos) => set({ r2Videos: videos }),
+            addR2Video: (video) => set((state) => ({
+                r2Videos: [...state.r2Videos, video]
+            })),
+            removeR2Video: (id) => set((state) => ({
+                r2Videos: state.r2Videos.filter(v => v.id !== id)
+            })),
         }),
         {
             name: 'stage-preview-storage', // localStorage key
@@ -367,6 +391,7 @@ export const useStore = create<State>()(
                 cues: state.cues, // [NEW]
                 activeCueId: state.activeCueId, // [NEW]
                 fov: state.fov, // [NEW]
+                r2Videos: state.r2Videos, // [NEW]
             }),
         }
     )
