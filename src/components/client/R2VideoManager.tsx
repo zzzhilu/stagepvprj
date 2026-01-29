@@ -126,7 +126,17 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
         try {
             // Extract key from R2 URL
             const urlParts = video.r2_url.split('/');
-            const key = urlParts.slice(3).join('/'); // Remove protocol and domain
+            // Find the index of 'videos' to start the key, or fallback to slice(3)
+            const videosIndex = urlParts.indexOf('videos');
+            let key = '';
+
+            if (videosIndex !== -1) {
+                key = urlParts.slice(videosIndex).join('/');
+            } else {
+                // Fallback for unexpected URL structure, remove empty parts causing leading slashes
+                const pathParts = urlParts.slice(3).filter(part => part !== '');
+                key = pathParts.join('/');
+            }
 
             // Delete from R2
             const response = await fetch('/api/r2-upload', {
@@ -136,7 +146,8 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
             });
 
             if (!response.ok) {
-                throw new Error('Failed to delete from R2');
+                const data = await response.json();
+                throw new Error(data.details || data.error || 'Failed to delete from R2');
             }
 
             // Remove from store
@@ -293,8 +304,8 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
                                 <button
                                     onClick={() => handleShare(video)}
                                     className={`p-2 rounded-lg transition-colors ${copiedId === video.id
-                                            ? 'bg-green-600 text-white'
-                                            : 'hover:bg-gray-700 text-gray-400 hover:text-white'
+                                        ? 'bg-green-600 text-white'
+                                        : 'hover:bg-gray-700 text-gray-400 hover:text-white'
                                         }`}
                                     title={copiedId === video.id ? '已複製!' : '複製分享連結'}
                                 >

@@ -95,10 +95,14 @@ export async function DELETE(request: NextRequest) {
         await s3Client.send(command);
 
         return NextResponse.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error deleting from R2:', error);
         return NextResponse.json(
-            { error: 'Failed to delete video' },
+            {
+                error: 'Failed to delete video',
+                details: error.message,
+                code: error.Code || error.code || 'UNKNOWN'
+            },
             { status: 500 }
         );
     }
