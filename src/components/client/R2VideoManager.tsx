@@ -162,9 +162,30 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
 
             // Trigger save callback
             onSave?.();
-        } catch (err) {
+        } catch (err: any) {
             console.error('Delete error:', err);
-            setError(err instanceof Error ? err.message : '刪除失敗');
+            const errorMessage = err instanceof Error ? err.message : '刪除失敗';
+
+            // Check for credential/permission errors to force remove
+            const isCredentialError =
+                errorMessage.includes('credential') ||
+                errorMessage.includes('AccessDenied') ||
+                errorMessage.includes('InvalidAccessKeyId') ||
+                errorMessage.includes('SignatureDoesNotMatch');
+
+            if (isCredentialError) {
+                // Force remove from store despite backend error
+                removeR2Video(video.id);
+                // Also remove ContentTexture if exists
+                const existingTexture = contentTextures.find(t => t.id === video.id);
+                if (existingTexture) {
+                    removeContentTexture(video.id);
+                }
+                onSave?.();
+                setError(`${errorMessage} (因憑證錯誤，已強制從列表移除)`);
+            } else {
+                setError(errorMessage);
+            }
         } finally {
             setLoading(false);
         }

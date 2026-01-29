@@ -126,14 +126,15 @@ export default function VideoProgressEditorPage() {
 
             if (data) {
                 // Load project state into store
+                // Load project state into store (always reset to ensure isolation)
                 if (data.name) setCurrentProjectName(data.name);
-                if (data.stageObjects) setStageObjects(data.stageObjects);
-                if (data.views) setViews(data.views);
-                if (data.contentTextures) setContentTextures(data.contentTextures);
-                if (data.activeViewId) setActiveView(data.activeViewId);
-                if (data.activeContentId) setActiveContent(data.activeContentId);
-                if (data.cues) setCues(data.cues);
-                if (data.r2Videos) setR2Videos(data.r2Videos);
+                setStageObjects(data.stageObjects || []);
+                setViews(data.views || []);
+                setContentTextures(data.contentTextures || []);
+                setActiveView(data.activeViewId || null);
+                setActiveContent(data.activeContentId || null);
+                setCues(data.cues || []);
+                setR2Videos(data.r2Videos || []);
             }
         } catch (error) {
             console.error('Failed to load project:', error);
