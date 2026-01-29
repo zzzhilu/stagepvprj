@@ -61,10 +61,14 @@ export async function POST(request: NextRequest) {
             filename,
             key,
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error generating presigned URL:', error);
         return NextResponse.json(
-            { error: 'Failed to generate upload URL' },
+            {
+                error: 'Failed to generate upload URL',
+                details: error.message,
+                code: error.Code || error.code || 'UNKNOWN'
+            },
             { status: 500 }
         );
     }

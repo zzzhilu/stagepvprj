@@ -51,7 +51,8 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
             });
 
             if (!presignedResponse.ok) {
-                throw new Error('Failed to get upload URL');
+                const data = await presignedResponse.json();
+                throw new Error(data.details || data.error || 'Failed to get upload URL');
             }
 
             const { uploadUrl, publicUrl, videoId, filename, key } = await presignedResponse.json();
