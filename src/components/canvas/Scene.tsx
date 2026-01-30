@@ -43,12 +43,13 @@ function CanvasRefCapture() {
 }
 
 export default function Scene() {
-    // Dynamic frameloop: 'always' when video is playing or recording, 'demand' otherwise
+    // Dynamic frameloop: 'always' when video is playing, recording, Gimzo, or Perfect Render
     const videoPlaying = useStore((state) => state.videoPlaying);
     const contentTextures = useStore((state) => state.contentTextures);
     const activeContentId = useStore((state) => state.activeContentId);
     const isRecordingMode = useStore((state) => state.isRecordingMode);
     const gizmoEnabled = useStore((state) => state.gizmoEnabled);
+    const perfectRenderEnabled = useStore((state) => state.perfectRenderEnabled);
 
     // Check if active content is a video (support both 'video' and 'r2_video')
     const activeContent = activeContentId
@@ -56,8 +57,8 @@ export default function Scene() {
         : null;
     const isVideoActive = activeContent?.type === 'video' || activeContent?.type === 'r2_video';
 
-    // Use 'always' frameloop when video is playing, recording, or Gimzo is enabled
-    const frameloop = (isVideoActive && videoPlaying) || isRecordingMode || gizmoEnabled ? 'always' : 'demand';
+    // Use 'always' frameloop when video is playing, recording, Gimzo, or Perfect Render is enabled
+    const frameloop = (isVideoActive && videoPlaying) || isRecordingMode || gizmoEnabled || perfectRenderEnabled ? 'always' : 'demand';
 
     return (
         <Canvas
@@ -68,7 +69,7 @@ export default function Scene() {
                 preserveDrawingBuffer: true,
                 alpha: false,
             }}
-            dpr={[1, 2]}
+            dpr={perfectRenderEnabled ? [2, 2] : [1, 2]}
             camera={{ position: [0, 5, 10], fov: 50 }}
             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
             shadows="soft"

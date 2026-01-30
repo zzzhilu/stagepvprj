@@ -105,6 +105,12 @@ interface State {
     transformMode: 'translate' | 'rotate' | 'scale';
     gizmoEnabled: boolean; // [NEW] Toggle for transform controls
 
+    // Perfect Render Mode [NEW]
+    perfectRenderEnabled: boolean;
+    reflectionMirror: number;      // 0-1
+    reflectionBlur: number;        // 0-20
+    reflectionMetalness: number;   // 0-1
+
     setMode: (mode: 'admin' | 'client') => void;
     setIsMobile: (isMobile: boolean) => void;
     addObject: (obj: StageObject) => void;
@@ -120,6 +126,12 @@ interface State {
     setSelectedObject: (id: string | null) => void;
     setTransformMode: (mode: 'translate' | 'rotate' | 'scale') => void;
     setGizmoEnabled: (enabled: boolean) => void; // [NEW]
+
+    // Perfect Render Actions [NEW]
+    setPerfectRenderEnabled: (enabled: boolean) => void;
+    setReflectionMirror: (value: number) => void;
+    setReflectionBlur: (value: number) => void;
+    setReflectionMetalness: (value: number) => void;
     updateObjectTransform: (id: string, pos: [number, number, number], rot: [number, number, number], scale: [number, number, number]) => void;
     linkObject: (childId: string, parentId: string | null) => void; // [NEW] Link/unlink parent
 
@@ -184,6 +196,12 @@ export const useStore = create<State>()(
             selectedObjectId: null,
             transformMode: 'translate',
             gizmoEnabled: false, // [NEW] Default off
+
+            // Perfect Render defaults
+            perfectRenderEnabled: false,
+            reflectionMirror: 0.6,
+            reflectionBlur: 8,
+            reflectionMetalness: 0.8,
 
             // Loading State
             isLoading: false,
@@ -290,6 +308,12 @@ export const useStore = create<State>()(
                 gizmoEnabled: enabled,
                 selectedObjectId: enabled ? null : null // Clear selection when toggling
             }),
+
+            // Perfect Render Actions
+            setPerfectRenderEnabled: (enabled) => set({ perfectRenderEnabled: enabled }),
+            setReflectionMirror: (value) => set({ reflectionMirror: value }),
+            setReflectionBlur: (value) => set({ reflectionBlur: value }),
+            setReflectionMetalness: (value) => set({ reflectionMetalness: value }),
 
             updateObjectTransform: (id, pos, rot, scale) => set((state) => ({
                 stageObjects: state.stageObjects.map(obj => {

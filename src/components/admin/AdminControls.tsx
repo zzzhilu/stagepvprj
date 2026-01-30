@@ -4,6 +4,7 @@ import { useStore } from '@/store/useStore';
 import { ModelUploader } from './ModelUploader';
 import { TextureUploader } from './TextureUploader';
 import { LightingControls } from './LightingControls';
+import { ReflectionControls } from './ReflectionControls';
 import ObjectInspector from './ObjectInspector';
 import CueManager from './CueManager';
 import { R2VideoManager } from '@/components/client/R2VideoManager';
@@ -396,7 +397,10 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                     </button>
                     {expandedSections.includes('lighting') && <LightingControls />}
                 </div>
+
+                {/* Reflection Settings Section - Show only when Perfect Render is enabled */}
+                <ReflectionControls />
             </div>
-        </div >
+        </div>
     );
 }

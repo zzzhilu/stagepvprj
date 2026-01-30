@@ -1,4 +1,4 @@
-import { OrbitControls, PerspectiveCamera, TransformControls } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, TransformControls, MeshReflectorMaterial } from '@react-three/drei';
 import { useStore, StageObject } from '@/store/useStore';
 import { StageObjectRenderer } from './StageObjectRenderer';
 import { CameraCapture } from './CameraCapture';
@@ -24,6 +24,12 @@ export function SceneGraph() {
     const setSelectedObject = useStore((state) => state.setSelectedObject);
     const transformMode = useStore((state) => state.transformMode);
     const updateObjectTransform = useStore((state) => state.updateObjectTransform);
+
+    // Perfect Render Mode state
+    const perfectRenderEnabled = useStore((state) => state.perfectRenderEnabled);
+    const reflectionMirror = useStore((state) => state.reflectionMirror);
+    const reflectionBlur = useStore((state) => state.reflectionBlur);
+    const reflectionMetalness = useStore((state) => state.reflectionMetalness);
 
     const controlsRef = useRef<OrbitControlsImpl>(null);
     const transformRef = useRef<any>(null);
@@ -221,28 +227,44 @@ export function SceneGraph() {
                 );
             })()}
 
-            {/* Ground plane */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
-                <planeGeometry args={[100, 100]} />
-                <meshStandardMaterial color="#1a1a1a" roughness={0.8} metalness={0.2} />
-            </mesh>
+            {/* Ground plane - with optional reflection */}
+            {perfectRenderEnabled ? (
+                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
+                    <planeGeometry args={[100, 100]} />
+                    <MeshReflectorMaterial
+                        blur={[reflectionBlur * 50, reflectionBlur * 50]}
+                        resolution={1024}
+                        mixBlur={1}
+                        mixStrength={reflectionMirror * 2}
+                        roughness={0.2}
+                        depthScale={1.2}
+                        minDepthThreshold={0.4}
+                        maxDepthThreshold={1.4}
+                        color="#111111"
+                        metalness={reflectionMetalness}
+                    />
+                </mesh>
+            ) : (
+                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
+                    <planeGeometry args={[100, 100]} />
+                    <meshStandardMaterial color="#1a1a1a" roughness={0.8} metalness={0.2} />
+                </mesh>
+            )}
 
             {/* Post-Processing Effects */}
             {/* 
-                Performance notes:
-                - N8AO removed: For best results, bake AO in modeling software (Blender/Maya)
-                - Bloom at half resolution for performance
-                - SMAA is the most efficient AA with good quality
+                Perfect Render mode uses MeshReflectorMaterial for reflections
+                Enhanced Bloom and MSAA for better quality
             */}
-            <EffectComposer multisampling={0}>
-                {/* Bloom for emissive glow - half resolution for performance */}
+            <EffectComposer multisampling={perfectRenderEnabled ? 4 : 0}>
+                {/* Bloom for emissive glow - enhanced in Perfect mode */}
                 <Bloom
-                    intensity={bloomIntensity}
+                    intensity={perfectRenderEnabled ? bloomIntensity * 1.5 : bloomIntensity}
                     luminanceThreshold={bloomThreshold}
                     luminanceSmoothing={0.9}
                     mipmapBlur={true}
-                    resolutionX={512}
-                    resolutionY={512}
+                    resolutionX={perfectRenderEnabled ? 1024 : 512}
+                    resolutionY={perfectRenderEnabled ? 1024 : 512}
                 />
                 {/* SMAA anti-aliasing - best quality/performance balance */}
                 <SMAA />
