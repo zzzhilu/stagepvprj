@@ -141,6 +141,8 @@ export default function AdminControls({ projectName, mode = 'free-test', project
     const startMode = useStore((state) => state.setMode);
     const gizmoEnabled = useStore((state) => state.gizmoEnabled);
     const setGizmoEnabled = useStore((state) => state.setGizmoEnabled);
+    const transformMode = useStore((state) => state.transformMode);
+    const setTransformMode = useStore((state) => state.setTransformMode);
     const [expandedSections, setExpandedSections] = useState<string[]>(isVideoProgress ? ['videos'] : ['models']);
     const [shareToast, setShareToast] = useState(false);
 
@@ -191,20 +193,51 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                     <div className="flex gap-2">
                         <a
                             href={isVideoProgress ? '/video-progress' : '/free-test'}
-                            className="text-xs bg-gray-700 px-3 py-1 rounded hover:bg-gray-600 flex items-center gap-1"
+                            className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600 flex items-center"
+                            title="專案列表"
                         >
-                            <span>📂</span> 專案列表
+                            <span>📂</span>
                         </a>
                         <button
-                            onClick={() => setGizmoEnabled(!gizmoEnabled)}
+                            onClick={() => {
+                                const newGizmoState = !gizmoEnabled;
+                                setGizmoEnabled(newGizmoState);
+                                if (newGizmoState) {
+                                    startMode('admin');
+                                }
+                            }}
                             className={`text-xs px-3 py-1 rounded flex items-center gap-1 ${gizmoEnabled
-                                    ? 'bg-violet-600 hover:bg-violet-700'
-                                    : 'bg-gray-700 hover:bg-gray-600'
+                                ? 'bg-violet-600 hover:bg-violet-700'
+                                : 'bg-gray-700 hover:bg-gray-600'
                                 }`}
                         >
-                            <span>🎛️</span> Admin
+                            <span>🎛️</span> Gimzo
                         </button>
                     </div>
+
+                    {/* Transform Mode Buttons - Shown when Gizmo is enabled */}
+                    {gizmoEnabled && (
+                        <div className="flex gap-1 mt-2">
+                            <button
+                                onClick={() => setTransformMode('translate')}
+                                className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${transformMode === 'translate'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-gray-700 text-gray-400 hover:text-white'
+                                    }`}
+                            >
+                                移動
+                            </button>
+                            <button
+                                onClick={() => setTransformMode('rotate')}
+                                className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${transformMode === 'rotate'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-gray-700 text-gray-400 hover:text-white'
+                                    }`}
+                            >
+                                旋轉
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Display Current Project Name */}
@@ -364,6 +397,6 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                     {expandedSections.includes('lighting') && <LightingControls />}
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

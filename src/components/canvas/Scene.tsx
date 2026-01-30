@@ -48,6 +48,7 @@ export default function Scene() {
     const contentTextures = useStore((state) => state.contentTextures);
     const activeContentId = useStore((state) => state.activeContentId);
     const isRecordingMode = useStore((state) => state.isRecordingMode);
+    const gizmoEnabled = useStore((state) => state.gizmoEnabled);
 
     // Check if active content is a video (support both 'video' and 'r2_video')
     const activeContent = activeContentId
@@ -55,8 +56,8 @@ export default function Scene() {
         : null;
     const isVideoActive = activeContent?.type === 'video' || activeContent?.type === 'r2_video';
 
-    // Use 'always' frameloop when video is playing or in recording mode
-    const frameloop = (isVideoActive && videoPlaying) || isRecordingMode ? 'always' : 'demand';
+    // Use 'always' frameloop when video is playing, recording, or Gimzo is enabled
+    const frameloop = (isVideoActive && videoPlaying) || isRecordingMode || gizmoEnabled ? 'always' : 'demand';
 
     return (
         <Canvas
