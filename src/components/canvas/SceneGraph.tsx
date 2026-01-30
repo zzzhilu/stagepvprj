@@ -19,6 +19,7 @@ export function SceneGraph() {
 
     // Editor state for TransformControls
     const mode = useStore((state) => state.mode);
+    const gizmoEnabled = useStore((state) => state.gizmoEnabled);
     const selectedObjectId = useStore((state) => state.selectedObjectId);
     const setSelectedObject = useStore((state) => state.setSelectedObject);
     const transformMode = useStore((state) => state.transformMode);
@@ -174,7 +175,7 @@ export function SceneGraph() {
                             ref={objRef}
                             object={obj}
                             onClick={(e: ThreeEvent<MouseEvent>) => {
-                                if (mode === 'admin') {
+                                if (mode === 'admin' && gizmoEnabled) {
                                     e.stopPropagation();
                                     setSelectedObject(obj.id);
                                 }
@@ -184,8 +185,8 @@ export function SceneGraph() {
                 );
             })}
 
-            {/* TransformControls for Admin Mode */}
-            {mode === 'admin' && selectedObjectId && (() => {
+            {/* TransformControls for Admin Mode (when Gizmo is enabled) */}
+            {mode === 'admin' && gizmoEnabled && selectedObjectId && (() => {
                 const objRef = objectRefsRef.current.get(selectedObjectId);
                 if (!objRef || !objRef.current) return null;
 

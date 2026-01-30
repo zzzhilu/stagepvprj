@@ -147,7 +147,7 @@ export default function VideoProgressDashboard() {
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-4xl font-bold text-white mb-2">影像進度</h1>
-                            <p className="text-gray-400">管理 R2 影片專案與分享連結</p>
+                            <p className="text-gray-400">管理影片專案與分享連結</p>
                         </div>
                         <div className="flex gap-3">
                             <Link

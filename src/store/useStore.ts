@@ -103,6 +103,7 @@ interface State {
     // Editor State [NEW]
     selectedObjectId: string | null;
     transformMode: 'translate' | 'rotate' | 'scale';
+    gizmoEnabled: boolean; // [NEW] Toggle for transform controls
 
     setMode: (mode: 'admin' | 'client') => void;
     setIsMobile: (isMobile: boolean) => void;
@@ -116,9 +117,9 @@ interface State {
     removeCue: (id: string) => void;
     applyCue: (id: string) => void;
 
-    // Editor Actions [NEW]
     setSelectedObject: (id: string | null) => void;
     setTransformMode: (mode: 'translate' | 'rotate' | 'scale') => void;
+    setGizmoEnabled: (enabled: boolean) => void; // [NEW]
     updateObjectTransform: (id: string, pos: [number, number, number], rot: [number, number, number], scale: [number, number, number]) => void;
     linkObject: (childId: string, parentId: string | null) => void; // [NEW] Link/unlink parent
 
@@ -182,6 +183,7 @@ export const useStore = create<State>()(
 
             selectedObjectId: null,
             transformMode: 'translate',
+            gizmoEnabled: false, // [NEW] Default off
 
             // Loading State
             isLoading: false,
@@ -282,9 +284,12 @@ export const useStore = create<State>()(
                 };
             }),
 
-            // --- Editor Actions ---
             setSelectedObject: (id) => set({ selectedObjectId: id }),
             setTransformMode: (mode) => set({ transformMode: mode }),
+            setGizmoEnabled: (enabled) => set({
+                gizmoEnabled: enabled,
+                selectedObjectId: enabled ? null : null // Clear selection when toggling
+            }),
 
             updateObjectTransform: (id, pos, rot, scale) => set((state) => ({
                 stageObjects: state.stageObjects.map(obj => {

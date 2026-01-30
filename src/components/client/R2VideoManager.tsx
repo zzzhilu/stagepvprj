@@ -228,7 +228,7 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
     return (
         <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">R2 影片管理</h3>
+                <h3 className="text-lg font-semibold text-white">內容管理</h3>
                 <label className={`
                     px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all
                     ${uploading

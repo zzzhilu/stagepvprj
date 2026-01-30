@@ -139,6 +139,8 @@ export default function AdminControls({ projectName, mode = 'free-test', project
 
     const storeMode = useStore((state) => state.mode);
     const startMode = useStore((state) => state.setMode);
+    const gizmoEnabled = useStore((state) => state.gizmoEnabled);
+    const setGizmoEnabled = useStore((state) => state.setGizmoEnabled);
     const [expandedSections, setExpandedSections] = useState<string[]>(isVideoProgress ? ['videos'] : ['models']);
     const [shareToast, setShareToast] = useState(false);
 
@@ -194,10 +196,13 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                             <span>📂</span> 專案列表
                         </a>
                         <button
-                            onClick={() => startMode('client')}
-                            className="text-xs bg-red-600 px-3 py-1 rounded hover:bg-red-700"
+                            onClick={() => setGizmoEnabled(!gizmoEnabled)}
+                            className={`text-xs px-3 py-1 rounded flex items-center gap-1 ${gizmoEnabled
+                                    ? 'bg-violet-600 hover:bg-violet-700'
+                                    : 'bg-gray-700 hover:bg-gray-600'
+                                }`}
                         >
-                            Exit
+                            <span>🎛️</span> Admin
                         </button>
                     </div>
                 </div>
@@ -210,16 +215,18 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                     </div>
                 </div>
 
-                {/* Share Button */}
-                <button
-                    onClick={handleShare}
-                    className="w-full bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 text-white py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2"
-                >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                    </svg>
-                    分享預覽連結
-                </button>
+                {/* Share Button - Hidden in video-progress mode */}
+                {!isVideoProgress && (
+                    <button
+                        onClick={handleShare}
+                        className="w-full bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 text-white py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                        分享預覽連結
+                    </button>
+                )}
             </div>
 
             <div className="p-4 space-y-4">
@@ -250,7 +257,7 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                         onClick={() => toggleSection('videos')}
                         className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
                     >
-                        <span className="font-semibold">{isVideoProgress ? '🎬 R2 影片' : '🎨 內容輸入'}</span>
+                        <span className="font-semibold">{isVideoProgress ? '🎬 內容上傳區' : '🎨 內容輸入'}</span>
                         <svg
                             className={`w-5 h-5 transition-transform ${expandedSections.includes('videos') ? 'rotate-180' : ''}`}
                             fill="none"
