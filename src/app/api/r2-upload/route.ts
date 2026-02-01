@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { rateLimit } from '@/lib/ratelimit';
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID!;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID!;
@@ -24,6 +25,30 @@ const s3Client = new S3Client({
  * Returns: { uploadUrl: string, publicUrl: string, videoId: string, filename: string, key: string }
  */
 export async function POST(request: NextRequest) {
+    // Security: Rate limiting (10 requests per minute per IP)
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
+        request.headers.get('x-real-ip') ||
+        'unknown';
+
+    const { success, remaining, reset } = rateLimit(
+        `r2-upload-post:${ip}`,
+        10,  // Max 10 requests
+        60 * 1000  // Per 1 minute
+    );
+
+    if (!success) {
+        return NextResponse.json(
+            { error: 'Too many upload requests. Please try again later.' },
+            {
+                status: 429,
+                headers: {
+                    'X-RateLimit-Remaining': '0',
+                    'X-RateLimit-Reset': reset ? new Date(reset).toISOString() : '',
+                    'Retry-After': '60'
+                }
+            }
+        );
+    }
     try {
         const { filename, contentType } = await request.json();
 
@@ -81,6 +106,30 @@ export async function POST(request: NextRequest) {
  * Returns: { success: true }
  */
 export async function DELETE(request: NextRequest) {
+    // Security: Rate limiting (10 requests per minute per IP)
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
+        request.headers.get('x-real-ip') ||
+        'unknown';
+
+    const { success, remaining, reset } = rateLimit(
+        `r2-upload-delete:${ip}`,
+        10,  // Max 10 requests
+        60 * 1000  // Per 1 minute
+    );
+
+    if (!success) {
+        return NextResponse.json(
+            { error: 'Too many delete requests. Please try again later.' },
+            {
+                status: 429,
+                headers: {
+                    'X-RateLimit-Remaining': '0',
+                    'X-RateLimit-Reset': reset ? new Date(reset).toISOString() : '',
+                    'Retry-After': '60'
+                }
+            }
+        );
+    }
     try {
         const { key } = await request.json();
 

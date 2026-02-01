@@ -20,6 +20,83 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Security Configuration
+
+### Environment Variables Setup
+
+1. Copy the example environment file:
+```bash
+cp .env.example .env.local
+```
+
+2. Fill in the required values:
+   - **Firebase**: Get from Firebase Console > Project Settings
+   - **Cloudflare R2**: Get from Cloudflare Dashboard > R2 > Manage R2 API Tokens
+   - **Cloudinary**: Get from Cloudinary Dashboard > Settings > API Keys
+
+⚠️ **Important**: Never commit `.env.local` to version control. It's already in `.gitignore`.
+
+### API Security
+
+All API endpoints are protected with:
+
+- **Rate Limiting**: Prevents abuse and DoS attacks
+  - R2 uploads/deletes: 10 requests per minute per IP
+  - Cloudinary uploads: 5 requests per minute per IP
+  - Cloudinary signatures: 20 requests per minute per IP
+  - GLB compression: 3 requests per minute per IP (CPU intensive)
+
+- **File Validation**:
+  - GLB files: Max 50MB, format validation (magic number check)
+  - Other uploads: Max 100MB
+
+- **Secure Credential Handling**:
+  - API secrets kept server-side only
+  - No API keys exposed to client
+  - Presigned URLs for R2 uploads
+
+### Firebase Security Rules
+
+Configure Firestore and Storage security rules in Firebase Console:
+
+**Firestore Rules** (`Database > Rules`):
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /projects/{projectId} {
+      allow read: if true;  // Public read
+      allow write: if request.auth != null;  // Authenticated writes
+    }
+  }
+}
+```
+
+**Storage Rules** (`Storage > Rules`):
+```javascript
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
+```
+
+### Production Deployment (Vercel)
+
+For production deployments with Vercel:
+
+1. Set all environment variables in Vercel Dashboard
+2. Consider upgrading rate limiting to use Vercel KV for distributed rate limiting:
+   ```bash
+   npm install @vercel/kv
+   ```
+3. Uncomment the Vercel KV implementation in `src/lib/ratelimit.ts`
+4. Create a KV store in Vercel Dashboard and link to your project
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
