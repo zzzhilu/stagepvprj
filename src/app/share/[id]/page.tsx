@@ -37,6 +37,11 @@ function SharePageContent() {
     const setR2Videos = useStore(state => state.setR2Videos);
     const addContentTexture = useStore(state => state.addContentTexture);
     const setVideoPlaying = useStore(state => state.setVideoPlaying);
+    // Lighting settings sync
+    const setAmbientIntensity = useStore(state => state.setAmbientIntensity);
+    const setDirectionalIntensity = useStore(state => state.setDirectionalIntensity);
+    const setBloomIntensity = useStore(state => state.setBloomIntensity);
+    const setBloomThreshold = useStore(state => state.setBloomThreshold);
 
     useEffect(() => {
         loadProjectAndVideo();
@@ -67,6 +72,12 @@ function SharePageContent() {
             if (data.views) setViews(data.views);
             if (data.cues) setCues(data.cues);
             if (data.r2Videos) setR2Videos(data.r2Videos);
+
+            // Restore lighting settings from project (if saved)
+            if (data.ambientIntensity !== undefined) setAmbientIntensity(data.ambientIntensity);
+            if (data.directionalIntensity !== undefined) setDirectionalIntensity(data.directionalIntensity);
+            if (data.bloomIntensity !== undefined) setBloomIntensity(data.bloomIntensity);
+            if (data.bloomThreshold !== undefined) setBloomThreshold(data.bloomThreshold);
 
             // Find the specified video
             if (videoId && data.r2Videos) {

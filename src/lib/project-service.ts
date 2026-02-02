@@ -12,6 +12,11 @@ export interface ProjectState {
     activeContentId: string | null;
     cues?: any[]; // Store cues
     r2Videos?: R2Video[]; // R2 videos for Image Progress
+    // Lighting & Post-processing settings (synced to client)
+    ambientIntensity?: number;
+    directionalIntensity?: number;
+    bloomIntensity?: number;
+    bloomThreshold?: number;
     createdAt?: any;
     updatedAt?: any;
 }

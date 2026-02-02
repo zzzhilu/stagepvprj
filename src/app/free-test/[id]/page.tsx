@@ -101,6 +101,11 @@ function ProjectEditorContent() {
     const setActiveView = useStore(state => state.setActiveView);
     const setActiveContent = useStore(state => state.setActiveContent);
     const setCues = useStore(state => state.setCues); // [NEW]
+    // Lighting settings sync
+    const setAmbientIntensity = useStore(state => state.setAmbientIntensity);
+    const setDirectionalIntensity = useStore(state => state.setDirectionalIntensity);
+    const setBloomIntensity = useStore(state => state.setBloomIntensity);
+    const setBloomThreshold = useStore(state => state.setBloomThreshold);
 
     // Current state for auto-save
     const stageObjects = useStore(state => state.stageObjects);
@@ -109,6 +114,10 @@ function ProjectEditorContent() {
     const activeViewId = useStore(state => state.activeViewId);
     const activeContentId = useStore(state => state.activeContentId);
     const cues = useStore(state => state.cues); // [NEW]
+    const ambientIntensity = useStore(state => state.ambientIntensity);
+    const directionalIntensity = useStore(state => state.directionalIntensity);
+    const bloomIntensity = useStore(state => state.bloomIntensity);
+    const bloomThreshold = useStore(state => state.bloomThreshold);
 
     useEffect(() => {
         // Share mode bypasses auth
@@ -143,6 +152,11 @@ function ProjectEditorContent() {
                 if (data.activeViewId) setActiveView(data.activeViewId);
                 if (data.activeContentId) setActiveContent(data.activeContentId);
                 if (data.cues) setCues(data.cues); // [NEW]
+                // Restore lighting settings from project (if saved)
+                if (data.ambientIntensity !== undefined) setAmbientIntensity(data.ambientIntensity);
+                if (data.directionalIntensity !== undefined) setDirectionalIntensity(data.directionalIntensity);
+                if (data.bloomIntensity !== undefined) setBloomIntensity(data.bloomIntensity);
+                if (data.bloomThreshold !== undefined) setBloomThreshold(data.bloomThreshold);
             }
         } catch (error) {
             console.error('Failed to load project:', error);
@@ -165,6 +179,11 @@ function ProjectEditorContent() {
                     activeViewId,
                     activeContentId,
                     cues, // [NEW]
+                    // Lighting settings
+                    ambientIntensity,
+                    directionalIntensity,
+                    bloomIntensity,
+                    bloomThreshold,
                 });
             } catch (error) {
                 console.error('Auto-save failed:', error);
@@ -172,7 +191,7 @@ function ProjectEditorContent() {
         }, 2000); // Debounce 2 seconds
 
         return () => clearTimeout(timeoutId);
-    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, isAuthenticated, isShareMode, isLoading, projectId]);
+    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, isAuthenticated, isShareMode, isLoading, projectId]);
 
     // Show loading while checking auth
     if (isChecking) {
