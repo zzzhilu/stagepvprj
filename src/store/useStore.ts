@@ -189,8 +189,8 @@ export const useStore = create<State>()(
             renderMode: 'beauty',
             ambientIntensity: 0.8,
             directionalIntensity: 1.2,
-            bloomIntensity: 0.3,
-            bloomThreshold: 0.5,
+            bloomIntensity: 0.1,
+            bloomThreshold: 0.7,
             fov: 50, // Default FOV
 
             selectedObjectId: null,

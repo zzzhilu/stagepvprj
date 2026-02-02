@@ -127,8 +127,8 @@ export function LightingControls() {
                     onClick={() => {
                         setAmbientIntensity(0.8);
                         setDirectionalIntensity(1.2);
-                        setBloomIntensity(0.3);
-                        setBloomThreshold(0.5);
+                        setBloomIntensity(0.1);
+                        setBloomThreshold(0.7);
                     }}
                     className="w-full mt-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors"
                 >
