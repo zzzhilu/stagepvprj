@@ -2,6 +2,7 @@
 
 import { useStore, ContentTexture } from '@/store/useStore';
 import { useRef, useState } from 'react';
+import { generateImageThumbnail, generateVideoThumbnail } from '@/lib/thumbnail';
 
 export function ClientUploader() {
     const addContentTexture = useStore((state) => state.addContentTexture);
@@ -95,68 +96,6 @@ export function ClientUploader() {
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
-    };
-
-    const generateImageThumbnail = (imageUrl: string): Promise<string> => {
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = 160;
-                canvas.height = 90;
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.5));
-                } else {
-                    resolve(imageUrl);
-                }
-            };
-            img.onerror = () => resolve(imageUrl);
-            img.src = imageUrl;
-        });
-    };
-
-    const generateVideoThumbnail = (videoUrl: string): Promise<string> => {
-        return new Promise((resolve) => {
-            const video = document.createElement('video');
-            video.crossOrigin = 'anonymous';
-            video.src = videoUrl;
-            video.muted = true;
-
-            // Timeout after 5 seconds
-            const timeout = setTimeout(() => {
-                video.src = '';
-                resolve('');
-            }, 5000);
-
-            const cleanup = () => {
-                clearTimeout(timeout);
-            };
-
-            video.onloadeddata = () => {
-                video.currentTime = 0.1;
-            };
-
-            video.onseeked = () => {
-                cleanup();
-                const canvas = document.createElement('canvas');
-                canvas.width = 160;
-                canvas.height = 90;
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.7));
-                } else {
-                    resolve('');
-                }
-            };
-
-            video.onerror = () => {
-                cleanup();
-                resolve('');
-            };
-        });
     };
 
     const handleDragOver = (e: React.DragEvent) => {

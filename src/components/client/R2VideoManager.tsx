@@ -101,8 +101,11 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
                 type: 'r2_video',
             });
 
-            // Trigger save callback
-            onSave?.();
+            // Trigger save callback after state updates
+            // Use setTimeout to ensure Zustand state updates have completed
+            setTimeout(() => {
+                onSave?.();
+            }, 100);
 
             // Reset input
             if (fileInputRef.current) {
@@ -160,8 +163,10 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
                 removeContentTexture(video.id);
             }
 
-            // Trigger save callback
-            onSave?.();
+            // Trigger save callback after state updates
+            setTimeout(() => {
+                onSave?.();
+            }, 100);
         } catch (err: any) {
             console.error('Delete error:', err);
             const errorMessage = err instanceof Error ? err.message : '刪除失敗';
@@ -181,7 +186,9 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
                 if (existingTexture) {
                     removeContentTexture(video.id);
                 }
-                onSave?.();
+                setTimeout(() => {
+                    onSave?.();
+                }, 100);
                 setError(`${errorMessage} (因憑證錯誤，已強制從列表移除)`);
             } else {
                 setError(errorMessage);

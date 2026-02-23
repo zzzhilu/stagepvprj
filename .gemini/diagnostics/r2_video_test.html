@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>R2 視頻診斷工具</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        h1 {
+            color: #60a5fa;
+            border-bottom: 2px solid #60a5fa;
+            padding-bottom: 10px;
+        }
+        .section {
+            background: #2a2a2a;
+            border: 1px solid #404040;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .section h2 {
+            color: #fbbf24;
+            margin-top: 0;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #1a1a1a;
+            border: 1px solid #404040;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-family: monospace;
+        }
+        button {
+            background: #60a5fa;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+        }
+        button:hover {
+            background: #3b82f6;
+        }
+        button.danger {
+            background: #ef4444;
+        }
+        button.danger:hover {
+            background: #dc2626;
+        }
+        .result {
+            background: #1a1a1a;
+            border: 1px solid #404040;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success {
+            color: #10b981;
+        }
+        .error {
+            color: #ef4444;
+        }
+        .warning {
+            color: #fbbf24;
+        }
+        .info {
+            color: #60a5fa;
+        }
+        video {
+            max-width: 100%;
+            background: #000;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 R2 視頻診斷工具</h1>
+    
+    <div class="section">
+        <h2>📝 步驟 1: 檢查環境變數</h2>
+        <p>在 Console 中執行以下命令，查看 R2 Public URL：</p>
+        <div class="result">console.log(process.env.NEXT_PUBLIC_R2_PUBLIC_URL);</div>
+        <p class="info">如果顯示 undefined，請檢查 .env.local 文件並重啟開發服務器。</p>
+    </div>
+
+    <div class="section">
+        <h2>🌐 步驟 2: 測試 R2 視頻 URL</h2>
+        <p>從診斷面板或 Console 複製您的 R2 視頻 URL：</p>
+        <input type="text" id="videoUrl" placeholder="https://your-r2-domain.com/videos/vid_xxxxx/video.mp4" />
+        <button onclick="testVideoUrl()">測試 URL</button>
+        <button onclick="testCORS()">測試 CORS</button>
+        <div id="urlTestResult"></div>
+    </div>
+
+    <div class="section">
+        <h2>📹 步驟 3: 視頻播放測試</h2>
+        <button onclick="loadVideo()">載入並播放視頻</button>
+        <button class="danger" onclick="clearVideo()">清除</button>
+        <div id="videoContainer"></div>
+        <div id="playbackResult"></div>
+    </div>
+
+    <div class="section">
+        <h2>🔍 步驟 4: CORS 詳細檢查</h2>
+        <button onclick="checkDetailedCORS()">執行 CORS 檢查</button>
+        <div id="corsResult"></div>
+    </div>
+
+    <div class="section">
+        <h2>💡 診斷建議</h2>
+        <div id="suggestions" class="result">
+等待診斷結果...
+        </div>
+    </div>
+
+    <script>
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const className = type;
+            const icon = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
+            }[type] || 'ℹ️';
+            
+            element.innerHTML += `<div class="${className}">${icon} ${message}</div>`;
+        }
+
+        function clearLog(elementId) {
+            document.getElementById(elementId).innerHTML = '';
+        }
+
+        async function testVideoUrl() {
+            const url = document.getElementById('videoUrl').value.trim();
+            clearLog('urlTestResult');
+            
+            if (!url) {
+                log('urlTestResult', '請輸入 R2 視頻 URL', 'warning');
+                return;
+            }
+
+            log('urlTestResult', `測試 URL: ${url}`, 'info');
+
+            try {
+                const response = await fetch(url, { method: 'HEAD' });
+                
+                log('urlTestResult', `HTTP 狀態: ${response.status} ${response.statusText}`, 
+                    response.ok ? 'success' : 'error');
+
+                if (response.ok) {
+                    const contentType = response.headers.get('Content-Type');
+                    const contentLength = response.headers.get('Content-Length');
+                    const corsHeader = response.headers.get('Access-Control-Allow-Origin');
+                    
+                    log('urlTestResult', `Content-Type: ${contentType || '未設置'}`, 
+                        contentType?.startsWith('video/') ? 'success' : 'warning');
+                    
+                    log('urlTestResult', `檔案大小: ${contentLength ? (parseInt(contentLength) / 1024 / 1024).toFixed(2) + ' MB' : '未知'}`, 'info');
+                    
+                    log('urlTestResult', `CORS Header: ${corsHeader || '❌ 未設置'}`, 
+                        corsHeader ? 'success' : 'error');
+                    
+                    if (!corsHeader) {
+                        updateSuggestions('CORS 標頭未設置！請在 R2 Bucket 設置中配置 CORS Policy。');
+                    }
+                } else {
+                    log('urlTestResult', `無法訪問視頻。可能原因：\n1. URL 不正確\n2. Public Access 未啟用\n3. 文件不存在`, 'error');
+                    updateSuggestions('URL 無法訪問！請檢查 R2 Public Access 設置和 URL 格式。');
+                }
+            } catch (error) {
+                log('urlTestResult', `請求失敗: ${error.message}`, 'error');
+                if (error.message.includes('CORS')) {
+                    log('urlTestResult', '這是 CORS 錯誤！請配置 R2 Bucket 的 CORS Policy。', 'error');
+                    updateSuggestions('CORS 錯誤！這是最常見的問題。請參考修復指南配置 CORS。');
+                }
+            }
+        }
+
+        async function testCORS() {
+            const url = document.getElementById('videoUrl').value.trim();
+            clearLog('urlTestResult');
+            
+            if (!url) {
+                log('urlTestResult', '請輸入 R2 視頻 URL', 'warning');
+                return;
+            }
+
+            log('urlTestResult', '執行 CORS 測試...', 'info');
+
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    mode: 'cors',
+                });
+                
+                log('urlTestResult', 'CORS 測試通過！您的 R2 Bucket CORS 設置正確。', 'success');
+                updateSuggestions('CORS 配置正常。如果視頻仍無法播放，請檢查視頻格式和編碼。');
+            } catch (error) {
+                log('urlTestResult', `CORS 測試失敗: ${error.message}`, 'error');
+                log('urlTestResult', '請在 Cloudflare R2 Dashboard 配置 CORS Policy。', 'error');
+                updateSuggestions('CORS 未配置或配置不正確！請立即配置 CORS Policy。');
+            }
+        }
+
+        function loadVideo() {
+            const url = document.getElementById('videoUrl').value.trim();
+            const container = document.getElementById('videoContainer');
+            clearLog('playbackResult');
+            
+            if (!url) {
+                log('playbackResult', '請輸入 R2 視頻 URL', 'warning');
+                return;
+            }
+
+            log('playbackResult', '正在載入視頻...', 'info');
+
+            // 創建視頻元素
+            const video = document.createElement('video');
+            video.src = url;
+            video.controls = true;
+            video.crossOrigin = 'anonymous';
+            video.loop = true;
+            video.style.width = '100%';
+            video.style.marginTop = '10px';
+
+            // 事件監聽
+            video.addEventListener('loadedmetadata', () => {
+                log('playbackResult', `✅ 視頻元數據已載入`, 'success');
+                log('playbackResult', `時長: ${video.duration.toFixed(2)}秒`, 'info');
+                log('playbackResult', `尺寸: ${video.videoWidth}x${video.videoHeight}`, 'info');
+            });
+
+            video.addEventListener('canplay', () => {
+                log('playbackResult', '✅ 視頻可以播放', 'success');
+                updateSuggestions('視頻可以正常播放！如果在應用中無法播放，請檢查應用代碼。');
+            });
+
+            video.addEventListener('error', (e) => {
+                log('playbackResult', `❌ 視頻載入錯誤: ${video.error?.message || '未知錯誤'}`, 'error');
+                log('playbackResult', `錯誤代碼: ${video.error?.code}`, 'error');
+                
+                if (video.error?.code === 4) {
+                    log('playbackResult', '可能原因：視頻格式不支持或文件損壞', 'warning');
+                }
+            });
+
+            video.addEventListener('playing', () => {
+                log('playbackResult', '▶️ 視頻正在播放', 'success');
+            });
+
+            container.innerHTML = '';
+            container.appendChild(video);
+
+            // 嘗試播放
+            video.play().then(() => {
+                log('playbackResult', '✅ 自動播放成功', 'success');
+            }).catch(err => {
+                log('playbackResult', `⚠️ 自動播放被阻擋: ${err.message}`, 'warning');
+                log('playbackResult', '這是正常的瀏覽器行為，請手動點擊播放。', 'info');
+            });
+        }
+
+        function clearVideo() {
+            document.getElementById('videoContainer').innerHTML = '';
+            clearLog('playbackResult');
+            log('playbackResult', '已清除視頻', 'info');
+        }
+
+        async function checkDetailedCORS() {
+            const url = document.getElementById('videoUrl').value.trim();
+            clearLog('corsResult');
+            
+            if (!url) {
+                log('corsResult', '請輸入 R2 視頻 URL', 'warning');
+                return;
+            }
+
+            log('corsResult', '執行詳細 CORS 檢查...', 'info');
+            log('corsResult', `當前來源: ${window.location.origin}`, 'info');
+
+            try {
+                const response = await fetch(url);
+                
+                const headers = [
+                    'Access-Control-Allow-Origin',
+                    'Access-Control-Allow-Methods',
+                    'Access-Control-Allow-Headers',
+                    'Access-Control-Expose-Headers',
+                    'Access-Control-Max-Age',
+                    'Content-Type',
+                    'Content-Length'
+                ];
+
+                log('corsResult', '\nResponse Headers:', 'info');
+                headers.forEach(header => {
+                    const value = response.headers.get(header);
+                    log('corsResult', `${header}: ${value || '❌ 未設置'}`, 
+                        value ? 'success' : 'warning');
+                });
+
+                const allowOrigin = response.headers.get('Access-Control-Allow-Origin');
+                if (allowOrigin === '*' || allowOrigin === window.location.origin) {
+                    log('corsResult', '\n✅ CORS 配置正確！', 'success');
+                } else if (!allowOrigin) {
+                    log('corsResult', '\n❌ CORS 未配置！', 'error');
+                    updateSuggestions('CORS 未配置！請立即在 R2 Bucket 設置中添加 CORS Policy。');
+                } else {
+                    log('corsResult', `\n⚠️ CORS 配置了，但不匹配當前來源`, 'warning');
+                    log('corsResult', `允許的來源: ${allowOrigin}`, 'warning');
+                    log('corsResult', `當前來源: ${window.location.origin}`, 'warning');
+                }
+            } catch (error) {
+                log('corsResult', `CORS 檢查失敗: ${error.message}`, 'error');
+            }
+        }
+
+        function updateSuggestions(message) {
+            const element = document.getElementById('suggestions');
+            element.innerHTML = `<div class="warning">⚠️ ${message}</div>`;
+            
+            element.innerHTML += `\n\n<strong>修復步驟：</strong>\n`;
+            element.innerHTML += `1. 進入 Cloudflare Dashboard → R2 → 您的 Bucket\n`;
+            element.innerHTML += `2. 點擊 Settings → CORS Policy → Edit CORS Policy\n`;
+            element.innerHTML += `3. 添加以下配置：\n\n`;
+            element.innerHTML += `<div class="result">[
+  {
+    "AllowedOrigins": ["*"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "MaxAgeSeconds": 3600
+  }
+]</div>\n`;
+            element.innerHTML += `4. 同時確保 Public Access 已啟用\n`;
+            element.innerHTML += `5. 重啟開發服務器並測試\n`;
+        }
+    </script>
+</body>
+</html>

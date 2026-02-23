@@ -44,7 +44,7 @@ export const MATERIAL_LIBRARY: Record<MaterialId, MaterialDefinition> = {
         roughness: 0.9,
         metalness: 0.0,
         emissive: '#ffaa00',
-        emissiveIntensity: 2.0
+        emissiveIntensity: 1.0
     },
     matteGray: {
         id: 'matteGray',

@@ -2,6 +2,7 @@
 
 import { useStore, ContentTexture, TextureType } from '@/store/useStore';
 import { useState, useRef } from 'react';
+import { generateThumbnailFromFile } from '@/lib/thumbnail';
 
 const MAX_VIDEO_SIZE_MB = 500; // Increased limit for Firebase
 const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
@@ -35,74 +36,6 @@ export function TextureUploader() {
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     };
 
-    const generateThumbnail = async (file: File, type: TextureType): Promise<string> => {
-        return new Promise((resolve) => {
-            if (type === 'image') {
-                // For images, use FileReader to create thumbnail
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const maxSize = 160;
-                        let width = img.width;
-                        let height = img.height;
-
-                        if (width > height) {
-                            if (width > maxSize) {
-                                height = (height * maxSize) / width;
-                                width = maxSize;
-                            }
-                        } else {
-                            if (height > maxSize) {
-                                width = (width * maxSize) / height;
-                                height = maxSize;
-                            }
-                        }
-
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        if (ctx) {
-                            ctx.drawImage(img, 0, 0, width, height);
-                            resolve(canvas.toDataURL('image/jpeg', 0.7));
-                        } else {
-                            resolve('');
-                        }
-                    };
-                    img.src = e.target?.result as string;
-                };
-                reader.readAsDataURL(file);
-            } else {
-                // For videos, capture frame at 1 second
-                const videoUrl = URL.createObjectURL(file);
-                const video = document.createElement('video');
-                video.src = videoUrl;
-                video.crossOrigin = 'anonymous';
-                video.currentTime = 1;
-
-                video.onloadeddata = () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = 160;
-                    canvas.height = 90;
-                    const ctx = canvas.getContext('2d');
-                    if (ctx) {
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.7));
-                    } else {
-                        resolve('');
-                    }
-                    URL.revokeObjectURL(videoUrl);
-                };
-
-                video.onerror = () => {
-                    URL.revokeObjectURL(videoUrl);
-                    resolve('');
-                };
-            }
-        });
-    };
-
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -124,8 +57,8 @@ export function TextureUploader() {
         setLoading(true, '上傳至雲端 (Firebase)...');
 
         try {
-            // Generate thumbnail locally first
-            const thumbnail = await generateThumbnail(file, fileType);
+            // Generate thumbnail locally first using shared utility
+            const thumbnail = await generateThumbnailFromFile(file);
 
             // Import Firebase functions dynamically
             const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');

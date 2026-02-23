@@ -197,7 +197,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                             side: THREE.DoubleSide,
                             emissive: new THREE.Color('#ffffff'), // White multiplier for emissive map
                             emissiveMap: textureMap,
-                            emissiveIntensity: matDef.emissiveIntensity || 2.0,
+                            emissiveIntensity: matDef.emissiveIntensity || 1.0,
                         });
                     } else {
                         // No texture, use solid emissive color
@@ -207,7 +207,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                             metalness: matDef.metalness,
                             side: THREE.DoubleSide,
                             emissive: new THREE.Color(matDef.emissive || '#ffaa00'),
-                            emissiveIntensity: matDef.emissiveIntensity || 2.0,
+                            emissiveIntensity: matDef.emissiveIntensity || 1.0,
                         });
                     }
                 }
