@@ -16,7 +16,7 @@ export function ReflectionControls() {
     return (
         <div className="bg-gray-900 rounded-lg p-4 space-y-4">
             <h4 className="text-sm font-bold flex items-center gap-2">
-                <span>🔮</span> 反射設定
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><circle cx="12" cy="12" r="9" /><path strokeLinecap="round" d="M12 3c4.97 0 9 4.03 9 9M8 21.17A9 9 0 013 12" /></svg> 反射設定
             </h4>
 
             {/* Mirror Strength */}

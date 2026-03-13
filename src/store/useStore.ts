@@ -56,6 +56,14 @@ export interface R2Video {
     uploadedAt: number;   // Timestamp
 }
 
+// Paper Figure (Billboard Sprite) for scale reference
+export interface PaperFigure {
+    id: string;
+    position: [number, number, number];
+    scale: number;   // uniform scale (default 1)
+    color: string;   // hex color
+}
+
 export interface CameraView {
     id: string;
     name: string;
@@ -104,6 +112,14 @@ interface State {
     selectedObjectId: string | null;
     transformMode: 'translate' | 'rotate' | 'scale';
     gizmoEnabled: boolean; // [NEW] Toggle for transform controls
+
+    // Drawing & Screenshot State [NEW]
+    drawingMode: boolean;
+    screenshotToast: boolean;
+
+    // Paper Figure State [NEW]
+    paperFigures: PaperFigure[];
+    paperFigureMode: boolean;
 
     // Perfect Render Mode [NEW]
     perfectRenderEnabled: boolean;
@@ -157,6 +173,19 @@ interface State {
     removeView: (id: string) => void;
     setActiveView: (id: string | null) => void;
 
+    // Drawing & Screenshot Actions [NEW]
+    setDrawingMode: (enabled: boolean) => void;
+    showScreenshotToast: () => void;
+
+    // Paper Figure Actions [NEW]
+    setPaperFigureMode: (enabled: boolean) => void;
+    addPaperFigure: (figure: PaperFigure) => void;
+    removePaperFigure: (id: string) => void;
+    updatePaperFigurePosition: (id: string, position: [number, number, number]) => void;
+    updatePaperFigureScale: (id: string, scale: number) => void;
+    clearAllPaperFigures: () => void;
+    setPaperFigures: (figures: PaperFigure[]) => void;
+
     setLoading: (loading: boolean, message?: string) => void;
     loadState: (state: Partial<State>) => void;
 
@@ -196,6 +225,14 @@ export const useStore = create<State>()(
             selectedObjectId: null,
             transformMode: 'translate',
             gizmoEnabled: false, // [NEW] Default off
+
+            // Drawing & Screenshot defaults
+            drawingMode: false,
+            screenshotToast: false,
+
+            // Paper Figure defaults
+            paperFigures: [],
+            paperFigureMode: false,
 
             // Perfect Render defaults
             perfectRenderEnabled: false,
@@ -383,6 +420,30 @@ export const useStore = create<State>()(
             })),
             setActiveView: (id) => set({ activeViewId: id }),
 
+            // Drawing & Screenshot
+            setDrawingMode: (enabled) => set({ drawingMode: enabled }),
+            showScreenshotToast: () => {
+                set({ screenshotToast: true });
+                setTimeout(() => set({ screenshotToast: false }), 2000);
+            },
+
+            // Paper Figure Actions
+            setPaperFigureMode: (enabled) => set({ paperFigureMode: enabled }),
+            addPaperFigure: (figure) => set((state) => ({
+                paperFigures: [...state.paperFigures, figure]
+            })),
+            removePaperFigure: (id) => set((state) => ({
+                paperFigures: state.paperFigures.filter(f => f.id !== id)
+            })),
+            updatePaperFigurePosition: (id, position) => set((state) => ({
+                paperFigures: state.paperFigures.map(f => f.id === id ? { ...f, position } : f)
+            })),
+            updatePaperFigureScale: (id, scale) => set((state) => ({
+                paperFigures: state.paperFigures.map(f => f.id === id ? { ...f, scale } : f)
+            })),
+            clearAllPaperFigures: () => set({ paperFigures: [] }),
+            setPaperFigures: (figures) => set({ paperFigures: figures }),
+
             setLoading: (loading, message = '') => set({ isLoading: loading, loadingMessage: message }),
             loadState: (newState) => set((state) => ({
                 ...state,
@@ -421,6 +482,7 @@ export const useStore = create<State>()(
                 activeCueId: state.activeCueId, // [NEW]
                 fov: state.fov, // [NEW]
                 r2Videos: state.r2Videos, // [NEW]
+                paperFigures: state.paperFigures, // [NEW]
             }),
         }
     )

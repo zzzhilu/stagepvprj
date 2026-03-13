@@ -50,6 +50,8 @@ export default function Scene() {
     const isRecordingMode = useStore((state) => state.isRecordingMode);
     const gizmoEnabled = useStore((state) => state.gizmoEnabled);
     const perfectRenderEnabled = useStore((state) => state.perfectRenderEnabled);
+    const paperFigureMode = useStore((state) => state.paperFigureMode);
+    const paperFigures = useStore((state) => state.paperFigures);
 
     // Check if active content is a video (support both 'video' and 'r2_video')
     const activeContent = activeContentId
@@ -57,8 +59,9 @@ export default function Scene() {
         : null;
     const isVideoActive = activeContent?.type === 'video' || activeContent?.type === 'r2_video';
 
-    // Use 'always' frameloop when video is playing, recording, Gimzo, or Perfect Render is enabled
-    const frameloop = (isVideoActive && videoPlaying) || isRecordingMode || gizmoEnabled || perfectRenderEnabled ? 'always' : 'demand';
+    // Use 'always' frameloop when video is playing, recording, Gimzo, Perfect Render, or paper figures exist
+    const hasPaperFigures = paperFigures.length > 0;
+    const frameloop = (isVideoActive && videoPlaying) || isRecordingMode || gizmoEnabled || perfectRenderEnabled || paperFigureMode || hasPaperFigures ? 'always' : 'demand';
 
     return (
         <Canvas

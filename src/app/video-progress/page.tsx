@@ -182,7 +182,7 @@ export default function VideoProgressDashboard() {
                         </div>
                     ) : projects.length === 0 ? (
                         <div className="text-center py-20">
-                            <div className="text-6xl mb-4">🎬</div>
+                            <div className="text-6xl mb-4"><svg className="w-16 h-16 mx-auto text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg></div>
                             <h3 className="text-2xl font-bold text-white mb-2">尚無專案</h3>
                             <p className="text-gray-400 mb-6">點擊上方按鈕建立您的第一個影像進度專案</p>
                         </div>
@@ -232,7 +232,7 @@ export default function VideoProgressDashboard() {
                                         className="block bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 hover:border-blue-500 transition-all hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/20"
                                     >
                                         <div className="flex items-start justify-between mb-4">
-                                            <div className="text-4xl">📹</div>
+                                            <div className="text-4xl"><svg className="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" /></svg></div>
                                             <div className="text-xs text-gray-500">
                                                 {formatDate(project.updatedAt || project.createdAt)}
                                             </div>

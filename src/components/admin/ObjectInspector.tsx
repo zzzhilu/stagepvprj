@@ -103,7 +103,7 @@ export function ObjectInspector() {
                             <div className="flex items-center justify-between">
                                 <span className="font-medium">{getObjectName(obj)}</span>
                                 {obj.parentId && (
-                                    <span className="text-[10px] opacity-60">🔗 已連結</span>
+                                    <span className="text-[10px] opacity-60 flex items-center gap-0.5"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg> 已連結</span>
                                 )}
                             </div>
                         </button>

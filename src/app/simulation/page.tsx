@@ -7,6 +7,7 @@ import { useStore } from '@/store/useStore';
 import ClientControls from '@/components/client/ClientControls';
 import { VideoControls } from '@/components/client/VideoControls';
 import { ViewSwitcher } from '@/components/client/ViewSwitcher';
+import { BottomLeftPanel } from '@/components/client/BottomLeftPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ClientUploader } from '@/components/client/ClientUploader';
 
@@ -76,8 +77,8 @@ function SimulationContent() {
             {/* Video Controls */}
             <VideoControls />
 
-            {/* View Switcher */}
-            <ViewSwitcher />
+            {/* Bottom Left Panel - Views & Cues */}
+            <BottomLeftPanel />
 
             {/* Client Uploader - Always visible on this route */}
             <ClientUploader />

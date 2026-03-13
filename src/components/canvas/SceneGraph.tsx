@@ -1,6 +1,7 @@
 import { OrbitControls, PerspectiveCamera, TransformControls, MeshReflectorMaterial } from '@react-three/drei';
 import { useStore, StageObject } from '@/store/useStore';
 import { StageObjectRenderer } from './StageObjectRenderer';
+import { PaperFigureRenderer } from './PaperFigureRenderer';
 import { CameraCapture } from './CameraCapture';
 import { VideoManager } from './VideoManager';
 import { EffectComposer, Bloom, SMAA } from '@react-three/postprocessing';
@@ -40,6 +41,12 @@ export function SceneGraph() {
     const cameraRef = useRef<THREE.PerspectiveCamera>(null);
     const fov = useStore((state) => state.fov);
     const setFov = useStore((state) => state.setFov);
+
+    // Drawing mode — disable orbit when drawing is active
+    const drawingMode = useStore((state) => state.drawingMode);
+
+    // Paper Figure mode
+    const paperFigureMode = useStore((state) => state.paperFigureMode);
 
     // Create/update refs for all objects (using mutable ref objects)
     useEffect(() => {
@@ -132,10 +139,11 @@ export function SceneGraph() {
                 fov={fov}
             />
 
-            {/* Free OrbitControls - full rotation freedom */}
+            {/* Free OrbitControls - full rotation freedom (disabled during drawing) */}
             <OrbitControls
                 ref={controlsRef}
                 makeDefault
+                enabled={!drawingMode && !paperFigureMode}
                 enablePan={true}
                 enableZoom={true}
                 enableRotate={true}
@@ -156,6 +164,9 @@ export function SceneGraph() {
 
             {/* Video Manager */}
             <VideoManager />
+
+            {/* Paper Figures (Billboard Sprites) */}
+            <PaperFigureRenderer />
 
             {/* Enhanced lighting for better model visibility */}
             <ambientLight intensity={ambientIntensity} />

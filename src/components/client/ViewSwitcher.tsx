@@ -20,7 +20,7 @@ export function ViewSwitcher() {
     return (
         <div className="absolute bottom-4 left-4 z-40 pointer-events-auto">
             <div className="flex flex-col gap-2">
-                <span className="text-xs text-gray-400 mb-1">📷 視角</span>
+                <span className="text-xs text-gray-400 mb-1 flex items-center gap-1"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg> 視角</span>
                 <div className="flex gap-2">
                     {views.map((view, index) => (
                         <button

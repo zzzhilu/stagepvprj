@@ -189,7 +189,7 @@ export function TextureUploader() {
                 {/* HLS/Stream URL Input */}
                 <div className="mt-4 pt-4 border-t border-gray-700">
                     <label className="text-sm font-medium text-gray-300 mb-2 block">
-                        📡 串流 URL (HLS/MP4)
+                        <svg className="w-4 h-4 inline-block mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.858 15.355-5.858 21.213 0" /></svg> 串流 URL (HLS/MP4)
                     </label>
                     <div className="flex gap-2">
                         <input
@@ -236,7 +236,7 @@ export function TextureUploader() {
                         {/* Images Section */}
                         {images.length > 0 && (
                             <div>
-                                <h5 className="text-xs font-medium text-blue-400 mb-2">🖼️ 圖片 ({images.length})</h5>
+                                <h5 className="text-xs font-medium text-blue-400 mb-2 flex items-center gap-1"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> 圖片 ({images.length})</h5>
                                 <div className="grid grid-cols-2 gap-2">
                                     {images.map(texture => {
                                         const isActive = activeContentId === texture.id;
@@ -303,7 +303,7 @@ export function TextureUploader() {
 
                         {images.length > 0 && (
                             <div>
-                                <h5 className="text-xs font-medium text-green-400 mb-2">🎬 影片 ({videos.length})</h5>
+                                <h5 className="text-xs font-medium text-green-400 mb-2 flex items-center gap-1"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg> 影片 ({videos.length})</h5>
                                 <div className="grid grid-cols-2 gap-2">
                                     {videos.map(texture => {
                                         const isActive = activeContentId === texture.id;

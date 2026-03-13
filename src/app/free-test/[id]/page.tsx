@@ -6,10 +6,11 @@ import { Suspense, useState, useEffect } from 'react';
 import AdminControls from '@/components/admin/AdminControls';
 import ClientControls from '@/components/client/ClientControls';
 import { VideoControls } from '@/components/client/VideoControls';
-import { ViewSwitcher } from '@/components/client/ViewSwitcher';
+import { BottomLeftPanel } from '@/components/client/BottomLeftPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ClientUploader } from '@/components/client/ClientUploader';
-import { CueSelector } from '@/components/client/CueSelector';
+import { ClientToolbar } from '@/components/client/ClientToolbar';
+import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
 
@@ -45,7 +46,7 @@ function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black">
             <div className="bg-gray-800 rounded-2xl p-8 w-full max-w-md mx-4 border border-gray-700 shadow-2xl">
-                <h3 className="text-2xl font-bold text-white mb-2 text-center">🔒 管理員驗證</h3>
+                <h3 className="text-2xl font-bold text-white mb-2 text-center flex items-center justify-center gap-2"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg> 管理員驗證</h3>
                 <p className="text-gray-400 text-sm text-center mb-6">請輸入密碼以進入編輯模式</p>
 
                 <input
@@ -215,30 +216,33 @@ function ProjectEditorContent() {
         <main className="relative w-full h-full">
             {/* Project Name Display - Share mode only - Bottom Right */}
             {isShareMode && currentProjectName && (
-                <div className="absolute bottom-6 right-6 z-50 pointer-events-none">
+                <div data-ui-element className="absolute bottom-6 right-6 z-50 pointer-events-none">
                     <div className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-lg">
                         <span className="text-white/90 font-medium tracking-wide text-sm">{currentProjectName}</span>
                     </div>
                 </div>
             )}
 
+            {/* Client Toolbar - Side tools */}
+            <ClientToolbar projectId={projectId} />
+
+            {/* Drawing Overlay */}
+            <DrawingOverlay projectId={projectId} />
+
             {/* Admin Controls - Hidden in share mode */}
-            {!isShareMode && <AdminControls projectName={currentProjectName} />}
+            {!isShareMode && <div data-ui-element><AdminControls projectName={currentProjectName} /></div>}
 
             {/* Client Controls */}
-            <ClientControls />
+            <div data-ui-element><ClientControls /></div>
 
             {/* Video Controls */}
-            <VideoControls />
+            <div data-ui-element><VideoControls /></div>
 
-            {/* View Switcher - Always visible */}
-            <ViewSwitcher />
-
-            {/* Cue Selector - Always visible */}
-            <CueSelector />
+            {/* Bottom Left Panel - Views & Cues */}
+            <BottomLeftPanel />
 
             {/* Client Uploader for Share Mode */}
-            {isShareMode && <ClientUploader />}
+            {isShareMode && <div data-ui-element><ClientUploader /></div>}
 
             {/* 3D Scene */}
             <ErrorBoundary>

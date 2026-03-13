@@ -5,9 +5,10 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { Suspense, useState, useEffect } from 'react';
 import ClientControls from '@/components/client/ClientControls';
 import { VideoControls } from '@/components/client/VideoControls';
-import { ViewSwitcher } from '@/components/client/ViewSwitcher';
+import { BottomLeftPanel } from '@/components/client/BottomLeftPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { CueSelector } from '@/components/client/CueSelector';
+import { ClientToolbar } from '@/components/client/ClientToolbar';
+import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
 
@@ -154,7 +155,7 @@ function SharePageContent() {
         return (
             <div className="w-full h-full flex items-center justify-center bg-gray-900">
                 <div className="text-center">
-                    <div className="text-6xl mb-4">😕</div>
+                    <div className="text-6xl mb-4"><svg className="w-16 h-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg></div>
                     <h2 className="text-2xl font-bold text-white mb-2">發生錯誤</h2>
                     <p className="text-gray-400">{error}</p>
                 </div>
@@ -166,7 +167,7 @@ function SharePageContent() {
         <main className="relative w-full h-full">
             {/* Watermark - Bottom Right */}
             {(projectName || videoFilename) && (
-                <div className="absolute bottom-6 right-6 z-50 pointer-events-none">
+                <div data-ui-element className="absolute bottom-6 right-6 z-50 pointer-events-none">
                     <div className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-lg">
                         <span className="text-white/90 font-medium tracking-wide text-sm">
                             {projectName}{videoFilename ? ` - ${videoFilename}` : ''}
@@ -175,17 +176,20 @@ function SharePageContent() {
                 </div>
             )}
 
+            {/* Client Toolbar - Side tools */}
+            <ClientToolbar projectId={projectId} />
+
+            {/* Drawing Overlay */}
+            <DrawingOverlay projectId={projectId} />
+
             {/* Client Controls - Keep for basic navigation */}
-            <ClientControls />
+            <div data-ui-element><ClientControls /></div>
 
             {/* Video Controls */}
-            <VideoControls />
+            <div data-ui-element><VideoControls /></div>
 
-            {/* View Switcher - Always visible */}
-            <ViewSwitcher />
-
-            {/* Cue Selector - Always visible */}
-            <CueSelector />
+            {/* Bottom Left Panel - Views & Cues */}
+            <BottomLeftPanel />
 
             {/* 3D Scene */}
             <ErrorBoundary>

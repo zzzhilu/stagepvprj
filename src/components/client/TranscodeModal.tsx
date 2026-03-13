@@ -81,7 +81,7 @@ export function TranscodeModal({ progress, videoDuration, onClose }: TranscodeMo
                 {progress.stage === 'loading' && videoDuration && videoDuration > 60 && (
                     <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-4">
                         <p className="text-yellow-400 text-sm">
-                            ⚠️ 影片較長，轉碼可能需要 {Math.ceil(videoDuration * 4 / 60)} 分鐘或更久
+                            <svg className="w-4 h-4 inline-block mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg> 影片較長，轉碼可能需要 {Math.ceil(videoDuration * 4 / 60)} 分鐘或更久
                         </p>
                     </div>
                 )}
@@ -89,7 +89,7 @@ export function TranscodeModal({ progress, videoDuration, onClose }: TranscodeMo
                 {/* Success Message */}
                 {isComplete && (
                     <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mb-4 text-center">
-                        <p className="text-green-400">✅ MP4 檔案已自動下載</p>
+                        <p className="text-green-400"><svg className="w-4 h-4 inline-block mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg> MP4 檔案已自動下載</p>
                     </div>
                 )}
 

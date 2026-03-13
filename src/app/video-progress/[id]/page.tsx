@@ -6,9 +6,8 @@ import { useState, useEffect, useCallback } from 'react';
 import AdminControls from '@/components/admin/AdminControls';
 import ClientControls from '@/components/client/ClientControls';
 import { VideoControls } from '@/components/client/VideoControls';
-import { ViewSwitcher } from '@/components/client/ViewSwitcher';
+import { BottomLeftPanel } from '@/components/client/BottomLeftPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { CueSelector } from '@/components/client/CueSelector';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
 
@@ -44,7 +43,7 @@ function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black">
             <div className="bg-gray-800 rounded-2xl p-8 w-full max-w-md mx-4 border border-gray-700 shadow-2xl">
-                <h3 className="text-2xl font-bold text-white mb-2 text-center">🔒 管理員驗證</h3>
+                <h3 className="text-2xl font-bold text-white mb-2 text-center flex items-center justify-center gap-2"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg> 管理員驗證</h3>
                 <p className="text-gray-400 text-sm text-center mb-6">請輸入密碼以進入編輯模式</p>
 
                 <input
@@ -218,11 +217,8 @@ export default function VideoProgressEditorPage() {
             {/* Video Controls */}
             <VideoControls />
 
-            {/* View Switcher */}
-            <ViewSwitcher />
-
-            {/* Cue Selector */}
-            <CueSelector />
+            {/* Bottom Left Panel - Views & Cues */}
+            <BottomLeftPanel />
 
             {/* 3D Scene */}
             <ErrorBoundary>
