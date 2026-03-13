@@ -2,7 +2,6 @@
 
 import { useSearchParams, usePathname } from 'next/navigation';
 import { RenderModeSelector } from './RenderModeSelector';
-import { PerfectRenderToggle } from './PerfectRenderToggle';
 
 export default function ClientControls() {
 
@@ -25,13 +24,6 @@ export default function ClientControls() {
                     <RenderModeSelector />
                 </div>
             )}
-
-            {/* Perfect Render Toggle - Below RenderModeSelector or ClientUploader */}
-            <div className="absolute top-16 left-4 pointer-events-auto z-40">
-                <PerfectRenderToggle />
-            </div>
-
-            {/* RenderModeSelector removed from client mode - now only in top-left */}
         </>
     );
 }

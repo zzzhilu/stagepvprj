@@ -51,10 +51,10 @@ export function VideoControls() {
         clearCollapseTimer();
         collapseTimerRef.current = setTimeout(() => {
             setCollapsed(true);
-        }, 2000);
+        }, 5000);
     }, [clearCollapseTimer]);
 
-    // When video starts playing → start 2s collapse timer
+    // When video starts playing → start 5s collapse timer
     // When video pauses or stops → expand and clear timer
     useEffect(() => {
         if (videoPlaying && !isRecording) {
@@ -66,7 +66,7 @@ export function VideoControls() {
         return clearCollapseTimer;
     }, [videoPlaying, isRecording, startCollapseTimer, clearCollapseTimer]);
 
-    // When user expands, restart the 2s timer if still playing
+    // When user expands, restart the 5s timer if still playing
     const handleExpand = useCallback(() => {
         setCollapsed(false);
         if (videoPlaying && !isRecording) {
@@ -263,7 +263,7 @@ export function VideoControls() {
     if (collapsed) {
         return (
             <div
-                className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto w-[500px] max-w-[85vw] cursor-pointer group transition-all duration-500 ease-out"
+                className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto w-[500px] max-w-[85vw] cursor-pointer group transition-all duration-[800ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
                 onClick={handleExpand}
             >
                 {/* Hover hint */}
@@ -293,7 +293,11 @@ export function VideoControls() {
     // --- Full controls when expanded ---
     return (
         <div
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-sm p-4 z-50 pointer-events-auto rounded-xl border border-white/10 w-[600px] max-w-[90vw] transition-all duration-500 ease-out"
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-sm p-4 z-50 pointer-events-auto rounded-xl border border-white/10 w-[600px] max-w-[90vw] transition-all duration-[800ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
+            onMouseEnter={clearCollapseTimer}
+            onMouseLeave={() => { if (videoPlaying && !isRecording) startCollapseTimer(); }}
+            onTouchStart={clearCollapseTimer}
+            onTouchEnd={() => { if (videoPlaying && !isRecording) startCollapseTimer(); }}
         >
             <div className="max-w-4xl mx-auto space-y-3">
                 {/* Recording Status */}
