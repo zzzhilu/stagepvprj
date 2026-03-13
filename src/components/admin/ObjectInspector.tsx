@@ -238,6 +238,29 @@ export function ObjectInspector() {
                             </div>
                         </div>
 
+                        {/* Mesh Component Names */}
+                        {selectedObject.meshNames && selectedObject.meshNames.length > 0 && (
+                            <div className="space-y-2 pt-2 border-t border-gray-700">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-xs text-gray-400 font-bold">模型元件 (Components)</label>
+                                    <span className="text-[10px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded">{selectedObject.meshNames.length}</span>
+                                </div>
+                                <div className="space-y-0.5 max-h-32 overflow-y-auto">
+                                    {selectedObject.meshNames.map((name, i) => (
+                                        <div
+                                            key={i}
+                                            className="flex items-center gap-1.5 px-2 py-1 bg-gray-800/60 rounded text-[11px] text-gray-300"
+                                        >
+                                            <svg className="w-3 h-3 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25" />
+                                            </svg>
+                                            <span className="truncate">{name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Link to Parent */}
                         <LinkToParentDropdown
                             selectedObjectId={selectedObject.id}

@@ -24,6 +24,8 @@ export function VideoControls() {
     const [isRecording, setIsRecording] = useState(false);
     const [recordingStatus, setRecordingStatus] = useState<string>('');
     const [showRecordTooltip, setShowRecordTooltip] = useState(false);
+    const [collapsed, setCollapsed] = useState(false);
+    const collapseTimerRef = useRef<NodeJS.Timeout | null>(null);
     const videoEndedHandlerRef = useRef<(() => void) | null>(null);
     const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
     const isLongPressingRef = useRef(false);
@@ -36,6 +38,41 @@ export function VideoControls() {
         ? contentTextures.find(t => t.id === activeContentId)
         : null;
     const isVideoActive = activeContent?.type === 'video' || activeContent?.type === 'r2_video';
+
+    // --- Auto-collapse logic ---
+    const clearCollapseTimer = useCallback(() => {
+        if (collapseTimerRef.current) {
+            clearTimeout(collapseTimerRef.current);
+            collapseTimerRef.current = null;
+        }
+    }, []);
+
+    const startCollapseTimer = useCallback(() => {
+        clearCollapseTimer();
+        collapseTimerRef.current = setTimeout(() => {
+            setCollapsed(true);
+        }, 2000);
+    }, [clearCollapseTimer]);
+
+    // When video starts playing → start 2s collapse timer
+    // When video pauses or stops → expand and clear timer
+    useEffect(() => {
+        if (videoPlaying && !isRecording) {
+            startCollapseTimer();
+        } else {
+            clearCollapseTimer();
+            setCollapsed(false);
+        }
+        return clearCollapseTimer;
+    }, [videoPlaying, isRecording, startCollapseTimer, clearCollapseTimer]);
+
+    // When user expands, restart the 2s timer if still playing
+    const handleExpand = useCallback(() => {
+        setCollapsed(false);
+        if (videoPlaying && !isRecording) {
+            startCollapseTimer();
+        }
+    }, [videoPlaying, isRecording, startCollapseTimer]);
 
     // Handle recording complete - direct download
     const handleRecordingComplete = useCallback((blob: Blob, mimeType: string) => {
@@ -175,8 +212,9 @@ export function VideoControls() {
             if (longPressTimerRef.current) {
                 clearTimeout(longPressTimerRef.current);
             }
+            clearCollapseTimer();
         };
-    }, []);
+    }, [clearCollapseTimer]);
 
     // Hide completely if no videos exist
     if (!hasVideo) return null;
@@ -188,11 +226,24 @@ export function VideoControls() {
         }
     };
 
+    // Seek from collapsed bar click
+    const handleCollapsedSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const ratio = clickX / rect.width;
+        const seekTime = ratio * (videoDuration || 0);
+        if (globalVideoElement) {
+            globalVideoElement.currentTime = seekTime;
+        }
+    };
+
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
+
+    const progressPercent = (videoCurrentTime / (videoDuration || 1)) * 100;
 
     // Minimized state when image is selected
     if (!isVideoActive) {
@@ -208,10 +259,42 @@ export function VideoControls() {
         );
     }
 
-    // Full controls when video is selected
-    return (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-sm p-4 z-50 pointer-events-auto rounded-xl border border-white/10 w-[600px] max-w-[90vw] transition-all duration-300 ease-out">
+    // --- Collapsed: slim progress bar only ---
+    if (collapsed) {
+        return (
+            <div
+                className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto w-[500px] max-w-[85vw] cursor-pointer group transition-all duration-500 ease-out"
+                onClick={handleExpand}
+            >
+                {/* Hover hint */}
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-center mb-1.5">
+                    <span className="text-[10px] text-white/40 bg-black/40 px-2 py-0.5 rounded-full">
+                        {formatTime(videoCurrentTime)} / {formatTime(videoDuration)}
+                    </span>
+                </div>
+                {/* Progress bar track */}
+                <div
+                    className="relative h-1 group-hover:h-1.5 bg-white/10 rounded-full overflow-hidden transition-all duration-200 backdrop-blur-sm"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        handleCollapsedSeek(e);
+                        handleExpand();
+                    }}
+                >
+                    <div
+                        className="absolute inset-y-0 left-0 bg-violet-500/80 group-hover:bg-violet-400 rounded-full transition-colors duration-200"
+                        style={{ width: `${progressPercent}%` }}
+                    />
+                </div>
+            </div>
+        );
+    }
 
+    // --- Full controls when expanded ---
+    return (
+        <div
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-sm p-4 z-50 pointer-events-auto rounded-xl border border-white/10 w-[600px] max-w-[90vw] transition-all duration-500 ease-out"
+        >
             <div className="max-w-4xl mx-auto space-y-3">
                 {/* Recording Status */}
                 {recordingStatus && (
@@ -235,7 +318,7 @@ export function VideoControls() {
                         disabled={isRecording}
                         className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-violet-500 disabled:opacity-50"
                         style={{
-                            background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(videoCurrentTime / (videoDuration || 1)) * 100}%, #4b5563 ${(videoCurrentTime / (videoDuration || 1)) * 100}%, #4b5563 100%)`
+                            background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${progressPercent}%, #4b5563 ${progressPercent}%, #4b5563 100%)`
                         }}
                     />
                     <span className="text-white text-xs font-mono w-12">
@@ -245,38 +328,6 @@ export function VideoControls() {
 
                 {/* Controls */}
                 <div className="flex items-center justify-center gap-4">
-                    {/* TODO: Record Button - Hidden pending development
-                    <div className="relative">
-                        <button
-                            onMouseDown={handleRecordMouseDown}
-                            onMouseUp={handleRecordMouseUp}
-                            onMouseLeave={handleRecordMouseLeave}
-                            onTouchStart={handleRecordMouseDown}
-                            onTouchEnd={handleRecordMouseUp}
-                            onMouseEnter={() => setShowRecordTooltip(true)}
-                            className={`w-10 h-10 flex items-center justify-center rounded-full transition-all ${isRecording
-                                ? 'bg-red-600 animate-pulse ring-2 ring-red-400 ring-offset-2 ring-offset-black'
-                                : 'bg-gray-700 hover:bg-red-600/50'
-                                }`}
-                            title="長按 0.5 秒開始錄製"
-                        >
-                            <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
-                                <circle cx="12" cy="12" r="8" />
-                            </svg>
-                        </button>
-                        {showRecordTooltip && !isRecording && (
-                            <div
-                                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-yellow-900/90 border border-yellow-600 rounded-lg text-xs text-yellow-200 text-center"
-                                onMouseLeave={() => setShowRecordTooltip(false)}
-                            >
-                                <p className="font-bold mb-1"><svg className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg> 功能開發中</p>
-                                <p>此功能尚不穩定，建議使用電腦內建錄影功能</p>
-                                <p className="mt-1 text-yellow-400">長按 0.5 秒開始錄製</p>
-                            </div>
-                        )}
-                    </div>
-                    */}
-
                     {/* Play/Pause Button */}
                     <button
                         onClick={handlePlayPause}

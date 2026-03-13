@@ -17,6 +17,9 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
     const setPaperFigureMode = useStore(s => s.setPaperFigureMode);
     const paperFigures = useStore(s => s.paperFigures);
     const clearAllPaperFigures = useStore(s => s.clearAllPaperFigures);
+    const perfectRenderEnabled = useStore(s => s.perfectRenderEnabled);
+    const setPerfectRenderEnabled = useStore(s => s.setPerfectRenderEnabled);
+    const setBloomIntensity = useStore(s => s.setBloomIntensity);
 
     const takeScreenshot = useCallback(async () => {
         try {
@@ -164,6 +167,27 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
                             </svg>
                         </button>
                     )}
+
+                    {/* Divider */}
+                    <div className="w-6 h-px bg-white/10 mx-auto" />
+
+                    {/* Perfect Render Toggle */}
+                    <button
+                        onClick={() => {
+                            const next = !perfectRenderEnabled;
+                            setPerfectRenderEnabled(next);
+                            setBloomIntensity(next ? 0.5 : 0);
+                        }}
+                        className={`group w-10 h-10 rounded-lg flex items-center justify-center transition-all active:scale-90 ${perfectRenderEnabled
+                            ? 'bg-amber-500/30 ring-1 ring-amber-400/50 shadow-lg shadow-amber-500/20'
+                            : 'hover:bg-white/15'
+                            }`}
+                        title={perfectRenderEnabled ? '關閉完美渲染' : '開啟完美渲染'}
+                    >
+                        <svg className={`w-5 h-5 ${perfectRenderEnabled ? 'text-amber-400' : 'text-white/80 group-hover:text-white'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                        </svg>
+                    </button>
                 </div>
 
                 {/* Expand/Collapse Tab */}

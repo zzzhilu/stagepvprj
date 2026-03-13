@@ -236,23 +236,55 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
         <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-white">內容管理</h3>
-                <label className={`
-                    px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all
-                    ${uploading
-                        ? 'bg-gray-600 cursor-not-allowed'
-                        : 'bg-violet-600 hover:bg-violet-700'
-                    } text-white
-                `}>
-                    {uploading ? '上傳中...' : '上傳影片'}
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="video/mp4,video/x-m4v,video/webm,video/quicktime"
-                        onChange={handleFileSelect}
-                        disabled={uploading}
-                        className="hidden"
-                    />
-                </label>
+                <div className="relative group">
+                    <label className={`
+                        px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all flex items-center gap-1.5
+                        ${uploading
+                            ? 'bg-gray-600 cursor-not-allowed'
+                            : 'bg-violet-600 hover:bg-violet-700'
+                        } text-white
+                    `}>
+                        {uploading ? '上傳中...' : (<>上傳影片 <svg className="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></>)}
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="video/mp4,video/x-m4v,video/webm,video/quicktime"
+                            onChange={handleFileSelect}
+                            disabled={uploading}
+                            className="hidden"
+                        />
+                    </label>
+                    {/* Info Tooltip Bubble */}
+                    <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 absolute right-0 top-full mt-2 w-64 bg-gray-900 border border-gray-600 rounded-lg p-3 shadow-xl z-50">
+                        <div className="absolute -top-1.5 right-6 w-3 h-3 bg-gray-900 border-l border-t border-gray-600 rotate-45" />
+                        <p className="text-xs font-bold text-white mb-2 flex items-center gap-1.5">
+                            <svg className="w-3.5 h-3.5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            上傳限制與說明
+                        </p>
+                        <ul className="space-y-1.5 text-[11px] text-gray-300">
+                            <li className="flex items-start gap-1.5">
+                                <span className="text-violet-400 mt-0.5">▸</span>
+                                <span>支援格式：<span className="text-white font-medium">MP4、M4V、WebM、MOV</span></span>
+                            </li>
+                            <li className="flex items-start gap-1.5">
+                                <span className="text-violet-400 mt-0.5">▸</span>
+                                <span>上傳頻率限制：<span className="text-white font-medium">每分鐘 10 次</span></span>
+                            </li>
+                            <li className="flex items-start gap-1.5">
+                                <span className="text-violet-400 mt-0.5">▸</span>
+                                <span>上傳連結有效期：<span className="text-white font-medium">1 小時</span></span>
+                            </li>
+                            <li className="flex items-start gap-1.5">
+                                <span className="text-violet-400 mt-0.5">▸</span>
+                                <span>儲存服務：<span className="text-white font-medium">Cloudflare R2</span></span>
+                            </li>
+                            <li className="flex items-start gap-1.5">
+                                <span className="text-yellow-400 mt-0.5">⚠</span>
+                                <span className="text-yellow-200/80">建議影片大小不超過 <span className="font-medium">500MB</span>，過大可能導致上傳逾時</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
             </div>
 
             {/* Upload Progress */}
