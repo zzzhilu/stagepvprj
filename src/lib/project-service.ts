@@ -1,7 +1,7 @@
 
 import { db } from './firebase';
 import { collection, addDoc, doc, getDoc, setDoc, updateDoc, deleteDoc, query, orderBy, getDocs, serverTimestamp } from 'firebase/firestore';
-import type { StageObject, CameraView, ContentTexture, R2Video } from '@/store/useStore';
+import type { StageObject, CameraView, ContentTexture, R2Video, SpotLightConfig } from '@/store/useStore';
 
 export interface ProjectState {
     name: string;
@@ -17,6 +17,16 @@ export interface ProjectState {
     directionalIntensity?: number;
     bloomIntensity?: number;
     bloomThreshold?: number;
+    // Perfect Render settings (synced to client)
+    perfectRenderEnabled?: boolean;
+    envPreset?: string;
+    envIntensity?: number;
+    contactShadow?: boolean;
+    toneMapping?: boolean;
+    spotLights?: SpotLightConfig[];
+    reflectionMirror?: number;
+    reflectionBlur?: number;
+    reflectionMetalness?: number;
     createdAt?: any;
     updatedAt?: any;
 }

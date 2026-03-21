@@ -4,12 +4,14 @@ import { StageObjectRenderer } from './StageObjectRenderer';
 import { PaperFigureRenderer } from './PaperFigureRenderer';
 import { CameraCapture } from './CameraCapture';
 import { VideoManager } from './VideoManager';
-import { EffectComposer, Bloom, SMAA } from '@react-three/postprocessing';
+import { EffectComposer, Bloom, SMAA, ToneMapping } from '@react-three/postprocessing';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
 import { useRef, useEffect, useCallback, createRef } from 'react';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { PerfectRenderEnvironment } from './PerfectRenderEnvironment';
+import { ToneMappingMode } from 'postprocessing';
 
 export function SceneGraph() {
     const stageObjects = useStore((state) => state.stageObjects);
@@ -174,6 +176,9 @@ export function SceneGraph() {
             <directionalLight position={[-10, 10, -5]} intensity={directionalIntensity * 0.4} />
             <hemisphereLight intensity={0.4} groundColor="#444" />
 
+            {/* Perfect Render Environment - HDR, SpotLights, ContactShadows */}
+            <PerfectRenderEnvironment />
+
             {/* Stage Objects from Store */}
             {stageObjects.map((obj) => {
                 const objRef = objectRefsRef.current.get(obj.id);
@@ -244,15 +249,16 @@ export function SceneGraph() {
                     <planeGeometry args={[100, 100]} />
                     <MeshReflectorMaterial
                         blur={[reflectionBlur * 50, reflectionBlur * 50]}
-                        resolution={1024}
+                        resolution={2048}
                         mixBlur={1}
                         mixStrength={reflectionMirror * 2}
-                        roughness={0.2}
+                        roughness={0.15}
                         depthScale={1.2}
                         minDepthThreshold={0.4}
                         maxDepthThreshold={1.4}
                         color="#111111"
                         metalness={reflectionMetalness}
+                        mirror={reflectionMirror}
                     />
                 </mesh>
             ) : (
@@ -263,23 +269,31 @@ export function SceneGraph() {
             )}
 
             {/* Post-Processing Effects */}
-            {/* 
-                Perfect Render mode uses MeshReflectorMaterial for reflections
-                Enhanced Bloom and MSAA for better quality
-            */}
-            <EffectComposer multisampling={perfectRenderEnabled ? 4 : 0}>
-                {/* Bloom for emissive glow - enhanced in Perfect mode */}
-                <Bloom
-                    intensity={perfectRenderEnabled ? bloomIntensity * 1.5 : bloomIntensity}
-                    luminanceThreshold={bloomThreshold}
-                    luminanceSmoothing={0.9}
-                    mipmapBlur={true}
-                    resolutionX={perfectRenderEnabled ? 1024 : 512}
-                    resolutionY={perfectRenderEnabled ? 1024 : 512}
-                />
-                {/* SMAA anti-aliasing - best quality/performance balance */}
-                <SMAA />
-            </EffectComposer>
+            {perfectRenderEnabled ? (
+                <EffectComposer multisampling={4}>
+                    <Bloom
+                        intensity={bloomIntensity * 1.5}
+                        luminanceThreshold={bloomThreshold}
+                        luminanceSmoothing={0.9}
+                        mipmapBlur={true}
+                        resolutionX={1024}
+                        resolutionY={1024}
+                    />
+                    <SMAA />
+                </EffectComposer>
+            ) : (
+                <EffectComposer multisampling={0}>
+                    <Bloom
+                        intensity={bloomIntensity}
+                        luminanceThreshold={bloomThreshold}
+                        luminanceSmoothing={0.9}
+                        mipmapBlur={true}
+                        resolutionX={512}
+                        resolutionY={512}
+                    />
+                    <SMAA />
+                </EffectComposer>
+            )}
         </>
     );
 }

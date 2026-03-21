@@ -520,23 +520,11 @@ export function ModelUploader() {
                                 </div>
                                 <div className="space-y-2">
                                     {objects.map(obj => {
-                                        let displayName = obj.id;
-                                        if (obj.id.startsWith('obj_')) {
-                                            try {
-                                                displayName = decodeURIComponent(obj.model_path).split('/').pop()?.split('?')[0].replace('.glb', '') || obj.id;
-                                            } catch (e) {
-                                                displayName = obj.id;
-                                            }
-                                        }
-
-                                        // Truncate if too long
-                                        if (displayName.length > 30) displayName = displayName.substring(0, 30) + '...';
-
                                         const isDeleting = deletingId === obj.id;
                                         return (
                                             <div key={obj.id} className="p-2 bg-gray-900/30 rounded hover:bg-gray-900/50 transition-colors group">
                                                 <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
-                                                    <span className="truncate flex-1" title={displayName}>{getFileNameFromUrl(obj.model_path)} ({obj.meshNames?.length || 0})</span>
+                                                    <span className="truncate flex-1" title={obj.id}>{getFileNameFromUrl(obj.model_path)} ({obj.meshNames?.length || 0})</span>
                                                     <button
                                                         onMouseDown={() => handleLongPressStart(obj.id)}
                                                         onMouseUp={handleLongPressEnd}

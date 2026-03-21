@@ -43,6 +43,15 @@ function SharePageContent() {
     const setDirectionalIntensity = useStore(state => state.setDirectionalIntensity);
     const setBloomIntensity = useStore(state => state.setBloomIntensity);
     const setBloomThreshold = useStore(state => state.setBloomThreshold);
+    // Perfect Render settings sync
+    const setPerfectRenderEnabled = useStore(state => state.setPerfectRenderEnabled);
+    const setEnvPreset = useStore(state => state.setEnvPreset);
+    const setEnvIntensity = useStore(state => state.setEnvIntensity);
+    const setContactShadow = useStore(state => state.setContactShadow);
+    const setToneMapping = useStore(state => state.setToneMapping);
+    const setReflectionMirror = useStore(state => state.setReflectionMirror);
+    const setReflectionBlur = useStore(state => state.setReflectionBlur);
+    const setReflectionMetalness = useStore(state => state.setReflectionMetalness);
 
     useEffect(() => {
         loadProjectAndVideo();
@@ -79,6 +88,16 @@ function SharePageContent() {
             if (data.directionalIntensity !== undefined) setDirectionalIntensity(data.directionalIntensity);
             if (data.bloomIntensity !== undefined) setBloomIntensity(data.bloomIntensity);
             if (data.bloomThreshold !== undefined) setBloomThreshold(data.bloomThreshold);
+            // Restore perfect render settings
+            if (data.perfectRenderEnabled !== undefined) setPerfectRenderEnabled(data.perfectRenderEnabled);
+            if (data.envPreset !== undefined) setEnvPreset(data.envPreset);
+            if (data.envIntensity !== undefined) setEnvIntensity(data.envIntensity);
+            if (data.contactShadow !== undefined) setContactShadow(data.contactShadow);
+            if (data.toneMapping !== undefined) setToneMapping(data.toneMapping);
+            if (data.spotLights !== undefined) useStore.setState({ spotLights: data.spotLights });
+            if (data.reflectionMirror !== undefined) setReflectionMirror(data.reflectionMirror);
+            if (data.reflectionBlur !== undefined) setReflectionBlur(data.reflectionBlur);
+            if (data.reflectionMetalness !== undefined) setReflectionMetalness(data.reflectionMetalness);
 
             // Find the specified video
             if (videoId && data.r2Videos) {

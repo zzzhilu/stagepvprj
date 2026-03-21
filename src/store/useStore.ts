@@ -48,6 +48,17 @@ export interface ContentTexture {
     file_size?: number; // bytes
 }
 
+export interface SpotLightConfig {
+    name: string;                           // Display name (主燈 Key, 補光 Fill, 背光 Rim)
+    position: [number, number, number];     // XYZ position
+    intensity: number;                      // 0-10
+    angle: number;                          // 0-Math.PI/2 (spotlight cone angle)
+    distance: number;                       // 0-50 (max range)
+    color: string;                          // hex color
+    enabled: boolean;                       // on/off toggle
+    castShadow: boolean;                    // shadow toggle
+}
+
 // R2 Video for Image Progress feature
 export interface R2Video {
     id: string;           // Unique video ID (for share links)
@@ -126,6 +137,11 @@ interface State {
     reflectionMirror: number;      // 0-1
     reflectionBlur: number;        // 0-20
     reflectionMetalness: number;   // 0-1
+    envPreset: string;             // 'studio' | 'city' | 'sunset' | 'warehouse' | 'forest' | 'apartment' | 'park' | 'lobby'
+    envIntensity: number;          // 0-3
+    contactShadow: boolean;
+    toneMapping: boolean;
+    spotLights: SpotLightConfig[];  // Controllable spotlights
 
     setMode: (mode: 'admin' | 'client') => void;
     setIsMobile: (isMobile: boolean) => void;
@@ -148,6 +164,11 @@ interface State {
     setReflectionMirror: (value: number) => void;
     setReflectionBlur: (value: number) => void;
     setReflectionMetalness: (value: number) => void;
+    setEnvPreset: (preset: string) => void;
+    setEnvIntensity: (intensity: number) => void;
+    setContactShadow: (enabled: boolean) => void;
+    setToneMapping: (enabled: boolean) => void;
+    updateSpotLight: (index: number, config: Partial<SpotLightConfig>) => void;
     updateObjectTransform: (id: string, pos: [number, number, number], rot: [number, number, number], scale: [number, number, number]) => void;
     linkObject: (childId: string, parentId: string | null) => void; // [NEW] Link/unlink parent
 
@@ -239,6 +260,15 @@ export const useStore = create<State>()(
             reflectionMirror: 0.6,
             reflectionBlur: 8,
             reflectionMetalness: 0.8,
+            envPreset: 'studio',
+            envIntensity: 1.0,
+            contactShadow: true,
+            toneMapping: true,
+            spotLights: [
+                { name: '主燈 Key', position: [0, 12, 0] as [number, number, number], intensity: 3, angle: 0.6, distance: 30, color: '#ffffff', enabled: true, castShadow: true },
+                { name: '補光 Fill', position: [8, 8, 8] as [number, number, number], intensity: 1.5, angle: 0.5, distance: 25, color: '#ffeedd', enabled: true, castShadow: false },
+                { name: '背光 Rim', position: [-5, 6, -8] as [number, number, number], intensity: 1.0, angle: 0.4, distance: 20, color: '#ddeeff', enabled: true, castShadow: false },
+            ],
 
             // Loading State
             isLoading: false,
@@ -351,6 +381,15 @@ export const useStore = create<State>()(
             setReflectionMirror: (value) => set({ reflectionMirror: value }),
             setReflectionBlur: (value) => set({ reflectionBlur: value }),
             setReflectionMetalness: (value) => set({ reflectionMetalness: value }),
+            setEnvPreset: (preset) => set({ envPreset: preset }),
+            setEnvIntensity: (intensity) => set({ envIntensity: intensity }),
+            setContactShadow: (enabled) => set({ contactShadow: enabled }),
+            setToneMapping: (enabled) => set({ toneMapping: enabled }),
+            updateSpotLight: (index, config) => set((state) => ({
+                spotLights: state.spotLights.map((light, i) =>
+                    i === index ? { ...light, ...config } : light
+                ),
+            })),
 
             updateObjectTransform: (id, pos, rot, scale) => set((state) => ({
                 stageObjects: state.stageObjects.map(obj => {

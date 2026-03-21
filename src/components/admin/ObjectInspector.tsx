@@ -3,19 +3,24 @@
 import { useStore, StageObject } from '@/store/useStore';
 import { useState, useEffect } from 'react';
 
+// Type label mapping for display names
+const typeLabels: Record<string, string> = {
+    'venues': '場館 Venue',
+    'stage': '舞台 Stage',
+    'static_LED': '靜態LED Static LED',
+    'moving_LED': '移動LED Moving LED',
+    'moving_prop': '移動道具 Moving Prop',
+    'basic_camera': '攝影機 Camera'
+};
+
 // Helper to get object display name
 function getObjectName(obj: StageObject) {
-    // If ID is not an auto-generated one (starting with obj_), use it as the name
-    // This covers the case of "moving led 1" etc.
+    // 1. Moving objects use their mesh name (= obj.id) directly
     if (!obj.id.startsWith('obj_')) {
         return obj.id;
     }
-    // Fallback to filename from URL for generic objects
-    try {
-        return decodeURIComponent(obj.model_path).split('/').pop()?.split('?')[0].replace('.glb', '') || `Object ${obj.id.slice(0, 6)}`;
-    } catch (e) {
-        return `Object ${obj.id.slice(0, 6)}`;
-    }
+    // 2. Static objects: use type-based label
+    return typeLabels[obj.type] || obj.type || `Object ${obj.id.slice(0, 6)}`;
 }
 
 // Helper component for Link to Parent dropdown

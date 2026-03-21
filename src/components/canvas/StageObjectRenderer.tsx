@@ -1,7 +1,7 @@
 import { useGLTF, Instances, Instance } from '@react-three/drei';
 import { StageObject, useStore } from '@/store/useStore';
 import * as THREE from 'three';
-import { createMaterial, MATERIAL_LIBRARY } from '@/lib/materials';
+import { createMaterial, createPerfectMaterial, MATERIAL_LIBRARY } from '@/lib/materials';
 import { useMemo, useEffect, useState, useRef, forwardRef } from 'react';
 import { globalVideoElement } from './VideoManager';
 import { useFrame } from '@react-three/fiber';
@@ -165,6 +165,8 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     // Select active texture map - support both 'video' and 'r2_video' types
     const textureMap = (activeTexture?.type === 'video' || activeTexture?.type === 'r2_video') ? videoTexture : imageTexture;
 
+    const perfectRenderEnabled = useStore((state) => state.perfectRenderEnabled);
+
     // Create material based on render mode
     const material = useMemo(() => {
         switch (renderMode) {
@@ -189,31 +191,43 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                     console.log('Creating emissive material, has texture:', !!textureMap);
 
                     if (textureMap) {
-                        // Use texture as emissive map with black base color
-                        return new THREE.MeshStandardMaterial({
-                            color: new THREE.Color('#000000'), // Black base - no ambient contribution
+                        // Perfect mode: use MeshPhysicalMaterial for emissive
+                        const MatClass = perfectRenderEnabled ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+                        const matParams: any = {
+                            color: new THREE.Color('#000000'),
                             roughness: 1.0,
                             metalness: 0.0,
                             side: THREE.DoubleSide,
-                            emissive: new THREE.Color('#ffffff'), // White multiplier for emissive map
+                            emissive: new THREE.Color('#ffffff'),
                             emissiveMap: textureMap,
                             emissiveIntensity: matDef.emissiveIntensity || 1.0,
-                        });
+                        };
+                        if (perfectRenderEnabled) {
+                            matParams.envMapIntensity = 0.5;
+                        }
+                        return new MatClass(matParams);
                     } else {
-                        // No texture, use solid emissive color
-                        return new THREE.MeshStandardMaterial({
-                            color: new THREE.Color('#000000'), // Black base
+                        const MatClass = perfectRenderEnabled ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+                        const matParams: any = {
+                            color: new THREE.Color('#000000'),
                             roughness: matDef.roughness,
                             metalness: matDef.metalness,
                             side: THREE.DoubleSide,
                             emissive: new THREE.Color(matDef.emissive || '#ffaa00'),
                             emissiveIntensity: matDef.emissiveIntensity || 1.0,
-                        });
+                        };
+                        if (perfectRenderEnabled) {
+                            matParams.envMapIntensity = 0.5;
+                        }
+                        return new MatClass(matParams);
                     }
                 }
-                return createMaterial(object.material_id);
+                // Use perfect material when perfect render is enabled
+                return perfectRenderEnabled
+                    ? createPerfectMaterial(object.material_id)
+                    : createMaterial(object.material_id);
         }
-    }, [renderMode, object.material_id, textureMap]);
+    }, [renderMode, object.material_id, textureMap, perfectRenderEnabled]);
 
     // Show error placeholder if loading failed
     if (!gltfData) return null;

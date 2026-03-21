@@ -107,6 +107,15 @@ function ProjectEditorContent() {
     const setDirectionalIntensity = useStore(state => state.setDirectionalIntensity);
     const setBloomIntensity = useStore(state => state.setBloomIntensity);
     const setBloomThreshold = useStore(state => state.setBloomThreshold);
+    // Perfect Render settings sync
+    const setPerfectRenderEnabled = useStore(state => state.setPerfectRenderEnabled);
+    const setEnvPreset = useStore(state => state.setEnvPreset);
+    const setEnvIntensity = useStore(state => state.setEnvIntensity);
+    const setContactShadow = useStore(state => state.setContactShadow);
+    const setToneMapping = useStore(state => state.setToneMapping);
+    const setReflectionMirror = useStore(state => state.setReflectionMirror);
+    const setReflectionBlur = useStore(state => state.setReflectionBlur);
+    const setReflectionMetalness = useStore(state => state.setReflectionMetalness);
 
     // Current state for auto-save
     const stageObjects = useStore(state => state.stageObjects);
@@ -119,6 +128,16 @@ function ProjectEditorContent() {
     const directionalIntensity = useStore(state => state.directionalIntensity);
     const bloomIntensity = useStore(state => state.bloomIntensity);
     const bloomThreshold = useStore(state => state.bloomThreshold);
+    // Perfect Render state for auto-save
+    const perfectRenderEnabled = useStore(state => state.perfectRenderEnabled);
+    const envPreset = useStore(state => state.envPreset);
+    const envIntensity = useStore(state => state.envIntensity);
+    const contactShadow = useStore(state => state.contactShadow);
+    const toneMapping = useStore(state => state.toneMapping);
+    const spotLights = useStore(state => state.spotLights);
+    const reflectionMirror = useStore(state => state.reflectionMirror);
+    const reflectionBlur = useStore(state => state.reflectionBlur);
+    const reflectionMetalness = useStore(state => state.reflectionMetalness);
 
     useEffect(() => {
         // Share mode bypasses auth
@@ -158,6 +177,16 @@ function ProjectEditorContent() {
                 if (data.directionalIntensity !== undefined) setDirectionalIntensity(data.directionalIntensity);
                 if (data.bloomIntensity !== undefined) setBloomIntensity(data.bloomIntensity);
                 if (data.bloomThreshold !== undefined) setBloomThreshold(data.bloomThreshold);
+                // Restore perfect render settings
+                if (data.perfectRenderEnabled !== undefined) setPerfectRenderEnabled(data.perfectRenderEnabled);
+                if (data.envPreset !== undefined) setEnvPreset(data.envPreset);
+                if (data.envIntensity !== undefined) setEnvIntensity(data.envIntensity);
+                if (data.contactShadow !== undefined) setContactShadow(data.contactShadow);
+                if (data.toneMapping !== undefined) setToneMapping(data.toneMapping);
+                if (data.spotLights !== undefined) useStore.setState({ spotLights: data.spotLights });
+                if (data.reflectionMirror !== undefined) setReflectionMirror(data.reflectionMirror);
+                if (data.reflectionBlur !== undefined) setReflectionBlur(data.reflectionBlur);
+                if (data.reflectionMetalness !== undefined) setReflectionMetalness(data.reflectionMetalness);
             }
         } catch (error) {
             console.error('Failed to load project:', error);
@@ -185,6 +214,16 @@ function ProjectEditorContent() {
                     directionalIntensity,
                     bloomIntensity,
                     bloomThreshold,
+                    // Perfect Render settings
+                    perfectRenderEnabled,
+                    envPreset,
+                    envIntensity,
+                    contactShadow,
+                    toneMapping,
+                    spotLights,
+                    reflectionMirror,
+                    reflectionBlur,
+                    reflectionMetalness,
                 });
             } catch (error) {
                 console.error('Auto-save failed:', error);
@@ -192,7 +231,7 @@ function ProjectEditorContent() {
         }, 2000); // Debounce 2 seconds
 
         return () => clearTimeout(timeoutId);
-    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, isAuthenticated, isShareMode, isLoading, projectId]);
+    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, isAuthenticated, isShareMode, isLoading, projectId]);
 
     // Show loading while checking auth
     if (isChecking) {
