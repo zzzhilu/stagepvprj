@@ -1,6 +1,6 @@
 # 🤖 AI Context Index
 
-> **生成時間:** 2026-03-22 00:38:36
+> **生成時間:** 2026-03-22 01:24:04
 > **專案路徑:** `E:\work\AI_Antigravity\stagepv_1`
 > **掃描深度:** 3 層
 >
@@ -99,24 +99,20 @@
 
 **當前分支:** `main`
 ### 工作區狀態：✅ 乾淨
-**最近 Commit:** `6eea9d7 feat: 新增平面圖上傳功能 + emissive單面渲染 - PLANE mesh自動識別為floor_plan類型 - FloorPlanUploader元件(上傳/預覽/替換/移除) - 平面圖材質半透明(opacity 0.7) - emissive材質改為FrontSide單面顯示 (26 seconds ago)`
+**最近 Commit:** `2c0a04d feat: LED反射+emissive色準優化 - CubeCamera即時envMap反射LED到舞台表面 - emissive色準:一般MeshBasicMaterial/完美微量環境反射 - emissive背面黑色渲染 - 平面圖黑底材質 (68 seconds ago)`
 ### 最近變更統計
 ```
-src/components/admin/AdminControls.tsx        |   6 +
- src/components/admin/FloorPlanUploader.tsx    | 156 ++++++++++++++++++++++++++
- src/components/admin/ModelUploader.tsx        |   6 +-
- src/components/admin/ObjectInspector.tsx      |   3 +-
- src/components/canvas/StageObjectRenderer.tsx |  48 +++++++-
- src/store/useStore.ts                         |  13 ++-
- 6 files changed, 226 insertions(+), 6 deletions(-)
+src/components/canvas/SceneGraph.tsx          | 48 ++++++++++++++++--
+ src/components/canvas/StageObjectRenderer.tsx | 71 ++++++++++++++++-----------
+ 2 files changed, 87 insertions(+), 32 deletions(-)
 ```
 ### 最近 Commits
 ```
+2c0a04d feat: LED反射+emissive色準優化 - CubeCamera即時envMap反射LED到舞台表面 - emissive色準:一般MeshBasicMaterial/完美微量環境反射 - emissive背面黑色渲染 - 平面圖黑底材質
+229ab88 fix: emissive背面黑色渲染 + 平面圖黑底材質 - LED正面內容/背面黑色背殼 - 平面圖底色改為純黑
 6eea9d7 feat: 新增平面圖上傳功能 + emissive單面渲染 - PLANE mesh自動識別為floor_plan類型 - FloorPlanUploader元件(上傳/預覽/替換/移除) - 平面圖材質半透明(opacity 0.7) - emissive材質改為FrontSide單面顯示
 1a43f60 fix: 修復物件名稱顯示 + 拉絲金屬黑塊問題 - ObjectInspector使用type標籤 - 移除brushedSteel anisotropy改用roughnessMap
 b01f5fe fix: video collapse 5s + touch support, remove old perfect render button
-97bc800 feat: perfect render toggle, mesh names, video auto-collapse, R2 tooltip
-c22e174 feat: 新增紙片小人(Billboard)、截圖/繪圖工具、Emoji全面替換SVG、Cue+視角可收合面板
 ```
 
 ---

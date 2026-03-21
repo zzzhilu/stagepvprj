@@ -182,7 +182,7 @@ export function SceneGraph() {
                 fov={fov}
             />
 
-            {/* Free OrbitControls - full rotation freedom (disabled during drawing) */}
+            {/* OrbitControls with vertical rotation limits (disabled during drawing) */}
             <OrbitControls
                 ref={controlsRef}
                 makeDefault
@@ -192,6 +192,8 @@ export function SceneGraph() {
                 enableRotate={true}
                 minDistance={2}
                 maxDistance={100}
+                minPolarAngle={0.1}
+                maxPolarAngle={Math.PI * 0.85}
                 dampingFactor={0.05}
                 enableDamping={true}
                 onStart={() => {

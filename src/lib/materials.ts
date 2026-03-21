@@ -21,7 +21,8 @@ export type MaterialId =
     | 'woodOak'
     | 'concrete'
     | 'copper'
-    | 'neonGlow';
+    | 'neonGlow'
+    | 'emissiveMesh';
 
 export interface MaterialDefinition {
     id: MaterialId;
@@ -331,6 +332,47 @@ function generateNormalMapFromCanvas(sourceTexture: THREE.CanvasTexture, strengt
 
 
 // ═══════════════════════════════════════════════════════════════
+// createMeshLEDAlphaMap - 程序化柵欄網格 alpha 貼圖
+// ═══════════════════════════════════════════════════════════════
+let cachedMeshLEDAlphaMap: THREE.CanvasTexture | null = null;
+
+export function createMeshLEDAlphaMap(): THREE.CanvasTexture {
+    if (cachedMeshLEDAlphaMap) return cachedMeshLEDAlphaMap;
+
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    // Black background (transparent areas)
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, size, size);
+
+    // White grid cells (opaque LED pixels)
+    ctx.fillStyle = '#ffffff';
+    const cellSize = 8;  // LED pixel size
+    const gap = 2;       // Gap between pixels
+    const step = cellSize + gap;
+
+    for (let y = 0; y < size; y += step) {
+        for (let x = 0; x < size; x += step) {
+            ctx.fillRect(x, y, cellSize, cellSize);
+        }
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(20, 20);
+    texture.needsUpdate = true;
+
+    cachedMeshLEDAlphaMap = texture;
+    return texture;
+}
+
+
+// ═══════════════════════════════════════════════════════════════
 // 材質庫 - 參數化 PBR 材質定義
 // ═══════════════════════════════════════════════════════════════
 export const MATERIAL_LIBRARY: Record<MaterialId, MaterialDefinition> = {
@@ -451,6 +493,17 @@ export const MATERIAL_LIBRARY: Record<MaterialId, MaterialDefinition> = {
         metalness: 0.0,
         emissive: '#00ffff',
         emissiveIntensity: 2.0
+    },
+    emissiveMesh: {
+        id: 'emissiveMesh',
+        name: '網格LED (透視)',
+        color: '#ffffff',
+        roughness: 0.9,
+        metalness: 0.0,
+        emissive: '#ffaa00',
+        emissiveIntensity: 1.0,
+        transparent: true,
+        opacity: 0.5
     },
 };
 

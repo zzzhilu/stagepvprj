@@ -1,7 +1,7 @@
 import { useGLTF, Instances, Instance } from '@react-three/drei';
 import { StageObject, useStore } from '@/store/useStore';
 import * as THREE from 'three';
-import { createMaterial, createPerfectMaterial, MATERIAL_LIBRARY } from '@/lib/materials';
+import { createMaterial, createPerfectMaterial, MATERIAL_LIBRARY, createMeshLEDAlphaMap } from '@/lib/materials';
 import { useMemo, useEffect, useState, useRef, forwardRef } from 'react';
 import { globalVideoElement } from './VideoManager';
 import { useFrame } from '@react-three/fiber';
@@ -263,6 +263,44 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                         });
                     }
                 }
+                // For emissiveMesh (transparent grid LED)
+                if (object.material_id === 'emissiveMesh') {
+                    const alphaMap = createMeshLEDAlphaMap();
+
+                    if (textureMap) {
+                        if (perfectRenderEnabled) {
+                            return new THREE.MeshPhysicalMaterial({
+                                color: new THREE.Color('#000000'),
+                                roughness: 0.1,
+                                metalness: 0.0,
+                                side: THREE.FrontSide,
+                                emissive: new THREE.Color('#ffffff'),
+                                emissiveMap: textureMap,
+                                emissiveIntensity: 1.0,
+                                envMapIntensity: 0.05,
+                                toneMapped: false,
+                                transparent: true,
+                                alphaMap: alphaMap,
+                            });
+                        } else {
+                            return new THREE.MeshBasicMaterial({
+                                map: textureMap,
+                                side: THREE.FrontSide,
+                                toneMapped: false,
+                                transparent: true,
+                                alphaMap: alphaMap,
+                            });
+                        }
+                    } else {
+                        return new THREE.MeshBasicMaterial({
+                            color: new THREE.Color('#ffaa00'),
+                            side: THREE.FrontSide,
+                            toneMapped: false,
+                            transparent: true,
+                            alphaMap: alphaMap,
+                        });
+                    }
+                }
                 // Use perfect material when perfect render is enabled
                 return perfectRenderEnabled
                     ? createPerfectMaterial(object.material_id)
@@ -353,16 +391,24 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
 
     // Back-face black material for emissive objects (LED screens show black on back)
     const backFaceMaterial = useMemo(() => {
-        if (object.material_id !== 'emissive') return null;
+        if (object.material_id !== 'emissive' && object.material_id !== 'emissiveMesh') return null;
         if (renderMode === 'wireframe' || renderMode === 'clay') return null;
 
         const MatClass = perfectRenderEnabled ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
-        return new MatClass({
+        const params: any = {
             color: '#000000',
             roughness: 0.9,
             metalness: 0.1,
             side: THREE.BackSide,
-        });
+        };
+
+        // For emissiveMesh, apply the same grid alphaMap to the back face
+        if (object.material_id === 'emissiveMesh') {
+            params.transparent = true;
+            params.alphaMap = createMeshLEDAlphaMap();
+        }
+
+        return new MatClass(params);
     }, [object.material_id, renderMode, perfectRenderEnabled]);
 
     return (
