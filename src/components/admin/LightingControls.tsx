@@ -3,10 +3,14 @@ import { useStore } from '@/store/useStore';
 export function LightingControls() {
     const ambientIntensity = useStore((state) => state.ambientIntensity);
     const directionalIntensity = useStore((state) => state.directionalIntensity);
+    const mainLightAzimuth = useStore((state) => state.mainLightAzimuth);
+    const mainLightElevation = useStore((state) => state.mainLightElevation);
     const bloomIntensity = useStore((state) => state.bloomIntensity);
     const bloomThreshold = useStore((state) => state.bloomThreshold);
     const setAmbientIntensity = useStore((state) => state.setAmbientIntensity);
     const setDirectionalIntensity = useStore((state) => state.setDirectionalIntensity);
+    const setMainLightAzimuth = useStore((state) => state.setMainLightAzimuth);
+    const setMainLightElevation = useStore((state) => state.setMainLightElevation);
     const setBloomIntensity = useStore((state) => state.setBloomIntensity);
     const setBloomThreshold = useStore((state) => state.setBloomThreshold);
 
@@ -46,7 +50,7 @@ export function LightingControls() {
                 <div>
                     <div className="flex items-center justify-between mb-2">
                         <label className="text-sm font-medium text-gray-300">
-                            主光源 (Directional)
+                            主光源強度 (Directional)
                         </label>
                         <span className="text-xs font-mono text-violet-400 bg-violet-500/20 px-2 py-1 rounded">
                             {directionalIntensity.toFixed(2)}
@@ -64,6 +68,65 @@ export function LightingControls() {
                     <div className="flex justify-between mt-1">
                         <span className="text-xs text-gray-500">0.0 (暗)</span>
                         <span className="text-xs text-gray-500">5.0 (亮)</span>
+                    </div>
+                </div>
+
+                {/* Main Light Direction Controls */}
+                <div className="border-t border-gray-700 pt-4">
+                    <h4 className="text-sm font-semibold text-violet-400 mb-3 flex items-center gap-1.5">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                        主光源方向
+                    </h4>
+                </div>
+
+                {/* Azimuth (horizontal rotation) */}
+                <div>
+                    <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm font-medium text-gray-300">
+                            水平角度 (Azimuth)
+                        </label>
+                        <span className="text-xs font-mono text-violet-400 bg-violet-500/20 px-2 py-1 rounded">
+                            {mainLightAzimuth}°
+                        </span>
+                    </div>
+                    <input
+                        type="range"
+                        min="0"
+                        max="360"
+                        step="5"
+                        value={mainLightAzimuth}
+                        onChange={(e) => setMainLightAzimuth(parseFloat(e.target.value))}
+                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                    />
+                    <div className="flex justify-between mt-1">
+                        <span className="text-xs text-gray-500">0° (前)</span>
+                        <span className="text-xs text-gray-500">180° (後)</span>
+                        <span className="text-xs text-gray-500">360°</span>
+                    </div>
+                </div>
+
+                {/* Elevation (vertical angle) */}
+                <div>
+                    <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm font-medium text-gray-300">
+                            垂直角度 (Elevation)
+                        </label>
+                        <span className="text-xs font-mono text-violet-400 bg-violet-500/20 px-2 py-1 rounded">
+                            {mainLightElevation}°
+                        </span>
+                    </div>
+                    <input
+                        type="range"
+                        min="10"
+                        max="90"
+                        step="5"
+                        value={mainLightElevation}
+                        onChange={(e) => setMainLightElevation(parseFloat(e.target.value))}
+                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                    />
+                    <div className="flex justify-between mt-1">
+                        <span className="text-xs text-gray-500">10° (低)</span>
+                        <span className="text-xs text-gray-500">90° (正上方)</span>
                     </div>
                 </div>
 
@@ -127,6 +190,8 @@ export function LightingControls() {
                     onClick={() => {
                         setAmbientIntensity(0.8);
                         setDirectionalIntensity(1.2);
+                        setMainLightAzimuth(45);
+                        setMainLightElevation(55);
                         setBloomIntensity(0.1);
                         setBloomThreshold(0.7);
                     }}

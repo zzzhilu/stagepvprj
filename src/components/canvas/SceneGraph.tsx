@@ -17,6 +17,8 @@ export function SceneGraph() {
     const stageObjects = useStore((state) => state.stageObjects);
     const ambientIntensity = useStore((state) => state.ambientIntensity);
     const directionalIntensity = useStore((state) => state.directionalIntensity);
+    const mainLightAzimuth = useStore((state) => state.mainLightAzimuth);
+    const mainLightElevation = useStore((state) => state.mainLightElevation);
     const bloomIntensity = useStore((state) => state.bloomIntensity);
     const bloomThreshold = useStore((state) => state.bloomThreshold);
 
@@ -215,7 +217,24 @@ export function SceneGraph() {
 
             {/* Enhanced lighting for better model visibility */}
             <ambientLight intensity={ambientIntensity} />
-            <directionalLight position={[10, 10, 5]} intensity={directionalIntensity} castShadow />
+            <directionalLight
+                position={[
+                    20 * Math.cos(mainLightElevation * Math.PI / 180) * Math.sin(mainLightAzimuth * Math.PI / 180),
+                    20 * Math.sin(mainLightElevation * Math.PI / 180),
+                    20 * Math.cos(mainLightElevation * Math.PI / 180) * Math.cos(mainLightAzimuth * Math.PI / 180)
+                ]}
+                intensity={directionalIntensity}
+                castShadow={perfectRenderEnabled}
+                shadow-mapSize-width={2048}
+                shadow-mapSize-height={2048}
+                shadow-camera-left={-30}
+                shadow-camera-right={30}
+                shadow-camera-top={30}
+                shadow-camera-bottom={-30}
+                shadow-camera-near={0.1}
+                shadow-camera-far={60}
+                shadow-bias={-0.001}
+            />
             <directionalLight position={[-10, 10, -5]} intensity={directionalIntensity * 0.4} />
             <hemisphereLight intensity={0.4} groundColor="#444" />
 

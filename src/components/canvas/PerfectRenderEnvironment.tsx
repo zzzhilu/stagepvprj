@@ -84,11 +84,11 @@ export function PerfectRenderEnvironment() {
             {contactShadow && (
                 <ContactShadows
                     position={[0, 0, 0]}
-                    opacity={0.6}
-                    scale={30}
-                    blur={2.5}
-                    far={4}
-                    resolution={512}
+                    opacity={0.75}
+                    scale={40}
+                    blur={1.0}
+                    far={6}
+                    resolution={1024}
                     color="#000000"
                 />
             )}

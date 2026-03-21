@@ -105,6 +105,8 @@ interface State {
     renderMode: RenderMode;
     ambientIntensity: number;
     directionalIntensity: number;
+    mainLightAzimuth: number;      // horizontal angle in degrees (0-360)
+    mainLightElevation: number;    // vertical angle in degrees (10-90)
     bloomIntensity: number;
     bloomThreshold: number;
     fov: number; // [NEW] Global FOV state
@@ -184,6 +186,8 @@ interface State {
     setRenderMode: (mode: RenderMode) => void;
     setAmbientIntensity: (intensity: number) => void;
     setDirectionalIntensity: (intensity: number) => void;
+    setMainLightAzimuth: (azimuth: number) => void;
+    setMainLightElevation: (elevation: number) => void;
     setBloomIntensity: (intensity: number) => void;
     setBloomThreshold: (threshold: number) => void;
     setFov: (fov: number) => void; // [NEW]
@@ -243,6 +247,8 @@ export const useStore = create<State>()(
             renderMode: 'beauty',
             ambientIntensity: 0.8,
             directionalIntensity: 1.2,
+            mainLightAzimuth: 45,
+            mainLightElevation: 55,
             bloomIntensity: 0,
             bloomThreshold: 0.7,
             fov: 50, // Default FOV
@@ -444,6 +450,8 @@ export const useStore = create<State>()(
             setRenderMode: (mode) => set({ renderMode: mode }),
             setAmbientIntensity: (intensity) => set({ ambientIntensity: intensity }),
             setDirectionalIntensity: (intensity) => set({ directionalIntensity: intensity }),
+            setMainLightAzimuth: (azimuth) => set({ mainLightAzimuth: azimuth }),
+            setMainLightElevation: (elevation) => set({ mainLightElevation: elevation }),
             setBloomIntensity: (intensity) => set({ bloomIntensity: intensity }),
             setBloomThreshold: (threshold) => set({ bloomThreshold: threshold }),
             setFov: (fov) => set({ fov }),

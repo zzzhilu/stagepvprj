@@ -1,4 +1,4 @@
-import { useGLTF, Instances, Instance } from '@react-three/drei';
+import { useGLTF } from '@react-three/drei';
 import { StageObject, useStore } from '@/store/useStore';
 import * as THREE from 'three';
 import { createMaterial, createPerfectMaterial, MATERIAL_LIBRARY, createMeshLEDAlphaMap } from '@/lib/materials';
@@ -411,6 +411,8 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         return new MatClass(params);
     }, [object.material_id, renderMode, perfectRenderEnabled]);
 
+    const isEmissiveType = object.material_id === 'emissive' || object.material_id === 'emissiveMesh';
+
     return (
         <group ref={groupRef} scale={worldTransform.scale} onClick={onClick}>
             {meshNodes.map((node) => {
@@ -419,22 +421,19 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                 return (
                     <group key={node.uuid}>
                         {/* Front face - main material */}
-                        <Instances
-                            range={1}
+                        <mesh
                             geometry={geometry}
                             material={material}
-                        >
-                            <Instance />
-                        </Instances>
+                            castShadow={perfectRenderEnabled}
+                            receiveShadow={perfectRenderEnabled && !isEmissiveType}
+                        />
                         {/* Back face - black for emissive objects */}
                         {backFaceMaterial && (
-                            <Instances
-                                range={1}
+                            <mesh
                                 geometry={geometry}
                                 material={backFaceMaterial}
-                            >
-                                <Instance />
-                            </Instances>
+                                castShadow={perfectRenderEnabled}
+                            />
                         )}
                     </group>
                 );

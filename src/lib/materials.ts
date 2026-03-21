@@ -379,8 +379,8 @@ export const MATERIAL_LIBRARY: Record<MaterialId, MaterialDefinition> = {
     // ── 金屬系 ──
     matteMetal: {
         id: 'matteMetal',
-        name: '霧面深灰塑膠',
-        color: '#2a2a2a',
+        name: '霧面黑塑膠',
+        color: '#1a1a1a',
         roughness: 0.85,
         metalness: 0.0
     },
@@ -409,9 +409,9 @@ export const MATERIAL_LIBRARY: Record<MaterialId, MaterialDefinition> = {
     // ── 塑料/合成 ──
     blackPlastic: {
         id: 'blackPlastic',
-        name: '亮面黑塑料',
+        name: '亮面黑塑膠',
         color: '#111111',
-        roughness: 0.4,
+        roughness: 0.55,
         metalness: 0.0
     },
     carbonFiber: {
