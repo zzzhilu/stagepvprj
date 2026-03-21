@@ -209,7 +209,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                 if (object.type === 'floor_plan') {
                     const MatClass = perfectRenderEnabled ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
                     const matParams: any = {
-                        color: '#ffffff',
+                        color: '#000000',
                         roughness: 1.0,
                         metalness: 0.0,
                         side: THREE.DoubleSide,
@@ -219,7 +219,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                     if (floorPlanTexture) {
                         matParams.map = floorPlanTexture;
                     } else {
-                        matParams.color = '#aaaaaa';
+                        matParams.color = '#111111';
                         matParams.opacity = 0.5;
                     }
                     if (perfectRenderEnabled) {
@@ -338,20 +338,46 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         currentRot.current.setFromQuaternion(currentQuat);
     });
 
+    // Back-face black material for emissive objects (LED screens show black on back)
+    const backFaceMaterial = useMemo(() => {
+        if (object.material_id !== 'emissive') return null;
+        if (renderMode === 'wireframe' || renderMode === 'clay') return null;
+
+        const MatClass = perfectRenderEnabled ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+        return new MatClass({
+            color: '#000000',
+            roughness: 0.9,
+            metalness: 0.1,
+            side: THREE.BackSide,
+        });
+    }, [object.material_id, renderMode, perfectRenderEnabled]);
+
     return (
         <group ref={groupRef} scale={worldTransform.scale} onClick={onClick}>
             {meshNodes.map((node) => {
                 const geometry = node.geometry.clone();
 
                 return (
-                    <Instances
-                        key={node.uuid}
-                        range={1}
-                        geometry={geometry}
-                        material={material}
-                    >
-                        <Instance />
-                    </Instances>
+                    <group key={node.uuid}>
+                        {/* Front face - main material */}
+                        <Instances
+                            range={1}
+                            geometry={geometry}
+                            material={material}
+                        >
+                            <Instance />
+                        </Instances>
+                        {/* Back face - black for emissive objects */}
+                        {backFaceMaterial && (
+                            <Instances
+                                range={1}
+                                geometry={geometry}
+                                material={backFaceMaterial}
+                            >
+                                <Instance />
+                            </Instances>
+                        )}
+                    </group>
                 );
             })}
         </group>
