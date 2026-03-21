@@ -55,6 +55,8 @@ export function ModelUploader() {
             case 'moving_LED':
             case 'moving_prop':
                 return 'emissive';
+            case 'floor_plan':
+                return 'matteLightGray';
             default:
                 return 'matteMetal';
         }
@@ -69,6 +71,7 @@ export function ModelUploader() {
         if (lowerName.includes('static') && lowerName.includes('led')) return 'static_LED';
         if (lowerName.includes('stage')) return 'stage';
         if (lowerName.includes('venue')) return 'venues';
+        if (lowerName.includes('plane')) return 'floor_plan';
 
         return null;
     };
@@ -361,7 +364,8 @@ export function ModelUploader() {
         'static_LED': '靜態LED (Static LED)',
         'moving_LED': '移動LED (Moving LED)',
         'moving_prop': '移動道具 (Moving Prop)',
-        'basic_camera': '攝影機 (Camera)'
+        'basic_camera': '攝影機 (Camera)',
+        'floor_plan': '平面圖 (Floor Plan)'
     };
 
     const getFileNameFromUrl = (url: string) => {

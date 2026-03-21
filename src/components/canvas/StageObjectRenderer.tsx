@@ -57,6 +57,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     const contentTextures = useStore((state) => state.contentTextures);
     const activeContentId = useStore((state) => state.activeContentId);
     const stageObjects = useStore((state) => state.stageObjects);
+    const floorPlanTextureUrl = useStore((state) => state.floorPlanTextureUrl);
     const [videoTexture, setVideoTexture] = useState<THREE.VideoTexture | null>(null);
 
     // Animation refs for smooth lerping
@@ -165,6 +166,25 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     // Select active texture map - support both 'video' and 'r2_video' types
     const textureMap = (activeTexture?.type === 'video' || activeTexture?.type === 'r2_video') ? videoTexture : imageTexture;
 
+    // Floor plan texture
+    const floorPlanTexture = useMemo(() => {
+        if (object.type !== 'floor_plan' || !floorPlanTextureUrl) return null;
+
+        const texture = new THREE.TextureLoader().load(
+            floorPlanTextureUrl,
+            (tex) => console.log('Floor plan texture loaded'),
+            undefined,
+            (err) => console.error('Floor plan texture error:', err)
+        );
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.flipY = false;
+        return texture;
+    }, [object.type, floorPlanTextureUrl]);
+
     const perfectRenderEnabled = useStore((state) => state.perfectRenderEnabled);
 
     // Create material based on render mode
@@ -185,6 +205,28 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                 });
             case 'beauty':
             default:
+                // Floor plan with uploaded texture
+                if (object.type === 'floor_plan') {
+                    const MatClass = perfectRenderEnabled ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+                    const matParams: any = {
+                        color: '#ffffff',
+                        roughness: 1.0,
+                        metalness: 0.0,
+                        side: THREE.DoubleSide,
+                        transparent: true,
+                        opacity: 0.7,
+                    };
+                    if (floorPlanTexture) {
+                        matParams.map = floorPlanTexture;
+                    } else {
+                        matParams.color = '#aaaaaa';
+                        matParams.opacity = 0.5;
+                    }
+                    if (perfectRenderEnabled) {
+                        matParams.envMapIntensity = 0.3;
+                    }
+                    return new MatClass(matParams);
+                }
                 // For emissive material with texture
                 if (object.material_id === 'emissive') {
                     const matDef = MATERIAL_LIBRARY.emissive;
@@ -197,7 +239,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                             color: new THREE.Color('#000000'),
                             roughness: 1.0,
                             metalness: 0.0,
-                            side: THREE.DoubleSide,
+                            side: THREE.FrontSide,
                             emissive: new THREE.Color('#ffffff'),
                             emissiveMap: textureMap,
                             emissiveIntensity: matDef.emissiveIntensity || 1.0,
@@ -212,7 +254,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                             color: new THREE.Color('#000000'),
                             roughness: matDef.roughness,
                             metalness: matDef.metalness,
-                            side: THREE.DoubleSide,
+                            side: THREE.FrontSide,
                             emissive: new THREE.Color(matDef.emissive || '#ffaa00'),
                             emissiveIntensity: matDef.emissiveIntensity || 1.0,
                         };
@@ -227,7 +269,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                     ? createPerfectMaterial(object.material_id)
                     : createMaterial(object.material_id);
         }
-    }, [renderMode, object.material_id, textureMap, perfectRenderEnabled]);
+    }, [renderMode, object.material_id, object.type, textureMap, floorPlanTexture, perfectRenderEnabled]);
 
     // Show error placeholder if loading failed
     if (!gltfData) return null;

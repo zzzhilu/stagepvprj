@@ -6,6 +6,7 @@ import { TextureUploader } from './TextureUploader';
 import { LightingControls } from './LightingControls';
 import { ReflectionControls } from './ReflectionControls';
 import ObjectInspector from './ObjectInspector';
+import { FloorPlanUploader } from './FloorPlanUploader';
 import CueManager from './CueManager';
 import { R2VideoManager } from '@/components/client/R2VideoManager';
 import { useState, useRef } from 'react';
@@ -377,6 +378,11 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                             </div>
                         )}
                     </div>
+                )}
+
+                {/* Floor Plan Uploader - Auto-shows when PLANE object exists */}
+                {!isVideoProgress && (
+                    <FloorPlanUploader />
                 )}
 
                 {/* Lighting Controls Section */}

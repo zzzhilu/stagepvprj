@@ -10,7 +10,8 @@ const typeLabels: Record<string, string> = {
     'static_LED': '靜態LED Static LED',
     'moving_LED': '移動LED Moving LED',
     'moving_prop': '移動道具 Moving Prop',
-    'basic_camera': '攝影機 Camera'
+    'basic_camera': '攝影機 Camera',
+    'floor_plan': '平面圖 Floor Plan'
 };
 
 // Helper to get object display name

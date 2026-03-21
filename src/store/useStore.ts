@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import type { MaterialId } from '@/lib/materials';
 
 // Types based on SAD 5.1 & 5.2
-export type ModelType = 'venues' | 'stage' | 'static_LED' | 'moving_LED' | 'moving_prop' | 'basic_camera';
+export type ModelType = 'venues' | 'stage' | 'static_LED' | 'moving_LED' | 'moving_prop' | 'basic_camera' | 'floor_plan';
 
 export interface Instance {
     pos: [number, number, number];
@@ -132,6 +132,9 @@ interface State {
     paperFigures: PaperFigure[];
     paperFigureMode: boolean;
 
+    // Floor Plan Texture [NEW]
+    floorPlanTextureUrl: string | null;
+
     // Perfect Render Mode [NEW]
     perfectRenderEnabled: boolean;
     reflectionMirror: number;      // 0-1
@@ -160,6 +163,7 @@ interface State {
     setGizmoEnabled: (enabled: boolean) => void; // [NEW]
 
     // Perfect Render Actions [NEW]
+    setFloorPlanTexture: (url: string | null) => void; // [NEW]
     setPerfectRenderEnabled: (enabled: boolean) => void;
     setReflectionMirror: (value: number) => void;
     setReflectionBlur: (value: number) => void;
@@ -254,6 +258,9 @@ export const useStore = create<State>()(
             // Paper Figure defaults
             paperFigures: [],
             paperFigureMode: false,
+
+            // Floor Plan Texture default
+            floorPlanTextureUrl: null,
 
             // Perfect Render defaults
             perfectRenderEnabled: false,
@@ -375,6 +382,9 @@ export const useStore = create<State>()(
                 gizmoEnabled: enabled,
                 selectedObjectId: enabled ? null : null // Clear selection when toggling
             }),
+
+            // Floor Plan Texture Action
+            setFloorPlanTexture: (url) => set({ floorPlanTextureUrl: url }),
 
             // Perfect Render Actions
             setPerfectRenderEnabled: (enabled) => set({ perfectRenderEnabled: enabled }),
@@ -522,6 +532,7 @@ export const useStore = create<State>()(
                 fov: state.fov, // [NEW]
                 r2Videos: state.r2Videos, // [NEW]
                 paperFigures: state.paperFigures, // [NEW]
+                floorPlanTextureUrl: state.floorPlanTextureUrl, // [NEW]
             }),
         }
     )
