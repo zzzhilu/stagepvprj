@@ -52,7 +52,8 @@ function computeWorldTransform(
 export const StageObjectRenderer = forwardRef<THREE.Group, {
     object: StageObject;
     onClick?: (e: any) => void;
-}>(({ object, onClick }, forwardedRef) => {
+    envMap?: THREE.CubeTexture | THREE.Texture | null;
+}>(({ object, onClick, envMap }, forwardedRef) => {
     const renderMode = useStore((state) => state.renderMode);
     const contentTextures = useStore((state) => state.contentTextures);
     const activeContentId = useStore((state) => state.activeContentId);
@@ -209,7 +210,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                 if (object.type === 'floor_plan') {
                     const MatClass = perfectRenderEnabled ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
                     const matParams: any = {
-                        color: '#000000',
+                        color: '#111111',
                         roughness: 1.0,
                         metalness: 0.0,
                         side: THREE.DoubleSide,
@@ -218,8 +219,8 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                     };
                     if (floorPlanTexture) {
                         matParams.map = floorPlanTexture;
+                        matParams.color = '#ffffff'; // White so texture renders at full brightness
                     } else {
-                        matParams.color = '#111111';
                         matParams.opacity = 0.5;
                     }
                     if (perfectRenderEnabled) {
@@ -229,39 +230,37 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                 }
                 // For emissive material with texture
                 if (object.material_id === 'emissive') {
-                    const matDef = MATERIAL_LIBRARY.emissive;
                     console.log('Creating emissive material, has texture:', !!textureMap);
 
                     if (textureMap) {
-                        // Perfect mode: use MeshPhysicalMaterial for emissive
-                        const MatClass = perfectRenderEnabled ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
-                        const matParams: any = {
-                            color: new THREE.Color('#000000'),
-                            roughness: 1.0,
-                            metalness: 0.0,
-                            side: THREE.FrontSide,
-                            emissive: new THREE.Color('#ffffff'),
-                            emissiveMap: textureMap,
-                            emissiveIntensity: matDef.emissiveIntensity || 1.0,
-                        };
                         if (perfectRenderEnabled) {
-                            matParams.envMapIntensity = 0.5;
+                            // Perfect mode: slight emissive glow + minimal environment reflection
+                            return new THREE.MeshPhysicalMaterial({
+                                color: new THREE.Color('#000000'),
+                                roughness: 0.1,
+                                metalness: 0.0,
+                                side: THREE.FrontSide,
+                                emissive: new THREE.Color('#ffffff'),
+                                emissiveMap: textureMap,
+                                emissiveIntensity: 1.0,
+                                envMapIntensity: 0.05,
+                                toneMapped: false,
+                            });
+                        } else {
+                            // Normal mode: color-accurate display (no lighting influence)
+                            return new THREE.MeshBasicMaterial({
+                                map: textureMap,
+                                side: THREE.FrontSide,
+                                toneMapped: false,
+                            });
                         }
-                        return new MatClass(matParams);
                     } else {
-                        const MatClass = perfectRenderEnabled ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
-                        const matParams: any = {
-                            color: new THREE.Color('#000000'),
-                            roughness: matDef.roughness,
-                            metalness: matDef.metalness,
+                        // Fallback: no texture, show solid emissive color
+                        return new THREE.MeshBasicMaterial({
+                            color: new THREE.Color('#ffaa00'),
                             side: THREE.FrontSide,
-                            emissive: new THREE.Color(matDef.emissive || '#ffaa00'),
-                            emissiveIntensity: matDef.emissiveIntensity || 1.0,
-                        };
-                        if (perfectRenderEnabled) {
-                            matParams.envMapIntensity = 0.5;
-                        }
-                        return new MatClass(matParams);
+                            toneMapped: false,
+                        });
                     }
                 }
                 // Use perfect material when perfect render is enabled
@@ -270,6 +269,20 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                     : createMaterial(object.material_id);
         }
     }, [renderMode, object.material_id, object.type, textureMap, floorPlanTexture, perfectRenderEnabled]);
+
+    // Apply realtime envMap to non-emissive materials for LED reflection
+    useEffect(() => {
+        if (!material || !envMap || !perfectRenderEnabled) return;
+        if (object.material_id === 'emissive' || object.type === 'floor_plan') return;
+        if (renderMode !== 'beauty') return;
+
+        const mat = material as THREE.MeshStandardMaterial;
+        if (mat.envMap !== envMap) {
+            mat.envMap = envMap;
+            mat.envMapIntensity = 1.5;
+            mat.needsUpdate = true;
+        }
+    }, [material, envMap, perfectRenderEnabled, object.material_id, object.type, renderMode]);
 
     // Show error placeholder if loading failed
     if (!gltfData) return null;

@@ -1,4 +1,4 @@
-import { OrbitControls, PerspectiveCamera, TransformControls, MeshReflectorMaterial } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, TransformControls, MeshReflectorMaterial, CubeCamera } from '@react-three/drei';
 import { useStore, StageObject } from '@/store/useStore';
 import { StageObjectRenderer } from './StageObjectRenderer';
 import { PaperFigureRenderer } from './PaperFigureRenderer';
@@ -6,7 +6,7 @@ import { CameraCapture } from './CameraCapture';
 import { VideoManager } from './VideoManager';
 import { EffectComposer, Bloom, SMAA, ToneMapping } from '@react-three/postprocessing';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
-import { useRef, useEffect, useCallback, createRef } from 'react';
+import { useRef, useEffect, useCallback, createRef, useState } from 'react';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
@@ -35,6 +35,9 @@ export function SceneGraph() {
     const reflectionMetalness = useStore((state) => state.reflectionMetalness);
 
     const controlsRef = useRef<OrbitControlsImpl>(null);
+    const cubeCameraRef = useRef<THREE.CubeCamera>(null);
+    const [realtimeEnvMap, setRealtimeEnvMap] = useState<THREE.CubeTexture | null>(null);
+    const frameCounter = useRef(0);
     const transformRef = useRef<any>(null);
     const objectRefsRef = useRef<Map<string, { current: THREE.Group | null }>>(new Map());
     const activeViewId = useStore((state) => state.activeViewId);
@@ -68,6 +71,33 @@ export function SceneGraph() {
         });
         keysToDelete.forEach(key => objectRefsRef.current.delete(key));
     }, [stageObjects]);
+
+    // CubeCamera for realtime LED reflections on stage surfaces
+    useEffect(() => {
+        if (!perfectRenderEnabled) {
+            if (cubeCameraRef.current) {
+                cubeCameraRef.current.renderTarget.dispose();
+                cubeCameraRef.current = null;
+                setRealtimeEnvMap(null);
+            }
+            return;
+        }
+
+        const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(256, {
+            format: THREE.RGBAFormat,
+            generateMipmaps: true,
+            minFilter: THREE.LinearMipmapLinearFilter,
+        });
+        const cubeCamera = new THREE.CubeCamera(0.1, 100, cubeRenderTarget);
+        cubeCamera.position.set(0, 1, 0); // Position at stage level
+        cubeCameraRef.current = cubeCamera;
+        setRealtimeEnvMap(cubeRenderTarget.texture);
+
+        return () => {
+            cubeRenderTarget.dispose();
+            cubeCameraRef.current = null;
+        };
+    }, [perfectRenderEnabled]);
 
     // Animation state refs (to avoid re-renders during animation)
     const animationRef = useRef<{
@@ -105,7 +135,15 @@ export function SceneGraph() {
     }, [activeViewId, views]);
 
     // Run animation in useFrame for sync with render loop
-    useFrame(({ invalidate }) => {
+    useFrame(({ invalidate, gl, scene }) => {
+        // CubeCamera update for realtime LED reflections (every 3 frames)
+        if (cubeCameraRef.current && perfectRenderEnabled) {
+            frameCounter.current++;
+            if (frameCounter.current % 3 === 0) {
+                cubeCameraRef.current.update(gl, scene);
+            }
+        }
+
         const anim = animationRef.current;
         if (!anim || !anim.active || !cameraRef.current || !controlsRef.current) return;
 
@@ -134,6 +172,9 @@ export function SceneGraph() {
 
     return (
         <>
+            {/* CubeCamera for realtime LED reflections */}
+            {cubeCameraRef.current && <primitive object={cubeCameraRef.current} />}
+
             <PerspectiveCamera
                 ref={cameraRef}
                 makeDefault
@@ -196,6 +237,7 @@ export function SceneGraph() {
                         <StageObjectRenderer
                             ref={objRef}
                             object={obj}
+                            envMap={realtimeEnvMap}
                             onClick={(e: ThreeEvent<MouseEvent>) => {
                                 if (mode === 'admin' && gizmoEnabled) {
                                     e.stopPropagation();
