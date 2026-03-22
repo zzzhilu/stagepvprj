@@ -323,10 +323,10 @@ export function DrawingOverlay({ projectId }: DrawingOverlayProps) {
                 style={{ width: '100vw', height: '100vh' }}
             />
 
-            {/* Drawing Toolbar */}
+            {/* Drawing Toolbar - positioned next to sidebar */}
             <div
                 data-ui-element
-                className="fixed top-4 left-1/2 -translate-x-1/2 z-[70] flex items-center gap-1.5 bg-gray-900/90 backdrop-blur-xl rounded-2xl px-3 py-2 border border-white/15 shadow-2xl"
+                className="fixed left-[72px] top-1/2 -translate-y-1/2 z-[70] flex flex-col items-center gap-1.5 bg-gray-900/90 backdrop-blur-xl rounded-2xl px-2 py-3 border border-red-400/30 shadow-2xl"
             >
                 {/* Tools */}
                 {tools.map(t => (
@@ -344,7 +344,7 @@ export function DrawingOverlay({ projectId }: DrawingOverlayProps) {
                 ))}
 
                 {/* Divider */}
-                <div className="w-px h-7 bg-white/20 mx-1" />
+                <div className="h-px w-7 bg-white/20 my-1" />
 
                 {/* Color */}
                 <div className="relative">
@@ -361,7 +361,7 @@ export function DrawingOverlay({ projectId }: DrawingOverlayProps) {
 
                     {/* Color Picker Dropdown */}
                     {showColorPicker && (
-                        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900/95 backdrop-blur-xl rounded-xl p-3 border border-white/15 shadow-2xl">
+                        <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900/95 backdrop-blur-xl rounded-xl p-3 border border-white/15 shadow-2xl">
                             <div className="flex items-center gap-2">
                                 {PRESET_COLORS.map(c => (
                                     <button
@@ -384,11 +384,11 @@ export function DrawingOverlay({ projectId }: DrawingOverlayProps) {
                 </div>
 
                 {/* Divider */}
-                <div className="w-px h-7 bg-white/20 mx-1" />
+                <div className="h-px w-7 bg-white/20 my-1" />
 
                 {/* Line Width */}
-                <div className="flex items-center gap-2 px-1">
-                    <span className="text-white/50 text-xs">{lineWidth}px</span>
+                <div className="flex flex-col items-center gap-1 py-1">
+                    <span className="text-white/50 text-[10px]">{lineWidth}px</span>
                     <input
                         type="range"
                         min="1"
@@ -396,11 +396,12 @@ export function DrawingOverlay({ projectId }: DrawingOverlayProps) {
                         value={lineWidth}
                         onChange={e => setLineWidth(parseInt(e.target.value))}
                         className="w-16 h-1 accent-white/80"
+                        style={{ writingMode: 'vertical-lr', direction: 'rtl', width: '1rem', height: '4rem' } as React.CSSProperties}
                     />
                 </div>
 
                 {/* Divider */}
-                <div className="w-px h-7 bg-white/20 mx-1" />
+                <div className="h-px w-7 bg-white/20 my-1" />
 
                 {/* Clear All */}
                 <button

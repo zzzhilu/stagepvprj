@@ -282,7 +282,7 @@ export function VideoControls() {
                     }}
                 >
                     <div
-                        className="absolute inset-y-0 left-0 bg-violet-500/80 group-hover:bg-violet-400 rounded-full transition-colors duration-200"
+                        className="absolute inset-y-0 left-0 bg-emerald-500/80 group-hover:bg-emerald-400 rounded-full transition-colors duration-200"
                         style={{ width: `${progressPercent}%` }}
                     />
                 </div>
@@ -293,7 +293,7 @@ export function VideoControls() {
     // --- Full controls when expanded ---
     return (
         <div
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-sm p-4 z-50 pointer-events-auto rounded-xl border border-white/10 w-[600px] max-w-[90vw] transition-all duration-[800ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-sm p-4 z-50 pointer-events-auto rounded-xl border border-emerald-500/30 w-[600px] max-w-[90vw] transition-all duration-[800ms] ease-[cubic-bezier(0.4,0,0.2,1)] shadow-lg shadow-emerald-500/10"
             onMouseEnter={clearCollapseTimer}
             onMouseLeave={() => { if (videoPlaying && !isRecording) startCollapseTimer(); }}
             onTouchStart={clearCollapseTimer}
@@ -320,9 +320,9 @@ export function VideoControls() {
                         value={videoCurrentTime}
                         onChange={handleSeek}
                         disabled={isRecording}
-                        className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-violet-500 disabled:opacity-50"
+                        className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-emerald-500 disabled:opacity-50"
                         style={{
-                            background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${progressPercent}%, #4b5563 ${progressPercent}%, #4b5563 100%)`
+                            background: `linear-gradient(to right, #10b981 0%, #10b981 ${progressPercent}%, #4b5563 ${progressPercent}%, #4b5563 100%)`
                         }}
                     />
                     <span className="text-white text-xs font-mono w-12">
@@ -337,7 +337,7 @@ export function VideoControls() {
                         onClick={handlePlayPause}
                         className={`w-12 h-12 flex items-center justify-center rounded-full transition-colors ${isRecording
                             ? 'bg-red-600 hover:bg-red-700'
-                            : 'bg-violet-600 hover:bg-violet-700'
+                            : 'bg-emerald-600 hover:bg-emerald-700'
                             }`}
                     >
                         {isRecording ? (
@@ -379,7 +379,7 @@ export function VideoControls() {
                             step="0.05"
                             value={videoVolume}
                             onChange={(e) => setVideoVolume(parseFloat(e.target.value))}
-                            className="w-24 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                            className="w-24 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                         />
                         <span className="text-white text-xs font-mono w-8">
                             {Math.round(videoVolume * 100)}%

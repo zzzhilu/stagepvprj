@@ -137,11 +137,13 @@ function PaperFigureMesh({
         setShowMenu(prev => !prev);
     }, [isPlacementMode]);
 
-    const material = useMemo(() => new THREE.MeshBasicMaterial({
+    const material = useMemo(() => new THREE.MeshStandardMaterial({
         color: figure.color,
         side: THREE.DoubleSide,
         transparent: true,
         opacity: 0.92,
+        roughness: 0.8,
+        metalness: 0.0,
     }), [figure.color]);
 
     return (

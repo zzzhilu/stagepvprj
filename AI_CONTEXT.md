@@ -1,6 +1,6 @@
 # 🤖 AI Context Index
 
-> **生成時間:** 2026-03-22 01:24:04
+> **生成時間:** 2026-03-22 02:24:00
 > **專案路徑:** `E:\work\AI_Antigravity\stagepv_1`
 > **掃描深度:** 3 層
 >
@@ -99,20 +99,24 @@
 
 **當前分支:** `main`
 ### 工作區狀態：✅ 乾淨
-**最近 Commit:** `2c0a04d feat: LED反射+emissive色準優化 - CubeCamera即時envMap反射LED到舞台表面 - emissive色準:一般MeshBasicMaterial/完美微量環境反射 - emissive背面黑色渲染 - 平面圖黑底材質 (68 seconds ago)`
+**最近 Commit:** `0b6364e feat: 主光源方向控制+陰影效能優化+材質修正 (6 minutes ago)`
 ### 最近變更統計
 ```
-src/components/canvas/SceneGraph.tsx          | 48 ++++++++++++++++--
- src/components/canvas/StageObjectRenderer.tsx | 71 ++++++++++++++++-----------
- 2 files changed, 87 insertions(+), 32 deletions(-)
+src/components/admin/LightingControls.tsx          | 67 +++++++++++++++++++++-
+ src/components/canvas/PerfectRenderEnvironment.tsx | 10 ++--
+ src/components/canvas/SceneGraph.tsx               | 21 ++++++-
+ src/components/canvas/StageObjectRenderer.tsx      | 21 ++++---
+ src/lib/materials.ts                               |  8 +--
+ src/store/useStore.ts                              |  8 +++
+ 6 files changed, 113 insertions(+), 22 deletions(-)
 ```
 ### 最近 Commits
 ```
+0b6364e feat: 主光源方向控制+陰影效能優化+材質修正
+a6b1dbe feat: 新增網格LED材質+旋轉限制 - emissiveMesh材質(程序化柵欄alphaMap透視) - 背面黑色+相同柵欄pattern - OrbitControls垂直旋轉角度限制防止空白空間
 2c0a04d feat: LED反射+emissive色準優化 - CubeCamera即時envMap反射LED到舞台表面 - emissive色準:一般MeshBasicMaterial/完美微量環境反射 - emissive背面黑色渲染 - 平面圖黑底材質
 229ab88 fix: emissive背面黑色渲染 + 平面圖黑底材質 - LED正面內容/背面黑色背殼 - 平面圖底色改為純黑
 6eea9d7 feat: 新增平面圖上傳功能 + emissive單面渲染 - PLANE mesh自動識別為floor_plan類型 - FloorPlanUploader元件(上傳/預覽/替換/移除) - 平面圖材質半透明(opacity 0.7) - emissive材質改為FrontSide單面顯示
-1a43f60 fix: 修復物件名稱顯示 + 拉絲金屬黑塊問題 - ObjectInspector使用type標籤 - 移除brushedSteel anisotropy改用roughnessMap
-b01f5fe fix: video collapse 5s + touch support, remove old perfect render button
 ```
 
 ---

@@ -217,6 +217,34 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
                     </div>
                 </div>
             )}
+
+            {/* Paper Figure Mode Banner */}
+            {paperFigureMode && (
+                <div
+                    data-ui-element
+                    className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] animate-fade-in-down"
+                >
+                    <div className="bg-amber-500/90 backdrop-blur-md text-white px-5 py-2.5 rounded-full shadow-2xl flex items-center gap-3 font-medium border border-amber-400/50">
+                        <div className="flex items-center gap-2">
+                            <svg className="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+                                <circle cx="12" cy="4.5" r="2.5" />
+                                <path d="M15 8H9a1 1 0 00-1 1v5h2v8h4v-8h2V9a1 1 0 00-1-1z" />
+                            </svg>
+                            <span className="text-sm">紙片小人模式啟動中</span>
+                            <span className="text-amber-200/80 text-xs">（點擊場景放置小人）</span>
+                        </div>
+                        <button
+                            onClick={() => setPaperFigureMode(false)}
+                            className="ml-1 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+                            title="關閉紙片小人模式"
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            )}
         </>
     );
 }
