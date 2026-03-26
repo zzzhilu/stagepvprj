@@ -57,6 +57,10 @@ export function ModelUploader() {
                 return 'emissive';
             case 'floor_plan':
                 return 'matteLightGray';
+            case 'prop':
+                return 'matteMetal';
+            case 'band':
+                return 'blackPlastic';
             default:
                 return 'matteMetal';
         }
@@ -69,6 +73,10 @@ export function ModelUploader() {
         if (lowerName.includes('moving') && lowerName.includes('led')) return 'moving_LED';
         if (lowerName.includes('moving') && lowerName.includes('prop')) return 'moving_prop';
         if (lowerName.includes('static') && lowerName.includes('led')) return 'static_LED';
+        // prop_1, prop_2, etc. (but NOT "moving_prop")
+        if (/\bprop[_\s]?\d*/i.test(name) && !lowerName.includes('moving')) return 'prop';
+        // band_1, band_2, etc.
+        if (/\bband[_\s]?\d*/i.test(name)) return 'band';
         if (lowerName.includes('stage')) return 'stage';
         if (lowerName.includes('venue')) return 'venues';
         if (lowerName.includes('plane')) return 'floor_plan';
@@ -231,8 +239,8 @@ export function ModelUploader() {
             // Create StageObject for each type using cloud URL
             // Create StageObject for each type using cloud URL
             parsedModels.forEach(parsed => {
-                // For moving objects (LEDs or props), create individual controllable objects for EACH mesh
-                if (parsed.type === 'moving_LED' || parsed.type === 'moving_prop') {
+                // For moving objects, props, and band members, create individual controllable objects for EACH mesh
+                if (parsed.type === 'moving_LED' || parsed.type === 'moving_prop' || parsed.type === 'prop' || parsed.type === 'band') {
                     parsed.meshes.forEach(mesh => {
                         const newObject = {
                             id: mesh.name, // Use the actual mesh name (e.g., "moving led 1") as ID
@@ -365,7 +373,9 @@ export function ModelUploader() {
         'moving_LED': '移動LED (Moving LED)',
         'moving_prop': '移動道具 (Moving Prop)',
         'basic_camera': '攝影機 (Camera)',
-        'floor_plan': '平面圖 (Floor Plan)'
+        'floor_plan': '平面圖 (Floor Plan)',
+        'prop': '道具 (Prop)',
+        'band': '樂團成員 (Band)'
     };
 
     const getFileNameFromUrl = (url: string) => {
@@ -391,7 +401,7 @@ export function ModelUploader() {
                         <svg className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> 上傳包含多個命名部件的 GLB 模型
                     </p>
                     <p className="text-xs text-gray-400 mb-3">
-                        部件命名規則：moving led / static led / stage / venue
+                        部件命名規則：moving led / static led / stage / venue / prop_1 / band_1
                     </p>
                 </div>
 

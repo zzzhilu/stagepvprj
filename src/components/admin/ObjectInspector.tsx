@@ -11,7 +11,9 @@ const typeLabels: Record<string, string> = {
     'moving_LED': '移動LED Moving LED',
     'moving_prop': '移動道具 Moving Prop',
     'basic_camera': '攝影機 Camera',
-    'floor_plan': '平面圖 Floor Plan'
+    'floor_plan': '平面圖 Floor Plan',
+    'prop': '道具 Prop',
+    'band': '樂團成員 Band'
 };
 
 // Helper to get object display name

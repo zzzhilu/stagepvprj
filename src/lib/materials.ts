@@ -349,15 +349,17 @@ export function createMeshLEDAlphaMap(): THREE.CanvasTexture {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, size, size);
 
-    // White grid cells (opaque LED pixels)
+    // White grid cells — tall rectangles (vertical orientation)
     ctx.fillStyle = '#ffffff';
-    const cellSize = 8;  // LED pixel size
-    const gap = 2;       // Gap between pixels
-    const step = cellSize + gap;
+    const cellW = 4;     // LED pixel width
+    const cellH = 16;    // LED pixel height (taller = vertical feel)
+    const gap = 1;       // Gap between pixels
+    const stepX = cellW + gap;
+    const stepY = cellH + gap;
 
-    for (let y = 0; y < size; y += step) {
-        for (let x = 0; x < size; x += step) {
-            ctx.fillRect(x, y, cellSize, cellSize);
+    for (let y = 0; y < size; y += stepY) {
+        for (let x = 0; x < size; x += stepX) {
+            ctx.fillRect(x, y, cellW, cellH);
         }
     }
 

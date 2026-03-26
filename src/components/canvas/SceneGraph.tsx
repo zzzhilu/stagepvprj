@@ -1,9 +1,11 @@
 import { OrbitControls, PerspectiveCamera, TransformControls, MeshReflectorMaterial, CubeCamera } from '@react-three/drei';
 import { useStore, StageObject } from '@/store/useStore';
 import { StageObjectRenderer } from './StageObjectRenderer';
+import { BoxPrimitiveRenderer } from './BoxPrimitiveRenderer';
 import { PaperFigureRenderer } from './PaperFigureRenderer';
 import { CameraCapture } from './CameraCapture';
 import { VideoManager } from './VideoManager';
+import { StageLightRenderer, StageLightRendererHandle } from './StageLightRenderer';
 import { EffectComposer, Bloom, SMAA, ToneMapping } from '@react-three/postprocessing';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
 import { useRef, useEffect, useCallback, createRef, useState } from 'react';
@@ -27,6 +29,8 @@ export function SceneGraph() {
     const gizmoEnabled = useStore((state) => state.gizmoEnabled);
     const selectedObjectId = useStore((state) => state.selectedObjectId);
     const setSelectedObject = useStore((state) => state.setSelectedObject);
+    const selectedLightId = useStore((state) => state.selectedLightId);
+    const updateStageLight = useStore((state) => state.updateStageLight);
     const transformMode = useStore((state) => state.transformMode);
     const updateObjectTransform = useStore((state) => state.updateObjectTransform);
 
@@ -41,6 +45,8 @@ export function SceneGraph() {
     const [realtimeEnvMap, setRealtimeEnvMap] = useState<THREE.CubeTexture | null>(null);
     const frameCounter = useRef(0);
     const transformRef = useRef<any>(null);
+    const lightTransformRef = useRef<any>(null);
+    const stageLightRendererRef = useRef<StageLightRendererHandle>(null);
     const objectRefsRef = useRef<Map<string, { current: THREE.Group | null }>>(new Map());
     const activeViewId = useStore((state) => state.activeViewId);
     const views = useStore((state) => state.views);
@@ -241,9 +247,13 @@ export function SceneGraph() {
             {/* Perfect Render Environment - HDR, SpotLights, ContactShadows */}
             <PerfectRenderEnvironment />
 
+            {/* Stage Light System - dynamic lights only in Perfect Render */}
+            <StageLightRenderer ref={stageLightRendererRef} />
+
             {/* Stage Objects from Store */}
             {stageObjects.map((obj) => {
                 const objRef = objectRefsRef.current.get(obj.id);
+                const Renderer = obj.model_path === '__box__' ? BoxPrimitiveRenderer : StageObjectRenderer;
 
                 return (
                     <ErrorBoundary
@@ -255,7 +265,7 @@ export function SceneGraph() {
                             </mesh>
                         }
                     >
-                        <StageObjectRenderer
+                        <Renderer
                             ref={objRef}
                             object={obj}
                             envMap={realtimeEnvMap}
@@ -300,6 +310,44 @@ export function SceneGraph() {
                         }}
                         onMouseUp={() => {
                             // Re-enable OrbitControls
+                            if (controlsRef.current) controlsRef.current.enabled = true;
+                        }}
+                    />
+                );
+            })()}
+
+            {/* TransformControls for Stage Lights (when Gizmo is enabled + light selected) */}
+            {mode === 'admin' && gizmoEnabled && selectedLightId && (() => {
+                const lightObj = stageLightRendererRef.current?.getLightRef(selectedLightId);
+                if (!lightObj) return null;
+
+                return (
+                    <TransformControls
+                        ref={lightTransformRef}
+                        object={lightObj}
+                        mode={transformMode === 'scale' ? 'translate' : transformMode}
+                        translationSnap={0.5}
+                        rotationSnap={Math.PI / 36}
+                        onObjectChange={() => {
+                            if (lightObj) {
+                                updateStageLight(selectedLightId, {
+                                    position: [
+                                        lightObj.position.x,
+                                        lightObj.position.y,
+                                        lightObj.position.z
+                                    ] as [number, number, number],
+                                    rotation: [
+                                        lightObj.rotation.x,
+                                        lightObj.rotation.y,
+                                        lightObj.rotation.z
+                                    ] as [number, number, number],
+                                });
+                            }
+                        }}
+                        onMouseDown={() => {
+                            if (controlsRef.current) controlsRef.current.enabled = false;
+                        }}
+                        onMouseUp={() => {
                             if (controlsRef.current) controlsRef.current.enabled = true;
                         }}
                     />

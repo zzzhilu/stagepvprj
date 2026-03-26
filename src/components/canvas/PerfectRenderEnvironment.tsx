@@ -25,7 +25,6 @@ export function PerfectRenderEnvironment() {
     const envIntensity = useStore((state) => state.envIntensity);
     const contactShadow = useStore((state) => state.contactShadow);
     const toneMapping = useStore((state) => state.toneMapping);
-    const spotLights = useStore((state) => state.spotLights);
 
     const { gl } = useThree();
 
@@ -61,24 +60,7 @@ export function PerfectRenderEnvironment() {
                 background={false}
             />
 
-            {/* 可控聚光燈 - 使用原生 Three.js spotLight（無可見錐體） */}
-            {spotLights.map((light, index) => (
-                light.enabled && (
-                    <spotLight
-                        key={index}
-                        position={light.position}
-                        angle={light.angle}
-                        penumbra={0.8}
-                        intensity={light.intensity}
-                        distance={light.distance}
-                        color={light.color}
-                        castShadow={light.castShadow}
-                        shadow-mapSize-width={light.castShadow ? 2048 : 512}
-                        shadow-mapSize-height={light.castShadow ? 2048 : 512}
-                        shadow-bias={-0.0001}
-                    />
-                )
-            ))}
+            {/* 聚光燈已移至 StageLightRenderer 元件，由燈光系統統一管理 */}
 
             {/* 接觸陰影 - 柔和的地面陰影效果 */}
             {contactShadow && (

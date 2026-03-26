@@ -47,3 +47,28 @@ main {
 .animate-fade-in-down {
   animation: fade-in-down 0.3s ease-out forwards;
 }
+
+/* ── Page Loading Bar ── */
+.loading-bar-gradient {
+  background: linear-gradient(90deg, #8b5cf6, #6366f1, #3b82f6);
+}
+
+@keyframes loading-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.loading-bar-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  animation: loading-shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes loading-brand-in {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.loading-brand-fade-in {
+  opacity: 0;
+  animation: loading-brand-in 0.5s ease-out forwards;
+}

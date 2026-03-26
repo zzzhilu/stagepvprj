@@ -140,7 +140,6 @@ export function ReflectionControls() {
     const envIntensity = useStore((state) => state.envIntensity);
     const contactShadow = useStore((state) => state.contactShadow);
     const toneMapping = useStore((state) => state.toneMapping);
-    const spotLights = useStore((state) => state.spotLights);
     const setEnvPreset = useStore((state) => state.setEnvPreset);
     const setEnvIntensity = useStore((state) => state.setEnvIntensity);
     const setContactShadow = useStore((state) => state.setContactShadow);
@@ -174,13 +173,7 @@ export function ReflectionControls() {
                 <SliderRow label="環境強度" value={envIntensity} min={0} max={3} step={0.1} onChange={setEnvIntensity} />
             </div>
 
-            {/* === 聚光燈 === */}
-            <div className="space-y-2 pt-2 border-t border-gray-800">
-                <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">聚光燈</span>
-                {spotLights.map((_, index) => (
-                    <SpotLightPanel key={index} index={index} />
-                ))}
-            </div>
+            {/* 聚光燈 section 已移至「💡 燈光系統」面板 */}
 
             {/* === 地板反射 === */}
             <div className="space-y-2 pt-2 border-t border-gray-800">

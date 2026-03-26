@@ -8,6 +8,8 @@ import { ReflectionControls } from './ReflectionControls';
 import ObjectInspector from './ObjectInspector';
 import { FloorPlanUploader } from './FloorPlanUploader';
 import CueManager from './CueManager';
+import { QuickAddPanel } from './QuickAddPanel';
+import { StageLightingPanel } from './StageLightingPanel';
 import { R2VideoManager } from '@/components/client/R2VideoManager';
 import { useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
@@ -283,6 +285,25 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                             </svg>
                         </button>
                         {expandedSections.includes('models') && <ModelUploader />}
+
+                {/* Quick Add Panel - Box + Preset Models */}
+                <div>
+                    <button
+                        onClick={() => toggleSection('quick-add')}
+                        className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2 mt-2"
+                    >
+                        <span className="font-semibold flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> 快速新增</span>
+                        <svg
+                            className={`w-5 h-5 transition-transform ${expandedSections.includes('quick-add') ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    {expandedSections.includes('quick-add') && <QuickAddPanel />}
+                </div>
                     </div>
                 )}
 
@@ -384,6 +405,25 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                 {!isVideoProgress && (
                     <FloorPlanUploader />
                 )}
+
+                {/* Stage Lighting System Section [NEW] */}
+                <div>
+                    <button
+                        onClick={() => toggleSection('stage-lights')}
+                        className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
+                    >
+                        <span className="font-semibold flex items-center gap-1.5">💡 燈光系統</span>
+                        <svg
+                            className={`w-5 h-5 transition-transform ${expandedSections.includes('stage-lights') ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    {expandedSections.includes('stage-lights') && <StageLightingPanel />}
+                </div>
 
                 {/* Lighting Controls Section */}
                 <div>

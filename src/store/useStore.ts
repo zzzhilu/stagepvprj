@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import type { MaterialId } from '@/lib/materials';
 
 // Types based on SAD 5.1 & 5.2
-export type ModelType = 'venues' | 'stage' | 'static_LED' | 'moving_LED' | 'moving_prop' | 'basic_camera' | 'floor_plan';
+export type ModelType = 'venues' | 'stage' | 'static_LED' | 'moving_LED' | 'moving_prop' | 'basic_camera' | 'floor_plan' | 'prop' | 'band';
 
 export interface Instance {
     pos: [number, number, number];
@@ -22,6 +22,7 @@ export interface StageCue {
     id: string;
     name: string;
     transforms: ObjectTransform[];
+    lightStates?: StageLightState[];       // Snapshot of all light states per cue
     thumbnail_url?: string;
     order: number;
 }
@@ -57,6 +58,40 @@ export interface SpotLightConfig {
     color: string;                          // hex color
     enabled: boolean;                       // on/off toggle
     castShadow: boolean;                    // shadow toggle
+}
+
+// === Stage Lighting System ===
+export type StageLightType = 'spot' | 'point' | 'rect' | 'strip';
+
+export interface StageLightState {
+    id: string;
+    position: [number, number, number];
+    rotation: [number, number, number];
+    intensity: number;
+    color: string;
+    enabled: boolean;
+}
+
+export interface StageLight {
+    id: string;
+    name: string;
+    type: StageLightType;
+    position: [number, number, number];
+    rotation: [number, number, number];     // Euler rotation for direction (default: pointing down)
+    intensity: number;                      // 0-30
+    color: string;                          // hex color
+    enabled: boolean;
+    castShadow: boolean;
+    parentId?: string;                      // Follow parent object (e.g. truss)
+
+    // SpotLight specific
+    angle?: number;        // 0-Math.PI/2
+    penumbra?: number;     // 0-1
+    distance?: number;     // 0-100
+
+    // RectAreaLight / StripLight specific
+    width?: number;
+    height?: number;       // strip uses fixed 0.1
 }
 
 // R2 Video for Image Progress feature
@@ -123,6 +158,7 @@ interface State {
 
     // Editor State [NEW]
     selectedObjectId: string | null;
+    selectedLightId: string | null;  // Selected stage light for TransformControls
     transformMode: 'translate' | 'rotate' | 'scale';
     gizmoEnabled: boolean; // [NEW] Toggle for transform controls
 
@@ -146,7 +182,8 @@ interface State {
     envIntensity: number;          // 0-3
     contactShadow: boolean;
     toneMapping: boolean;
-    spotLights: SpotLightConfig[];  // Controllable spotlights
+    spotLights: SpotLightConfig[];  // Legacy - kept for migration
+    stageLights: StageLight[];     // Dynamic stage lighting system
 
     setMode: (mode: 'admin' | 'client') => void;
     setIsMobile: (isMobile: boolean) => void;
@@ -161,6 +198,7 @@ interface State {
     applyCue: (id: string) => void;
 
     setSelectedObject: (id: string | null) => void;
+    setSelectedLight: (id: string | null) => void;  // Select stage light
     setTransformMode: (mode: 'translate' | 'rotate' | 'scale') => void;
     setGizmoEnabled: (enabled: boolean) => void; // [NEW]
 
@@ -176,6 +214,13 @@ interface State {
     setToneMapping: (enabled: boolean) => void;
     updateSpotLight: (index: number, config: Partial<SpotLightConfig>) => void;
     updateObjectTransform: (id: string, pos: [number, number, number], rot: [number, number, number], scale: [number, number, number]) => void;
+
+    // Stage Light CRUD
+    addStageLight: (light: StageLight) => void;
+    removeStageLight: (id: string) => void;
+    updateStageLight: (id: string, updates: Partial<StageLight>) => void;
+    duplicateStageLight: (id: string) => void;
+    setStageLights: (lights: StageLight[]) => void;
     linkObject: (childId: string, parentId: string | null) => void; // [NEW] Link/unlink parent
 
     addView: (view: CameraView) => void;
@@ -254,6 +299,7 @@ export const useStore = create<State>()(
             fov: 50, // Default FOV
 
             selectedObjectId: null,
+            selectedLightId: null,
             transformMode: 'translate',
             gizmoEnabled: false, // [NEW] Default off
 
@@ -282,6 +328,7 @@ export const useStore = create<State>()(
                 { name: '補光 Fill', position: [8, 8, 8] as [number, number, number], intensity: 1.5, angle: 0.5, distance: 25, color: '#ffeedd', enabled: true, castShadow: false },
                 { name: '背光 Rim', position: [-5, 6, -8] as [number, number, number], intensity: 1.0, angle: 0.4, distance: 20, color: '#ddeeff', enabled: true, castShadow: false },
             ],
+            stageLights: [],
 
             // Loading State
             isLoading: false,
@@ -310,9 +357,6 @@ export const useStore = create<State>()(
             // --- Cue Actions ---
             addCue: (name) => set((state) => {
                 const transforms: ObjectTransform[] = state.stageObjects.map(obj => {
-                    // Assuming instances[0] is the main transform for now as per current requirement (simpler model)
-                    // If we have multiple instances per object, we might need a more complex structure.
-                    // Based on "updateObjectTransform" below, we seem to be treating the first instance as THE object.
                     const inst = obj.instances[0] || { pos: [0, 0, 0], rot: [0, 0, 0], scale: [1, 1, 1] };
                     return {
                         id: obj.id,
@@ -322,10 +366,21 @@ export const useStore = create<State>()(
                     };
                 });
 
+                // Snapshot light states
+                const lightStates: StageLightState[] = state.stageLights.map(l => ({
+                    id: l.id,
+                    position: [...l.position] as [number, number, number],
+                    rotation: [...l.rotation] as [number, number, number],
+                    intensity: l.intensity,
+                    color: l.color,
+                    enabled: l.enabled,
+                }));
+
                 const newCue: StageCue = {
                     id: `cue_${Date.now()}`,
                     name,
                     transforms,
+                    lightStates,
                     order: state.cues.length
                 };
 
@@ -346,8 +401,17 @@ export const useStore = create<State>()(
                     };
                 });
 
+                const lightStates: StageLightState[] = state.stageLights.map(l => ({
+                    id: l.id,
+                    position: [...l.position] as [number, number, number],
+                    rotation: [...l.rotation] as [number, number, number],
+                    intensity: l.intensity,
+                    color: l.color,
+                    enabled: l.enabled,
+                }));
+
                 return {
-                    cues: state.cues.map(c => c.id === id ? { ...c, transforms } : c)
+                    cues: state.cues.map(c => c.id === id ? { ...c, transforms, lightStates } : c)
                 };
             }),
 
@@ -376,17 +440,39 @@ export const useStore = create<State>()(
                     return obj;
                 });
 
+                // Restore light states if present in cue
+                let newLights = state.stageLights;
+                if (cue.lightStates && cue.lightStates.length > 0) {
+                    newLights = state.stageLights.map(light => {
+                        const saved = cue.lightStates!.find(ls => ls.id === light.id);
+                        if (saved) {
+                            return {
+                                ...light,
+                                position: saved.position,
+                                rotation: saved.rotation,
+                                intensity: saved.intensity,
+                                color: saved.color,
+                                enabled: saved.enabled,
+                            };
+                        }
+                        return light;
+                    });
+                }
+
                 return {
                     stageObjects: newObjects,
+                    stageLights: newLights,
                     activeCueId: id
                 };
             }),
 
-            setSelectedObject: (id) => set({ selectedObjectId: id }),
+            setSelectedObject: (id) => set({ selectedObjectId: id, selectedLightId: null }),
+            setSelectedLight: (id) => set({ selectedLightId: id, selectedObjectId: null }),
             setTransformMode: (mode) => set({ transformMode: mode }),
             setGizmoEnabled: (enabled) => set({
                 gizmoEnabled: enabled,
-                selectedObjectId: enabled ? null : null // Clear selection when toggling
+                selectedObjectId: enabled ? null : null,
+                selectedLightId: enabled ? null : null,
             }),
 
             // Floor Plan Texture Action
@@ -406,6 +492,32 @@ export const useStore = create<State>()(
                     i === index ? { ...light, ...config } : light
                 ),
             })),
+
+            // --- Stage Light CRUD ---
+            addStageLight: (light) => set((state) => ({
+                stageLights: [...state.stageLights, light]
+            })),
+            removeStageLight: (id) => set((state) => ({
+                stageLights: state.stageLights.filter(l => l.id !== id),
+                selectedLightId: state.selectedLightId === id ? null : state.selectedLightId,
+            })),
+            updateStageLight: (id, updates) => set((state) => ({
+                stageLights: state.stageLights.map(l =>
+                    l.id === id ? { ...l, ...updates } : l
+                ),
+            })),
+            duplicateStageLight: (id) => set((state) => {
+                const src = state.stageLights.find(l => l.id === id);
+                if (!src) return {};
+                const dup: StageLight = {
+                    ...src,
+                    id: `light_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                    name: `${src.name} (copy)`,
+                    position: [src.position[0] + 1, src.position[1], src.position[2]] as [number, number, number],
+                };
+                return { stageLights: [...state.stageLights, dup] };
+            }),
+            setStageLights: (lights) => set({ stageLights: lights }),
 
             updateObjectTransform: (id, pos, rot, scale) => set((state) => ({
                 stageObjects: state.stageObjects.map(obj => {
@@ -541,7 +653,29 @@ export const useStore = create<State>()(
                 r2Videos: state.r2Videos, // [NEW]
                 paperFigures: state.paperFigures, // [NEW]
                 floorPlanTextureUrl: state.floorPlanTextureUrl, // [NEW]
+                stageLights: state.stageLights, // Stage lighting system
             }),
+            // Migration: convert old spotLights to stageLights on hydration
+            onRehydrateStorage: () => (state) => {
+                if (!state) return;
+                // If stageLights is empty but old spotLights exist, migrate them
+                if ((!state.stageLights || state.stageLights.length === 0) && state.spotLights && state.spotLights.length > 0) {
+                    state.stageLights = state.spotLights.map((old, i) => ({
+                        id: `light_migrated_${i}_${Date.now()}`,
+                        name: old.name,
+                        type: 'spot' as StageLightType,
+                        position: old.position,
+                        rotation: [-Math.PI / 2, 0, 0] as [number, number, number],
+                        intensity: old.intensity,
+                        color: old.color,
+                        enabled: old.enabled,
+                        castShadow: old.castShadow,
+                        angle: old.angle,
+                        penumbra: 0.8,
+                        distance: old.distance,
+                    }));
+                }
+            },
         }
     )
 );
