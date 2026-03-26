@@ -324,9 +324,9 @@ export const useStore = create<State>()(
             contactShadow: true,
             toneMapping: true,
             spotLights: [
-                { name: '主燈 Key', position: [0, 12, 0] as [number, number, number], intensity: 3, angle: 0.6, distance: 30, color: '#ffffff', enabled: true, castShadow: true },
-                { name: '補光 Fill', position: [8, 8, 8] as [number, number, number], intensity: 1.5, angle: 0.5, distance: 25, color: '#ffeedd', enabled: true, castShadow: false },
-                { name: '背光 Rim', position: [-5, 6, -8] as [number, number, number], intensity: 1.0, angle: 0.4, distance: 20, color: '#ddeeff', enabled: true, castShadow: false },
+                { name: '主燈 Key', position: [0, 12, 0] as [number, number, number], intensity: 3, angle: 0.6, distance: 30, color: '#ffffff', enabled: false, castShadow: true },
+                { name: '補光 Fill', position: [8, 8, 8] as [number, number, number], intensity: 1.5, angle: 0.5, distance: 25, color: '#ffeedd', enabled: false, castShadow: false },
+                { name: '背光 Rim', position: [-5, 6, -8] as [number, number, number], intensity: 1.0, angle: 0.4, distance: 20, color: '#ddeeff', enabled: false, castShadow: false },
             ],
             stageLights: [],
 
@@ -668,7 +668,7 @@ export const useStore = create<State>()(
                         rotation: [-Math.PI / 2, 0, 0] as [number, number, number],
                         intensity: old.intensity,
                         color: old.color,
-                        enabled: old.enabled,
+                        enabled: false, // Disabled by default - lighting system not ready for client display
                         castShadow: old.castShadow,
                         angle: old.angle,
                         penumbra: 0.8,
