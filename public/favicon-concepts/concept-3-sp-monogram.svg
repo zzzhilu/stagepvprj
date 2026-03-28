@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>StagePV Favicon - SP Monogram</title>
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="28" fill="#000"/>
+  <!-- Letter S - flowing curve -->
+  <path d="M22,22 C22,18 28,14 32,18 C36,22 24,28 24,32 C24,36 30,40 34,36" 
+        fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Letter P - geometric -->
+  <path d="M36,18 L36,46 M36,18 L44,18 C48,18 50,22 48,26 C46,30 42,30 36,30" 
+        fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

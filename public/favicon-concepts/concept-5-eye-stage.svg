@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>StagePV Favicon - Eye Stage</title>
+  <!-- Eye shape (viewing/preview) -->
+  <path d="M4,32 Q32,6 60,32 Q32,58 4,32 Z" fill="none" stroke="#000" stroke-width="3" stroke-linejoin="round"/>
+  <!-- Inner circle (iris) -->
+  <circle cx="32" cy="32" r="12" fill="none" stroke="#000" stroke-width="2.5"/>
+  <!-- Pupil as stage platform -->
+  <rect x="25" y="29" width="14" height="3" rx="0.5" fill="#000"/>
+  <!-- Tiny figure on stage -->
+  <circle cx="32" cy="26" r="2" fill="#000"/>
+  <line x1="32" y1="28" x2="32" y2="29" stroke="#000" stroke-width="1.5" stroke-linecap="round"/>
+</svg>
