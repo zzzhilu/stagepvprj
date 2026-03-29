@@ -163,7 +163,7 @@ export function PageLoadingBar() {
         {/* Center brand (smaller) */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <h1 className="text-2xl font-bold text-white/80 tracking-tight select-none loading-brand-fade-in">
-            Stage<span className="text-violet-400/80">PV</span>
+            Stage<span className="bg-gradient-to-r from-gray-300 via-white to-gray-400 bg-clip-text text-transparent">PV</span>
           </h1>
           <div className="w-48 mt-6 flex flex-col items-center gap-2">
             <div className="w-full h-[2px] bg-white/[0.06] rounded-full overflow-hidden">
@@ -191,9 +191,20 @@ export function PageLoadingBar() {
       }`}
     >
       {/* Central brand */}
-      <div className="flex flex-col items-center gap-3 mb-16">
+      <div className="flex flex-col items-center gap-4 mb-16">
+        {/* StagePV Icon */}
+        <div className="w-16 h-16 animate-pulse loading-brand-fade-in" style={{ animationDuration: '2.5s' }}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+            <circle cx="32" cy="32" r="30" fill="#111" stroke="rgba(255,255,255,0.06)" strokeWidth="0.5"/>
+            <polygon points="32,18 50,28 32,38 14,28" fill="#fff" stroke="#000" strokeWidth="0.5" strokeLinejoin="round"/>
+            <polygon points="14,28 32,38 32,46 14,36" fill="#ccc" stroke="#000" strokeWidth="0.5" strokeLinejoin="round"/>
+            <polygon points="50,28 32,38 32,46 50,36" fill="#999" stroke="#000" strokeWidth="0.5" strokeLinejoin="round"/>
+            <circle cx="32" cy="23" r="1.8" fill="#000"/>
+            <line x1="32" y1="24.8" x2="32" y2="29.5" stroke="#000" strokeWidth="1" strokeLinecap="round"/>
+          </svg>
+        </div>
         <h1 className="text-4xl font-bold text-white tracking-tight select-none loading-brand-fade-in">
-          Stage<span className="text-violet-400">PV</span>
+          Stage<span className="bg-gradient-to-r from-gray-300 via-white to-gray-400 bg-clip-text text-transparent">PV</span>
         </h1>
         <p className="text-sm text-gray-500 tracking-widest uppercase loading-brand-fade-in"
            style={{ animationDelay: '150ms' }}>

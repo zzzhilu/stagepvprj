@@ -84,7 +84,7 @@ export function BottomLeftPanel() {
                                                 relative w-12 h-12 rounded-lg overflow-hidden
                                                 transition-all duration-200
                                                 ${activeViewId === view.id
-                                                    ? 'ring-2 ring-violet-500 scale-110'
+                                                    ? 'ring-2 ring-gray-300 scale-110'
                                                     : 'ring-1 ring-white/10 hover:ring-white/30'}
                                                 bg-gray-800 hover:bg-gray-700
                                             `}
@@ -101,7 +101,7 @@ export function BottomLeftPanel() {
                                                 </span>
                                             )}
                                             {activeViewId === view.id && (
-                                                <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-violet-500 rounded-full" />
+                                                <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-300 rounded-full" />
                                             )}
                                         </button>
                                     ))}

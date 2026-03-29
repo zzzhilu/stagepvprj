@@ -56,7 +56,7 @@ function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
                     onKeyDown={handleKeyDown}
                     placeholder="請輸入密碼..."
                     autoFocus
-                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white text-center text-lg tracking-widest placeholder-gray-500 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white text-center text-lg tracking-widest placeholder-gray-500 focus:border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400/50"
                 />
 
                 {error && (
@@ -72,7 +72,7 @@ function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
                     </button>
                     <button
                         onClick={handleSubmit}
-                        className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-3 rounded-lg font-semibold transition-colors"
+                        className="flex-1 bg-gradient-to-r from-gray-400 to-gray-300 hover:from-gray-300 hover:to-gray-200 text-gray-900 py-3 rounded-lg font-semibold transition-all"
                     >
                         確認
                     </button>

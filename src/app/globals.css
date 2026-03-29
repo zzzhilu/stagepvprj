@@ -50,7 +50,7 @@ main {
 
 /* ── Page Loading Bar ── */
 .loading-bar-gradient {
-  background: linear-gradient(90deg, #8b5cf6, #6366f1, #3b82f6);
+  background: linear-gradient(90deg, #9ca3af, #d1d5db, #e5e7eb, #d1d5db, #9ca3af);
 }
 
 @keyframes loading-shimmer {
