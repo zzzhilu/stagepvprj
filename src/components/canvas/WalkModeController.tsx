@@ -27,7 +27,6 @@ export function WalkModeController() {
     const { camera, gl, scene } = useThree();
     const walkMode = useStore(s => s.walkMode);
     const setWalkMode = useStore(s => s.setWalkMode);
-    const walkMoveInput = useStore(s => s.walkMoveInput);
 
     const keysPressed = useRef(new Set<string>());
     const isMouseDragging = useRef(false);
@@ -252,9 +251,10 @@ export function WalkModeController() {
         if (keys.has('d')) moveVec.current.add(rightDir.current);
         if (keys.has('a')) moveVec.current.sub(rightDir.current);
 
-        if (walkMoveInput.x !== 0 || walkMoveInput.y !== 0) {
-            moveVec.current.addScaledVector(direction.current, walkMoveInput.y);
-            moveVec.current.addScaledVector(rightDir.current, walkMoveInput.x);
+        const joyInput = useStore.getState().walkMoveInput;
+        if (joyInput.x !== 0 || joyInput.y !== 0) {
+            moveVec.current.addScaledVector(direction.current, joyInput.y);
+            moveVec.current.addScaledVector(rightDir.current, joyInput.x);
         }
 
         // Apply horizontal movement
