@@ -9,7 +9,8 @@ const MOVE_SPEED = 4; // meters per second
 const LOOK_SPEED = 0.003; // radians per pixel
 const EYE_HEIGHT = 1.7; // meters above ground
 const HEIGHT_SMOOTH = 8; // how fast camera follows terrain height
-const RAY_CEILING = 50; // max ray distance upward for ceiling check
+const MAX_STEP_UP = 1.2; // max height the camera can "step up" onto (e.g. a stage platform)
+const MAX_DROP = 20; // max distance to look for ground below
 const WASD_KEYS = new Set(['w', 'a', 's', 'd', 'W', 'A', 'S', 'D']);
 
 /**
@@ -18,9 +19,9 @@ const WASD_KEYS = new Set(['w', 'a', 's', 'd', 'W', 'A', 'S', 'D']);
  * Instead of blocking on walls, the camera follows the surface:
  * - Walking towards a stage → camera rises onto the stage
  * - Walking off a stage → camera descends to ground level
- * - Raycasts DOWN from above the destination to find the ground surface
+ * - Raycasts DOWN from near the camera to find the NEAREST ground below
+ * - Supports multi-story: only detects floors at/below current level
  * - Smoothly interpolates Y to ground + EYE_HEIGHT
- * - Only blocks movement if a ceiling would trap the camera
  */
 export function WalkModeController() {
     const { camera, gl, scene } = useThree();
@@ -58,21 +59,26 @@ export function WalkModeController() {
     };
 
     /**
-     * Find ground height at a given XZ position by raycasting downward
-     * from high above. Returns the Y of the highest surface found,
-     * or null if no ground detected.
+     * Find ground height at a given XZ position.
+     * 
+     * Casts DOWN from (feet + MAX_STEP_UP) so:
+     * - Can step UP onto a stage platform (up to MAX_STEP_UP)
+     * - Finds the floor UNDER the camera, not the highest roof
+     * - Works correctly in multi-story buildings
+     * 
+     * @param feetY - current camera Y minus EYE_HEIGHT (approximate feet position)
      */
-    const findGroundY = (x: number, z: number, collidables: THREE.Object3D[]): number | null => {
-        // Cast from high above straight down
-        rayOrigin.current.set(x, RAY_CEILING, z);
+    const findGroundY = (x: number, z: number, feetY: number, collidables: THREE.Object3D[]): number | null => {
+        // Cast from just above the max step-up height, straight down
+        const rayStartY = feetY + MAX_STEP_UP;
+        rayOrigin.current.set(x, rayStartY, z);
         raycaster.current.set(rayOrigin.current, downDir);
-        raycaster.current.far = RAY_CEILING * 2;
+        raycaster.current.far = MAX_STEP_UP + MAX_DROP;
 
         const hits = raycaster.current.intersectObjects(collidables, false);
         if (hits.length === 0) return null;
 
-        // Return the HIGHEST hit point (top surface)
-        // hits are sorted by distance, so first hit from above = highest surface
+        // First hit from this position = the ground closest to our feet
         return hits[0].point.y;
     };
 
@@ -260,7 +266,8 @@ export function WalkModeController() {
         }
 
         // --- Terrain following: find ground at current XZ ---
-        const groundY = findGroundY(camera.position.x, camera.position.z, collidables);
+        const feetY = camera.position.y - EYE_HEIGHT;
+        const groundY = findGroundY(camera.position.x, camera.position.z, feetY, collidables);
 
         if (groundY !== null) {
             // Target = ground surface + eye height

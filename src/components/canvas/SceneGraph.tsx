@@ -216,8 +216,8 @@ export function SceneGraph() {
                 }}
             />
 
-            {/* Walk Mode Controller (first person) */}
-            {walkMode && <WalkModeController />}
+            {/* Walk Mode Controller — always mounted so WASD auto-enter works */}
+            <WalkModeController />
 
             {/* Helper component to capture camera state when triggered from Admin UI */}
             <CameraCapture controlsRef={controlsRef} />
