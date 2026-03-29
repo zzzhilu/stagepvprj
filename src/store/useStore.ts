@@ -170,6 +170,10 @@ interface State {
     paperFigures: PaperFigure[];
     paperFigureMode: boolean;
 
+    // Walk Mode (First Person) [NEW]
+    walkMode: boolean;
+    walkMoveInput: { x: number; y: number }; // joystick input for mobile
+
     // Floor Plan Texture [NEW]
     floorPlanTextureUrl: string | null;
 
@@ -260,6 +264,10 @@ interface State {
     clearAllPaperFigures: () => void;
     setPaperFigures: (figures: PaperFigure[]) => void;
 
+    // Walk Mode Actions [NEW]
+    setWalkMode: (enabled: boolean) => void;
+    setWalkMoveInput: (input: { x: number; y: number }) => void;
+
     setLoading: (loading: boolean, message?: string) => void;
     loadState: (state: Partial<State>) => void;
 
@@ -310,6 +318,10 @@ export const useStore = create<State>()(
             // Paper Figure defaults
             paperFigures: [],
             paperFigureMode: false,
+
+            // Walk Mode defaults
+            walkMode: false,
+            walkMoveInput: { x: 0, y: 0 },
 
             // Floor Plan Texture default
             floorPlanTextureUrl: null,
@@ -612,6 +624,10 @@ export const useStore = create<State>()(
             })),
             clearAllPaperFigures: () => set({ paperFigures: [] }),
             setPaperFigures: (figures) => set({ paperFigures: figures }),
+
+            // Walk Mode Actions
+            setWalkMode: (enabled) => set({ walkMode: enabled }),
+            setWalkMoveInput: (input) => set({ walkMoveInput: input }),
 
             setLoading: (loading, message = '') => set({ isLoading: loading, loadingMessage: message }),
             loadState: (newState) => set((state) => ({

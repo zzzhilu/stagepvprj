@@ -6,6 +6,7 @@ import { PaperFigureRenderer } from './PaperFigureRenderer';
 import { CameraCapture } from './CameraCapture';
 import { VideoManager } from './VideoManager';
 import { StageLightRenderer, StageLightRendererHandle } from './StageLightRenderer';
+import { WalkModeController } from './WalkModeController';
 import { EffectComposer, Bloom, SMAA, ToneMapping } from '@react-three/postprocessing';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
 import { useRef, useEffect, useCallback, createRef, useState } from 'react';
@@ -60,6 +61,9 @@ export function SceneGraph() {
 
     // Paper Figure mode
     const paperFigureMode = useStore((state) => state.paperFigureMode);
+
+    // Walk Mode (first person)
+    const walkMode = useStore((state) => state.walkMode);
 
     // Create/update refs for all objects (using mutable ref objects)
     useEffect(() => {
@@ -190,11 +194,11 @@ export function SceneGraph() {
                 fov={fov}
             />
 
-            {/* OrbitControls with vertical rotation limits (disabled during drawing) */}
+            {/* OrbitControls with vertical rotation limits (disabled during drawing/walkMode) */}
             <OrbitControls
                 ref={controlsRef}
                 makeDefault
-                enabled={!drawingMode && !paperFigureMode}
+                enabled={!drawingMode && !paperFigureMode && !walkMode}
                 enablePan={true}
                 enableZoom={true}
                 enableRotate={true}
@@ -211,6 +215,9 @@ export function SceneGraph() {
                     }
                 }}
             />
+
+            {/* Walk Mode Controller (first person) */}
+            {walkMode && <WalkModeController />}
 
             {/* Helper component to capture camera state when triggered from Admin UI */}
             <CameraCapture controlsRef={controlsRef} />

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
+import { TouchJoystick } from './TouchJoystick';
 
 interface ClientToolbarProps {
     projectId?: string;
@@ -20,6 +21,23 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
     const perfectRenderEnabled = useStore(s => s.perfectRenderEnabled);
     const setPerfectRenderEnabled = useStore(s => s.setPerfectRenderEnabled);
     const setBloomIntensity = useStore(s => s.setBloomIntensity);
+    const walkMode = useStore(s => s.walkMode);
+    const setWalkMode = useStore(s => s.setWalkMode);
+
+    // Detect touch device (mobile/tablet) — reliable local detection
+    const [isTouchDevice, setIsTouchDevice] = useState(false);
+    useEffect(() => {
+        const check = () => {
+            const hasTouch = navigator.maxTouchPoints > 0 ||
+                'ontouchstart' in window ||
+                window.matchMedia('(pointer: coarse)').matches;
+            setIsTouchDevice(hasTouch);
+        };
+        check();
+        // Re-check on resize (some 2-in-1 devices switch modes)
+        window.addEventListener('resize', check);
+        return () => window.removeEventListener('resize', check);
+    }, []);
 
     const takeScreenshot = useCallback(async () => {
         try {
@@ -109,6 +127,28 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
             >
                 {/* Tool buttons */}
                 <div className="bg-black/60 backdrop-blur-md rounded-r-xl border border-white/10 border-l-0 py-3 px-2 flex flex-col gap-2 shadow-2xl">
+                    {/* Walk Mode Toggle */}
+                    <button
+                        onClick={() => setWalkMode(!walkMode)}
+                        className={`group w-10 h-10 rounded-lg flex items-center justify-center transition-all active:scale-90 ${walkMode
+                            ? 'bg-cyan-500/30 ring-1 ring-cyan-400/50 shadow-lg shadow-cyan-500/20'
+                            : 'hover:bg-white/15'
+                            }`}
+                        title={walkMode ? '退出漫遊模式' : '進入漫遊模式（WASD移動）'}
+                    >
+                        {/* Walking person icon */}
+                        <svg className={`w-5 h-5 ${walkMode ? 'text-cyan-400' : 'text-white/80 group-hover:text-white'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.6}>
+                            {/* Head */}
+                            <circle cx="12" cy="4" r="2" fill="currentColor" stroke="none" />
+                            {/* Body + legs in walking pose */}
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 8.5L12 14l-3 7M13.5 8.5L12 14l3 7" />
+                            {/* Arms swinging */}
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 11l4 2 4-2" />
+                            {/* Torso */}
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v7" />
+                        </svg>
+                    </button>
+
                     {/* Screenshot */}
                     <button
                         onClick={takeScreenshot}
@@ -204,6 +244,16 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
                 </button>
             </div>
 
+            {/* Mobile Touch Joystick (bottom-left, only when walkMode active on mobile/touch) */}
+            {walkMode && isTouchDevice && (
+                <div
+                    data-ui-element
+                    className="fixed bottom-6 left-4 z-[100] pointer-events-auto animate-fade-in"
+                >
+                    <TouchJoystick />
+                </div>
+            )}
+
             {/* Screenshot Toast */}
             {screenshotToast && (
                 <div
@@ -214,6 +264,30 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                         已截圖到剪貼簿
+                    </div>
+                </div>
+            )}
+
+            {/* Walk Mode Tip Banner — subtle, low-key */}
+            {walkMode && (
+                <div
+                    data-ui-element
+                    className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] animate-fade-in-down pointer-events-auto"
+                >
+                    <div className="bg-white/10 backdrop-blur-sm text-white/50 px-4 py-1.5 rounded-full flex items-center gap-2 text-xs border border-white/5">
+                        <span>漫遊模式</span>
+                        {!isTouchDevice && (
+                            <span className="text-white/30">WASD移動 · 按住滑鼠旋轉 · 中鍵/右鍵退出</span>
+                        )}
+                        <button
+                            onClick={() => setWalkMode(false)}
+                            className="ml-1 w-4 h-4 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors"
+                            title="退出漫遊模式"
+                        >
+                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
             )}
@@ -248,3 +322,4 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
         </>
     );
 }
+
