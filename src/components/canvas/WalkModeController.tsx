@@ -9,7 +9,7 @@ const MOVE_SPEED = 4; // meters per second
 const LOOK_SPEED = 0.003; // radians per pixel
 const EYE_HEIGHT = 1.7; // meters above ground
 const HEIGHT_SMOOTH = 8; // how fast camera follows terrain height
-const MAX_STEP_UP = 1.2; // max height the camera can "step up" onto (e.g. a stage platform)
+const MAX_STEP_UP = 2.2; // max height the camera can "step up" onto (e.g. a stage platform)
 const MAX_DROP = 20; // max distance to look for ground below
 const WASD_KEYS = new Set(['w', 'a', 's', 'd', 'W', 'A', 'S', 'D']);
 
