@@ -24,20 +24,39 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
     const walkMode = useStore(s => s.walkMode);
     const setWalkMode = useStore(s => s.setWalkMode);
 
-    // Detect touch device (mobile/tablet) — reliable local detection
+    // Detect touch device (mobile/tablet) — robust multi-signal detection
+    const setIsMobile = useStore(s => s.setIsMobile);
     const [isTouchDevice, setIsTouchDevice] = useState(false);
     useEffect(() => {
+        const update = (val: boolean) => {
+            setIsTouchDevice(val);
+            setIsMobile(val);
+        };
+
         const check = () => {
             const hasTouch = navigator.maxTouchPoints > 0 ||
                 'ontouchstart' in window ||
                 window.matchMedia('(pointer: coarse)').matches;
-            setIsTouchDevice(hasTouch);
+            // Fallback: if screen is narrow, very likely a mobile device
+            const isNarrowScreen = window.innerWidth <= 1024;
+            update(hasTouch || isNarrowScreen);
         };
         check();
+
+        // One-shot: if we ever receive a real touch event, we are definitely touch
+        const onFirstTouch = () => {
+            update(true);
+            window.removeEventListener('touchstart', onFirstTouch);
+        };
+        window.addEventListener('touchstart', onFirstTouch, { passive: true });
+
         // Re-check on resize (some 2-in-1 devices switch modes)
         window.addEventListener('resize', check);
-        return () => window.removeEventListener('resize', check);
-    }, []);
+        return () => {
+            window.removeEventListener('resize', check);
+            window.removeEventListener('touchstart', onFirstTouch);
+        };
+    }, [setIsMobile]);
 
     const takeScreenshot = useCallback(async () => {
         try {
