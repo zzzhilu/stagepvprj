@@ -28,29 +28,36 @@ export function LoadingOverlay() {
     if (!isLoading) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-300">
-            <div className="flex flex-col items-center gap-4 p-8 rounded-2xl bg-gray-900/90 border border-white/10 shadow-2xl min-w-[280px]">
-                {/* Spinner */}
-                <div className="relative w-16 h-16">
-                    <div className="absolute inset-0 border-4 border-violet-500/30 rounded-full animate-pulse"></div>
-                    <div className="absolute inset-0 border-4 border-t-violet-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
-                    <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white">
-                        {Math.round(progress)}%
-                    </div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md transition-all duration-300">
+            <div className="flex flex-col items-center gap-5 p-8 min-w-[280px]">
+                {/* StagePV Icon — isometric stage box with breathing animation */}
+                <div className="w-20 h-20 animate-pulse" style={{ animationDuration: '2s' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="80" height="80">
+                        <circle cx="32" cy="32" r="30" fill="#111" stroke="rgba(255,255,255,0.08)" strokeWidth="0.5"/>
+                        {/* Top face */}
+                        <polygon points="32,18 50,28 32,38 14,28" fill="#fff" stroke="#000" strokeWidth="0.5" strokeLinejoin="round"/>
+                        {/* Left face */}
+                        <polygon points="14,28 32,38 32,46 14,36" fill="#ccc" stroke="#000" strokeWidth="0.5" strokeLinejoin="round"/>
+                        {/* Right face */}
+                        <polygon points="50,28 32,38 32,46 50,36" fill="#999" stroke="#000" strokeWidth="0.5" strokeLinejoin="round"/>
+                        {/* Figure on stage */}
+                        <circle cx="32" cy="23" r="1.8" fill="#000"/>
+                        <line x1="32" y1="24.8" x2="32" y2="29.5" stroke="#000" strokeWidth="1" strokeLinecap="round"/>
+                    </svg>
                 </div>
 
-                {/* Message */}
+                {/* Brand name */}
                 <div className="text-center">
-                    <h3 className="text-lg font-bold text-white mb-1">Processing</h3>
+                    <h3 className="text-base font-medium text-white/70 tracking-widest uppercase">StagePV</h3>
                     {loadingMessage && (
-                        <p className="text-sm text-gray-400 animate-pulse">{loadingMessage}</p>
+                        <p className="text-xs text-white/30 mt-1.5 animate-pulse">{loadingMessage}</p>
                     )}
                 </div>
 
-                {/* Progress Bar (Determinate) */}
-                <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden mt-2">
+                {/* Thin progress bar */}
+                <div className="w-48 bg-white/5 rounded-full h-0.5 overflow-hidden">
                     <div
-                        className="bg-violet-500 h-full transition-all duration-200 ease-out"
+                        className="bg-white/40 h-full transition-all duration-300 ease-out rounded-full"
                         style={{ width: `${progress}%` }}
                     ></div>
                 </div>
