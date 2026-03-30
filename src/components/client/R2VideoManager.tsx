@@ -31,7 +31,7 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
         // Validate file type
         const validTypes = ['video/mp4', 'video/x-m4v', 'video/webm', 'video/quicktime'];
         if (!validTypes.includes(file.type)) {
-            setError('請上傳 MP4、M4V 或 WebM 格式的影片');
+            setError('請上傳 MP4、M4V、WebM 或 MOV 格式的影片');
             return;
         }
 

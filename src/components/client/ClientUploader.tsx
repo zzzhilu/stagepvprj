@@ -43,7 +43,7 @@ export function ClientUploader() {
         const isImage = file.type.startsWith('image/');
 
         if (!isVideo && !isImage) {
-            alert('請上傳圖片 (PNG/JPG) 或影片 (MP4)');
+            alert('請上傳圖片 (PNG/JPG/WebP/AVIF/GIF/SVG/BMP) 或影片 (MP4/MOV/WebM/M4V)');
             return;
         }
 
@@ -136,8 +136,9 @@ export function ClientUploader() {
             <div className="relative">
                 {/* Tooltip - Below and to the right */}
                 {showTooltip && (
-                    <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-gray-900/95 text-white text-xs rounded-lg shadow-lg whitespace-nowrap backdrop-blur-sm border border-gray-700/50">
-                        <div className="font-medium mb-1">Format: PNG/JPG/MP4/M4V</div>
+                    <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-gray-900/95 text-white text-xs rounded-lg shadow-lg backdrop-blur-sm border border-gray-700/50">
+                        <div className="font-medium mb-1">🖼️ PNG/JPG/WebP/AVIF/GIF/SVG/BMP</div>
+                        <div className="font-medium mb-1">🎬 MP4/MOV/WebM/M4V</div>
                         <div className="text-gray-400 leading-tight">
                             Local processing only. No file uploads.<br />
                             檔案僅在本地處理，不會上傳。
@@ -165,7 +166,7 @@ export function ClientUploader() {
                     <input
                         ref={fileInputRef}
                         type="file"
-                        accept="image/png,image/jpeg,image/jpg,video/mp4,video/x-m4v"
+                        accept="image/png,image/jpeg,image/jpg,image/webp,image/avif,image/gif,image/svg+xml,image/bmp,video/mp4,video/x-m4v,video/quicktime,video/webm"
                         onChange={handleFileUpload}
                         className="hidden"
                     />

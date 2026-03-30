@@ -1,4 +1,4 @@
-import { OrbitControls, PerspectiveCamera, TransformControls, MeshReflectorMaterial, CubeCamera } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, TransformControls } from '@react-three/drei';
 import { useStore, StageObject } from '@/store/useStore';
 import { StageObjectRenderer } from './StageObjectRenderer';
 import { BoxPrimitiveRenderer } from './BoxPrimitiveRenderer';
@@ -7,7 +7,7 @@ import { CameraCapture } from './CameraCapture';
 import { VideoManager } from './VideoManager';
 import { StageLightRenderer, StageLightRendererHandle } from './StageLightRenderer';
 import { WalkModeController } from './WalkModeController';
-import { EffectComposer, Bloom, SMAA, ToneMapping } from '@react-three/postprocessing';
+import { EffectComposer, Bloom, SMAA, ToneMapping, N8AO } from '@react-three/postprocessing';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
 import { useRef, useEffect, useCallback, createRef, useState } from 'react';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -37,9 +37,6 @@ export function SceneGraph() {
 
     // Perfect Render Mode state
     const perfectRenderEnabled = useStore((state) => state.perfectRenderEnabled);
-    const reflectionMirror = useStore((state) => state.reflectionMirror);
-    const reflectionBlur = useStore((state) => state.reflectionBlur);
-    const reflectionMetalness = useStore((state) => state.reflectionMetalness);
 
     const controlsRef = useRef<OrbitControlsImpl>(null);
     const cubeCameraRef = useRef<THREE.CubeCamera>(null);
@@ -361,34 +358,23 @@ export function SceneGraph() {
                 );
             })()}
 
-            {/* Ground plane - with optional reflection */}
-            {perfectRenderEnabled ? (
-                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
-                    <planeGeometry args={[100, 100]} />
-                    <MeshReflectorMaterial
-                        blur={[reflectionBlur * 50, reflectionBlur * 50]}
-                        resolution={2048}
-                        mixBlur={1}
-                        mixStrength={reflectionMirror * 2}
-                        roughness={0.15}
-                        depthScale={1.2}
-                        minDepthThreshold={0.4}
-                        maxDepthThreshold={1.4}
-                        color="#111111"
-                        metalness={reflectionMetalness}
-                        mirror={reflectionMirror}
-                    />
-                </mesh>
-            ) : (
-                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
-                    <planeGeometry args={[100, 100]} />
-                    <meshStandardMaterial color="#1a1a1a" roughness={0.8} metalness={0.2} />
-                </mesh>
-            )}
+            {/* Ground plane - simple dark surface */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
+                <planeGeometry args={[100, 100]} />
+                <meshStandardMaterial color="#1a1a1a" roughness={0.8} metalness={0.2} />
+            </mesh>
 
             {/* Post-Processing Effects */}
             {perfectRenderEnabled ? (
-                <EffectComposer multisampling={4}>
+                <EffectComposer multisampling={0}>
+                    <N8AO
+                        aoRadius={2}
+                        distanceFalloff={1}
+                        intensity={3}
+                        color="black"
+                        halfRes={false}
+                        quality="medium"
+                    />
                     <Bloom
                         intensity={bloomIntensity * 1.5}
                         luminanceThreshold={bloomThreshold}
