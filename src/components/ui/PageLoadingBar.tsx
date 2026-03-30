@@ -53,15 +53,30 @@ export function PageLoadingBar() {
     const cancelAnim = animateProgress();
 
     const finish = () => {
-      setProgress(100);
-      setPhase('complete');
-      setTimeout(() => {
-        setPhase('fadeout');
-        setTimeout(() => {
-          setPhase('done');
-          isFirstLoad.current = false;
-        }, 500);
-      }, 1000);
+      // Smoothly animate from current progress to 100%
+      let startVal: number | null = null;
+      let startT: number | null = null;
+      const completeAnim = (ts: number) => {
+        if (startT === null) { startT = ts; startVal = progress; }
+        const elapsed = ts - startT;
+        const t = Math.min(elapsed / 500, 1);
+        const eased = 1 - Math.pow(1 - t, 3);
+        setProgress((startVal ?? 80) + (100 - (startVal ?? 80)) * eased);
+        if (t < 1) {
+          requestAnimationFrame(completeAnim);
+        } else {
+          setProgress(100);
+          setPhase('complete');
+          setTimeout(() => {
+            setPhase('fadeout');
+            setTimeout(() => {
+              setPhase('done');
+              isFirstLoad.current = false;
+            }, 1500);
+          }, 400);
+        }
+      };
+      requestAnimationFrame(completeAnim);
     };
 
     if (document.readyState === 'complete') {
@@ -126,16 +141,30 @@ export function PageLoadingBar() {
       // Complete after a short delay (page content should be rendered)
       routeTimerRef.current = setTimeout(() => {
         cancelAnimationFrame(raf);
-        setProgress(100);
-        setPhase('complete');
 
-        // 1s delay then fade out
-        routeTimerRef.current = setTimeout(() => {
-          setPhase('fadeout');
-          routeTimerRef.current = setTimeout(() => {
-            setPhase('done');
-          }, 400);
-        }, 1000);
+        // Smoothly animate to 100%
+        let startVal: number | null = null;
+        let startT: number | null = null;
+        const completeAnim = (ts: number) => {
+          if (startT === null) { startT = ts; startVal = progress; }
+          const elapsed = ts - startT;
+          const t = Math.min(elapsed / 400, 1);
+          const eased = 1 - Math.pow(1 - t, 3);
+          setProgress((startVal ?? 80) + (100 - (startVal ?? 80)) * eased);
+          if (t < 1) {
+            requestAnimationFrame(completeAnim);
+          } else {
+            setProgress(100);
+            setPhase('complete');
+            routeTimerRef.current = setTimeout(() => {
+              setPhase('fadeout');
+              routeTimerRef.current = setTimeout(() => {
+                setPhase('done');
+              }, 1500);
+            }, 400);
+          }
+        };
+        requestAnimationFrame(completeAnim);
       }, 500);
 
       return () => {
@@ -151,9 +180,10 @@ export function PageLoadingBar() {
   if (mode === 'route') {
     return (
       <div
-        className={`fixed inset-0 z-[200] pointer-events-none transition-opacity duration-400 ${
+        className={`fixed inset-0 z-[200] pointer-events-none ${
           phase === 'fadeout' ? 'opacity-0' : 'opacity-100'
         }`}
+        style={{ transition: 'opacity 1.5s ease-out' }}
       >
         {/* Scrim overlay — subtle */}
         <div className={`absolute inset-0 bg-black/40 transition-opacity duration-500 ${
@@ -186,9 +216,10 @@ export function PageLoadingBar() {
   // ── Initial load mode: full overlay ──
   return (
     <div
-      className={`fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black transition-opacity duration-500 ${
-        phase === 'fadeout' ? 'opacity-0 pointer-events-none' : 'opacity-100'
+      className={`fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black pointer-events-none ${
+        phase === 'fadeout' ? 'opacity-0' : 'opacity-100'
       }`}
+      style={{ transition: 'opacity 1.5s ease-out' }}
     >
       {/* Central brand */}
       <div className="flex flex-col items-center gap-4 mb-16">
