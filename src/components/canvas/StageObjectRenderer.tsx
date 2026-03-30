@@ -133,7 +133,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         };
     }, [activeTexture]);
 
-    // Create static image texture
+    // Create static image texture (for non-GIF images)
     const imageTexture = useMemo(() => {
         if (!activeTexture || activeTexture.type !== 'image') return null;
 
@@ -156,16 +156,94 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         texture.magFilter = THREE.LinearFilter;
         texture.flipY = false; // Important: GLTF uses top-left origin
 
-        // Flip horizontally (mirror U coordinate) - REMOVED per user request
-        // texture.repeat.x = -1;
-        // texture.offset.x = 1;
-
         return texture;
     }, [activeTexture]);
 
+    // Create animated GIF texture using CanvasTexture
+    // Strategy: <img> plays GIF natively → draw to <canvas> → CanvasTexture updates each frame
+    const gifCanvasRef = useRef<HTMLCanvasElement | null>(null);
+    const gifImgRef = useRef<HTMLImageElement | null>(null);
+    const gifTextureRef = useRef<THREE.CanvasTexture | null>(null);
+    const [gifReady, setGifReady] = useState(false);
 
-    // Select active texture map - support both 'video' and 'r2_video' types
-    const textureMap = (activeTexture?.type === 'video' || activeTexture?.type === 'r2_video') ? videoTexture : imageTexture;
+    useEffect(() => {
+        if (!activeTexture || activeTexture.type !== 'gif') {
+            // Cleanup
+            if (gifTextureRef.current) {
+                gifTextureRef.current.dispose();
+                gifTextureRef.current = null;
+            }
+            gifCanvasRef.current = null;
+            gifImgRef.current = null;
+            setGifReady(false);
+            return;
+        }
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = activeTexture.file_path;
+
+        img.onload = () => {
+            // Create offscreen canvas matching GIF dimensions
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+
+            // Draw first frame
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(img, 0, 0);
+            }
+
+            // Create CanvasTexture
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            texture.wrapS = THREE.ClampToEdgeWrapping;
+            texture.wrapT = THREE.ClampToEdgeWrapping;
+            texture.minFilter = THREE.LinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            texture.flipY = false; // GLTF uses top-left origin
+
+            gifCanvasRef.current = canvas;
+            gifImgRef.current = img;
+            gifTextureRef.current = texture;
+            setGifReady(true);
+            console.log('GIF CanvasTexture created:', img.naturalWidth, 'x', img.naturalHeight);
+        };
+
+        img.onerror = (err) => {
+            console.error('GIF image loading error:', err);
+        };
+
+        return () => {
+            img.src = '';
+            if (gifTextureRef.current) {
+                gifTextureRef.current.dispose();
+                gifTextureRef.current = null;
+            }
+            gifCanvasRef.current = null;
+            gifImgRef.current = null;
+            setGifReady(false);
+        };
+    }, [activeTexture]);
+
+    // Update GIF CanvasTexture every frame (draws current <img> frame to canvas)
+    useFrame(() => {
+        if (!gifReady || !gifCanvasRef.current || !gifImgRef.current || !gifTextureRef.current) return;
+
+        const ctx = gifCanvasRef.current.getContext('2d');
+        if (ctx) {
+            ctx.drawImage(gifImgRef.current, 0, 0);
+            gifTextureRef.current.needsUpdate = true;
+        }
+    });
+
+    // Select active texture map - support 'video', 'r2_video', and 'gif' types
+    const textureMap = (activeTexture?.type === 'video' || activeTexture?.type === 'r2_video')
+        ? videoTexture
+        : activeTexture?.type === 'gif'
+            ? (gifReady ? gifTextureRef.current : null)
+            : imageTexture;
 
     // Floor plan texture
     const floorPlanTexture = useMemo(() => {

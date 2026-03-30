@@ -38,7 +38,7 @@ export interface StageObject {
 }
 
 
-export type TextureType = 'image' | 'video' | 'r2_video';
+export type TextureType = 'image' | 'video' | 'r2_video' | 'gif';
 
 export interface ContentTexture {
     id: string;

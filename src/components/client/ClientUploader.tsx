@@ -41,6 +41,7 @@ export function ClientUploader() {
 
         const isVideo = file.type.startsWith('video/');
         const isImage = file.type.startsWith('image/');
+        const isGif = file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif');
 
         if (!isVideo && !isImage) {
             alert('請上傳圖片 (PNG/JPG/WebP/AVIF/GIF/SVG/BMP) 或影片 (MP4/MOV/WebM/M4V)');
@@ -78,7 +79,7 @@ export function ClientUploader() {
                 id: `client_${Date.now()}`,
                 name: file.name,
                 file_path: objectUrl,  // Object URL instead of data URL
-                type: isVideo ? 'video' : 'image',
+                type: isGif ? 'gif' : (isVideo ? 'video' : 'image'),
                 thumbnail_url: thumbnailUrl,
                 file_size: file.size,
             };
