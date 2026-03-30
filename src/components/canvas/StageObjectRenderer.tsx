@@ -169,6 +169,9 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     useEffect(() => {
         if (!activeTexture || activeTexture.type !== 'gif') {
             // Cleanup
+            if (gifImgRef.current && gifImgRef.current.parentNode) {
+                gifImgRef.current.parentNode.removeChild(gifImgRef.current);
+            }
             if (gifTextureRef.current) {
                 gifTextureRef.current.dispose();
                 gifTextureRef.current = null;
@@ -181,6 +184,18 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
 
         const img = new Image();
         img.crossOrigin = 'anonymous';
+
+        // CRITICAL: Append to DOM so the browser actually animates the GIF frames.
+        // A detached <img> won't advance GIF frames, causing drawImage() to always return frame 0.
+        img.style.position = 'fixed';
+        img.style.left = '-9999px';
+        img.style.top = '-9999px';
+        img.style.width = '1px';
+        img.style.height = '1px';
+        img.style.pointerEvents = 'none';
+        img.style.opacity = '0.01'; // Near-invisible but browser still animates
+        document.body.appendChild(img);
+
         img.src = activeTexture.file_path;
 
         img.onload = () => {
@@ -216,6 +231,10 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         };
 
         return () => {
+            // Remove from DOM
+            if (img.parentNode) {
+                img.parentNode.removeChild(img);
+            }
             img.src = '';
             if (gifTextureRef.current) {
                 gifTextureRef.current.dispose();
