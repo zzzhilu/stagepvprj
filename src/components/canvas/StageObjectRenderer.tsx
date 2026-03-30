@@ -5,6 +5,7 @@ import { createMaterial, createPerfectMaterial, MATERIAL_LIBRARY, createMeshLEDA
 import { useMemo, useEffect, useState, useRef, forwardRef } from 'react';
 import { globalVideoElement } from './VideoManager';
 import { useFrame } from '@react-three/fiber';
+import { parseGIF, decompressFrames } from 'gifuct-js';
 
 // Calculate lerp speed based on distance (0.5s - 1.5s)
 function calculateLerpSpeed(distance: number): number {
@@ -159,101 +160,135 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         return texture;
     }, [activeTexture]);
 
-    // Create animated GIF texture using CanvasTexture
-    // Strategy: <img> plays GIF natively → draw to <canvas> → CanvasTexture updates each frame
+    // Animated GIF texture using gifuct-js decoder
+    // Decodes GIF binary → pre-renders all frames → plays back at correct timing
     const gifCanvasRef = useRef<HTMLCanvasElement | null>(null);
-    const gifImgRef = useRef<HTMLImageElement | null>(null);
     const gifTextureRef = useRef<THREE.CanvasTexture | null>(null);
+    const gifFramesRef = useRef<{ imageData: ImageData; delay: number }[]>([]);
+    const gifFrameIndexRef = useRef(0);
+    const gifLastTimeRef = useRef(0);
     const [gifReady, setGifReady] = useState(false);
 
     useEffect(() => {
         if (!activeTexture || activeTexture.type !== 'gif') {
-            // Cleanup
-            if (gifImgRef.current && gifImgRef.current.parentNode) {
-                gifImgRef.current.parentNode.removeChild(gifImgRef.current);
-            }
             if (gifTextureRef.current) {
                 gifTextureRef.current.dispose();
                 gifTextureRef.current = null;
             }
             gifCanvasRef.current = null;
-            gifImgRef.current = null;
+            gifFramesRef.current = [];
+            gifFrameIndexRef.current = 0;
             setGifReady(false);
             return;
         }
 
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
+        let cancelled = false;
 
-        // CRITICAL: Append to DOM so the browser actually animates the GIF frames.
-        // A detached <img> won't advance GIF frames, causing drawImage() to always return frame 0.
-        img.style.position = 'fixed';
-        img.style.left = '-9999px';
-        img.style.top = '-9999px';
-        img.style.width = '1px';
-        img.style.height = '1px';
-        img.style.pointerEvents = 'none';
-        img.style.opacity = '0.01'; // Near-invisible but browser still animates
-        document.body.appendChild(img);
+        (async () => {
+            try {
+                // Fetch GIF as binary
+                const response = await fetch(activeTexture.file_path);
+                const buffer = await response.arrayBuffer();
+                if (cancelled) return;
 
-        img.src = activeTexture.file_path;
+                // Decode with gifuct-js
+                const gif = parseGIF(buffer);
+                const rawFrames = decompressFrames(gif, true);
+                if (cancelled || rawFrames.length === 0) return;
 
-        img.onload = () => {
-            // Create offscreen canvas matching GIF dimensions
-            const canvas = document.createElement('canvas');
-            canvas.width = img.naturalWidth;
-            canvas.height = img.naturalHeight;
+                const gifWidth = gif.lsd.width;
+                const gifHeight = gif.lsd.height;
 
-            // Draw first frame
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.drawImage(img, 0, 0);
+                // Pre-render all frames with proper disposal handling
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = gifWidth;
+                tempCanvas.height = gifHeight;
+                const tempCtx = tempCanvas.getContext('2d')!;
+
+                const fullFrames: { imageData: ImageData; delay: number }[] = [];
+
+                for (let i = 0; i < rawFrames.length; i++) {
+                    const frame = rawFrames[i];
+
+                    // Handle disposal of previous frame
+                    if (i > 0) {
+                        const prev = rawFrames[i - 1];
+                        if (prev.disposalType === 2) {
+                            tempCtx.clearRect(prev.dims.left, prev.dims.top, prev.dims.width, prev.dims.height);
+                        }
+                    }
+
+                    // Composite this frame's patch onto the canvas
+                    const frameImageData = tempCtx.createImageData(frame.dims.width, frame.dims.height);
+                    frameImageData.data.set(frame.patch);
+                    tempCtx.putImageData(frameImageData, frame.dims.left, frame.dims.top);
+
+                    // Save full canvas state as this frame
+                    fullFrames.push({
+                        imageData: tempCtx.getImageData(0, 0, gifWidth, gifHeight),
+                        delay: Math.max(frame.delay, 20), // Minimum 20ms
+                    });
+                }
+
+                if (cancelled) return;
+
+                // Create display canvas and texture
+                const canvas = document.createElement('canvas');
+                canvas.width = gifWidth;
+                canvas.height = gifHeight;
+                const ctx = canvas.getContext('2d')!;
+                ctx.putImageData(fullFrames[0].imageData, 0, 0);
+
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.colorSpace = THREE.SRGBColorSpace;
+                texture.wrapS = THREE.ClampToEdgeWrapping;
+                texture.wrapT = THREE.ClampToEdgeWrapping;
+                texture.minFilter = THREE.LinearFilter;
+                texture.magFilter = THREE.LinearFilter;
+                texture.flipY = false;
+
+                gifCanvasRef.current = canvas;
+                gifFramesRef.current = fullFrames;
+                gifFrameIndexRef.current = 0;
+                gifLastTimeRef.current = performance.now();
+                gifTextureRef.current = texture;
+                setGifReady(true);
+                console.log(`GIF decoded: ${fullFrames.length} frames, ${gifWidth}x${gifHeight}`);
+            } catch (err) {
+                console.error('GIF decode error:', err);
             }
-
-            // Create CanvasTexture
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.colorSpace = THREE.SRGBColorSpace;
-            texture.wrapS = THREE.ClampToEdgeWrapping;
-            texture.wrapT = THREE.ClampToEdgeWrapping;
-            texture.minFilter = THREE.LinearFilter;
-            texture.magFilter = THREE.LinearFilter;
-            texture.flipY = false; // GLTF uses top-left origin
-
-            gifCanvasRef.current = canvas;
-            gifImgRef.current = img;
-            gifTextureRef.current = texture;
-            setGifReady(true);
-            console.log('GIF CanvasTexture created:', img.naturalWidth, 'x', img.naturalHeight);
-        };
-
-        img.onerror = (err) => {
-            console.error('GIF image loading error:', err);
-        };
+        })();
 
         return () => {
-            // Remove from DOM
-            if (img.parentNode) {
-                img.parentNode.removeChild(img);
-            }
-            img.src = '';
+            cancelled = true;
             if (gifTextureRef.current) {
                 gifTextureRef.current.dispose();
                 gifTextureRef.current = null;
             }
             gifCanvasRef.current = null;
-            gifImgRef.current = null;
+            gifFramesRef.current = [];
             setGifReady(false);
         };
     }, [activeTexture]);
 
-    // Update GIF CanvasTexture every frame (draws current <img> frame to canvas)
+    // Advance GIF frames at correct timing
     useFrame(() => {
-        if (!gifReady || !gifCanvasRef.current || !gifImgRef.current || !gifTextureRef.current) return;
+        if (!gifReady || gifFramesRef.current.length === 0 || !gifCanvasRef.current || !gifTextureRef.current) return;
 
-        const ctx = gifCanvasRef.current.getContext('2d');
-        if (ctx) {
-            ctx.drawImage(gifImgRef.current, 0, 0);
-            gifTextureRef.current.needsUpdate = true;
+        const now = performance.now();
+        const currentFrame = gifFramesRef.current[gifFrameIndexRef.current];
+
+        if (now - gifLastTimeRef.current >= currentFrame.delay) {
+            // Advance to next frame
+            gifFrameIndexRef.current = (gifFrameIndexRef.current + 1) % gifFramesRef.current.length;
+            gifLastTimeRef.current = now;
+
+            const nextFrame = gifFramesRef.current[gifFrameIndexRef.current];
+            const ctx = gifCanvasRef.current.getContext('2d');
+            if (ctx) {
+                ctx.putImageData(nextFrame.imageData, 0, 0);
+                gifTextureRef.current.needsUpdate = true;
+            }
         }
     });
 
