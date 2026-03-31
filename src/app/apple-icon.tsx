@@ -1,0 +1,49 @@
+import { ImageResponse } from 'next/og';
+
+export const runtime = 'edge';
+
+// Image metadata
+export const size = {
+  width: 180,
+  height: 180,
+};
+export const contentType = 'image/png';
+
+export default function Icon() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="180" height="180">
+  <title>StagePV Favicon</title>
+  <!-- Circular black background -->
+  <circle cx="32" cy="32" r="30" fill="#000"/>
+  <!-- 3D stage platform - isometric, white faces, thin lines -->
+  <!-- Top face -->
+  <polygon points="32,18 50,28 32,38 14,28" fill="#fff" stroke="#000" stroke-width="0.5" stroke-linejoin="round"/>
+  <!-- Left face -->
+  <polygon points="14,28 32,38 32,46 14,36" fill="#ccc" stroke="#000" stroke-width="0.5" stroke-linejoin="round"/>
+  <!-- Right face -->
+  <polygon points="50,28 32,38 32,46 50,36" fill="#999" stroke="#000" stroke-width="0.5" stroke-linejoin="round"/>
+  <!-- Figure on stage (black person on white stage) -->
+  <circle cx="32" cy="23" r="1.8" fill="#000"/>
+  <line x1="32" y1="24.8" x2="32" y2="29.5" stroke="#000" stroke-width="1" stroke-linecap="round"/>
+</svg>`;
+
+  // Next.js Edge Runtime supports btoa
+  const d = `data:image/svg+xml;base64,${btoa(svg)}`;
+
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'transparent'
+        }}
+      >
+        <img src={d} width="180" height="180" />
+      </div>
+    ),
+    { ...size }
+  );
+}
