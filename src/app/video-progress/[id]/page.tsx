@@ -298,7 +298,7 @@ export default function VideoProgressEditorPage() {
             <VideoControls />
 
             {/* Bottom Left Panel - Views & Cues */}
-            <BottomLeftPanel />
+            <BottomLeftPanel defaultCollapsed={true} />
 
             {/* 3D Scene */}
             <ErrorBoundary>

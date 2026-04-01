@@ -2,8 +2,11 @@
 
 import { useStore } from '@/store/useStore';
 import { useState, useEffect, useRef } from 'react';
+interface BottomLeftPanelProps {
+    defaultCollapsed?: boolean;
+}
 
-export function BottomLeftPanel() {
+export function BottomLeftPanel({ defaultCollapsed = false }: BottomLeftPanelProps) {
     const views = useStore((state) => state.views);
     const activeViewId = useStore((state) => state.activeViewId);
     const setActiveView = useStore((state) => state.setActiveView);
@@ -11,8 +14,8 @@ export function BottomLeftPanel() {
     const activeCueId = useStore((state) => state.activeCueId);
     const applyCue = useStore((state) => state.applyCue);
 
-    // Default collapsed (per user request for a cleaner initial view)
-    const [collapsed, setCollapsed] = useState(true);
+    // Initial state based on prop
+    const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
     // Only auto-select first view on initial mount (not when user clears it by rotating)
     const hasAutoSelected = useRef(false);

@@ -278,10 +278,10 @@ function ProjectEditorContent() {
             <div data-ui-element><VideoControls /></div>
 
             {/* Bottom Left Panel - Views & Cues */}
-            <BottomLeftPanel />
+            <BottomLeftPanel defaultCollapsed={false} />
 
-            {/* Client Uploader - Hidden per user request for share links */}
-            {/* {isShareMode && <div data-ui-element><ClientUploader /></div>} */}
+            {/* Client Uploader - Share mode only */}
+            {isShareMode && <div data-ui-element><ClientUploader /></div>}
 
             {/* 3D Scene */}
             <ErrorBoundary>

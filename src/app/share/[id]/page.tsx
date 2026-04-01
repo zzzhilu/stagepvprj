@@ -229,7 +229,7 @@ function SharePageContent() {
             <div data-ui-element><VideoControls /></div>
 
             {/* Bottom Left Panel - Views & Cues */}
-            <BottomLeftPanel />
+            <BottomLeftPanel defaultCollapsed={true} />
 
             {/* 3D Scene */}
             <ErrorBoundary>
