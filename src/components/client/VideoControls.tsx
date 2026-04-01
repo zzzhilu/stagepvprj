@@ -25,6 +25,8 @@ export function VideoControls() {
     const [recordingStatus, setRecordingStatus] = useState<string>('');
     const [showRecordTooltip, setShowRecordTooltip] = useState(false);
     const [collapsed, setCollapsed] = useState(false);
+    const [audioUnlocked, setAudioUnlocked] = useState(false);
+    const [showUnmuteHint, setShowUnmuteHint] = useState(false);
     const collapseTimerRef = useRef<NodeJS.Timeout | null>(null);
     const videoEndedHandlerRef = useRef<(() => void) | null>(null);
     const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -38,6 +40,39 @@ export function VideoControls() {
         ? contentTextures.find(t => t.id === activeContentId)
         : null;
     const isVideoActive = activeContent?.type === 'video' || activeContent?.type === 'r2_video';
+
+    // --- Click-to-unmute: show hint when video starts playing muted ---
+    useEffect(() => {
+        if (videoPlaying && !audioUnlocked && isVideoActive) {
+            setShowUnmuteHint(true);
+
+            const handleUnmute = () => {
+                if (globalVideoElement) {
+                    globalVideoElement.muted = false;
+                    globalVideoElement.volume = 1;
+                }
+                setVideoVolume(1);
+                setAudioUnlocked(true);
+                setShowUnmuteHint(false);
+                document.removeEventListener('click', handleUnmute);
+                document.removeEventListener('touchstart', handleUnmute);
+            };
+
+            // Wait a tiny bit so the play-button click itself doesn't immediately trigger unmute
+            const timer = setTimeout(() => {
+                document.addEventListener('click', handleUnmute, { once: true });
+                document.addEventListener('touchstart', handleUnmute, { once: true });
+            }, 300);
+
+            return () => {
+                clearTimeout(timer);
+                document.removeEventListener('click', handleUnmute);
+                document.removeEventListener('touchstart', handleUnmute);
+            };
+        } else if (!videoPlaying) {
+            setShowUnmuteHint(false);
+        }
+    }, [videoPlaying, audioUnlocked, isVideoActive, setVideoVolume]);
 
     // --- Auto-collapse logic ---
     const clearCollapseTimer = useCallback(() => {
@@ -357,9 +392,25 @@ export function VideoControls() {
                     </button>
 
                     {/* Volume Control */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 relative">
+                        {/* Unmute hint tooltip */}
+                        {showUnmuteHint && (
+                            <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap animate-pulse">
+                                <div className="bg-amber-500/90 text-black text-xs font-bold px-3 py-1.5 rounded-full shadow-lg shadow-amber-500/30">
+                                    🔊 點擊任意處開啟音量
+                                </div>
+                                <div className="w-2 h-2 bg-amber-500/90 rotate-45 mx-auto -mt-1"></div>
+                            </div>
+                        )}
                         <button
-                            onClick={() => setVideoVolume(videoVolume === 0 ? 1 : 0)}
+                            onClick={() => {
+                                setVideoVolume(videoVolume === 0 ? 1 : 0);
+                                setAudioUnlocked(true);
+                                setShowUnmuteHint(false);
+                                if (globalVideoElement) {
+                                    globalVideoElement.muted = videoVolume !== 0;
+                                }
+                            }}
                             className="w-10 h-10 flex items-center justify-center bg-gray-700 hover:bg-gray-600 rounded-full transition-colors"
                         >
                             {videoVolume === 0 ? (

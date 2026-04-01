@@ -12,11 +12,13 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
     const r2Videos = useStore((state) => state.r2Videos);
     const addR2Video = useStore((state) => state.addR2Video);
     const removeR2Video = useStore((state) => state.removeR2Video);
+    const updateR2Video = useStore((state) => state.updateR2Video);
     const setActiveContent = useStore((state) => state.setActiveContent);
     const addContentTexture = useStore((state) => state.addContentTexture);
     const removeContentTexture = useStore((state) => state.removeContentTexture);
     const contentTextures = useStore((state) => state.contentTextures);
     const setLoading = useStore((state) => state.setLoading);
+    const cues = useStore((state) => state.cues);
 
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
@@ -203,23 +205,32 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
     };
 
     const handleShare = (video: R2Video) => {
-        const shareUrl = `${window.location.origin}/share/${projectId}?video=${video.id}`;
+        let shareUrl = `${window.location.origin}/share/${projectId}?video=${video.id}`;
+        if (video.cueId) {
+            shareUrl += `&cue=${video.cueId}`;
+        }
         navigator.clipboard.writeText(shareUrl);
         setCopiedId(video.id);
         setTimeout(() => setCopiedId(null), 2000);
     };
 
     const handlePlay = (video: R2Video) => {
-        // Find or create ContentTexture for this video
+        // Find or create ContentTexture for this video/image
         let texture = contentTextures.find(t => t.id === video.id);
 
         if (!texture) {
-            // Create ContentTexture if it doesn't exist
+            // Detect if this is an image based on file extension or URL
+            const lowerName = video.filename.toLowerCase();
+            const lowerUrl = video.r2_url.toLowerCase();
+            const isImageFile = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(lowerName) ||
+                /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(lowerUrl);
+
+            // Create ContentTexture with correct type
             texture = {
                 id: video.id,
                 name: video.filename,
                 file_path: video.r2_url,
-                type: 'r2_video',
+                type: isImageFile ? 'image' : 'r2_video',
             };
             addContentTexture(texture);
         }
@@ -329,7 +340,15 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
                 </div>
             ) : (
                 <div className="space-y-2">
-                    {r2Videos.map((video) => (
+                    {[...r2Videos].sort((a, b) => {
+                        // Extract leading number from filename (e.g. "00_xxx.mp4" → 0, "12 title.png" → 12)
+                        const numA = a.filename.match(/^(\d+)/);
+                        const numB = b.filename.match(/^(\d+)/);
+                        if (numA && numB) return parseInt(numA[1]) - parseInt(numB[1]);
+                        if (numA) return -1; // numbers first
+                        if (numB) return 1;
+                        return a.filename.localeCompare(b.filename); // fallback: alphabetical
+                    }).map((video) => (
                         <div
                             key={video.id}
                             className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors"
@@ -357,6 +376,31 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
                                     {formatDate(video.uploadedAt)}
                                 </div>
                             </div>
+
+                            {/* Cue Selector */}
+                            {cues.length > 0 && (
+                                <div className="flex-shrink-0">
+                                    <select
+                                        value={video.cueId || ''}
+                                        onChange={(e) => {
+                                            const newCueId = e.target.value || undefined;
+                                            updateR2Video(video.id, { cueId: newCueId });
+                                            // Trigger save after state update
+                                            setTimeout(() => onSave?.(), 100);
+                                        }}
+                                        className="bg-gray-700/80 border border-gray-600 text-gray-300 text-xs rounded-md px-2 py-1 appearance-none cursor-pointer hover:border-violet-500/50 focus:border-violet-500 focus:outline-none transition-colors"
+                                        title="分享時套用的 Cue"
+                                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239ca3af' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', paddingRight: '20px' }}
+                                    >
+                                        <option value="">Cue: 未指定</option>
+                                        {cues.map((cue) => (
+                                            <option key={cue.id} value={cue.id}>
+                                                Cue: {cue.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
                             {/* Actions */}
                             <div className="flex items-center gap-1 flex-shrink-0">

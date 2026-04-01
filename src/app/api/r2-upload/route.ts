@@ -62,10 +62,10 @@ export async function POST(request: NextRequest) {
         // Generate unique video ID
         const videoId = `vid_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-        // Create object key with videoId prefix for easy management
-        // Preserve original filename for display purposes
-        const safeFilename = encodeURIComponent(filename);
-        const key = `videos/${videoId}/${safeFilename}`;
+        // Use ASCII-safe key for R2 storage (avoids double-encoding issues with Chinese filenames)
+        // Extract file extension from original filename
+        const ext = filename.includes('.') ? filename.substring(filename.lastIndexOf('.')) : '';
+        const key = `videos/${videoId}/${videoId}${ext}`;
 
         const command = new PutObjectCommand({
             Bucket: R2_BUCKET_NAME,

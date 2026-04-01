@@ -100,6 +100,7 @@ export interface R2Video {
     filename: string;     // Original filename (for watermark)
     r2_url: string;       // Full R2 URL
     uploadedAt: number;   // Timestamp
+    cueId?: string;       // [NEW] Associated cue ID for sharing with a specific scene state
 }
 
 // Paper Figure (Billboard Sprite) for scale reference
@@ -281,6 +282,7 @@ interface State {
     setR2Videos: (videos: R2Video[]) => void;
     addR2Video: (video: R2Video) => void;
     removeR2Video: (id: string) => void;
+    updateR2Video: (id: string, updates: Partial<R2Video>) => void;
 }
 
 export const useStore = create<State>()(
@@ -650,7 +652,12 @@ export const useStore = create<State>()(
                 r2Videos: [...state.r2Videos, video]
             })),
             removeR2Video: (id) => set((state) => ({
-                r2Videos: state.r2Videos.filter(v => v.id !== id)
+                r2Videos: state.r2Videos.filter(v => v.id !== id),
+            })),
+            updateR2Video: (id, updates) => set((state) => ({
+                r2Videos: state.r2Videos.map(v =>
+                    v.id === id ? { ...v, ...updates } : v
+                ),
             })),
         }),
         {

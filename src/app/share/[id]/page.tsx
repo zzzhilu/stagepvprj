@@ -22,11 +22,15 @@ function SharePageContent() {
     const searchParams = useSearchParams();
     const projectId = params.id as string;
     const videoId = searchParams.get('video');
+    const cueId = searchParams.get('cue');
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [projectName, setProjectName] = useState('');
     const [videoFilename, setVideoFilename] = useState('');
+
+    // Helper: strip file extension from display name
+    const stripExtension = (name: string) => name.replace(/\.[^.]+$/, '');
 
     // Get store methods
     const setStageObjects = useStore(state => state.setStageObjects);
@@ -38,6 +42,7 @@ function SharePageContent() {
     const setR2Videos = useStore(state => state.setR2Videos);
     const addContentTexture = useStore(state => state.addContentTexture);
     const setVideoPlaying = useStore(state => state.setVideoPlaying);
+    const applyCue = useStore(state => state.applyCue);
     // Lighting settings sync
     const setAmbientIntensity = useStore(state => state.setAmbientIntensity);
     const setDirectionalIntensity = useStore(state => state.setDirectionalIntensity);
@@ -109,37 +114,44 @@ function SharePageContent() {
                     return;
                 }
 
-                setVideoFilename(video.filename);
+                setVideoFilename(stripExtension(video.filename));
 
-                // Create ContentTexture for the R2 video
+                // Detect if this is an image based on file extension
+                const isImageFile = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(video.filename) ||
+                    /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(video.r2_url);
+
+                // Create ContentTexture for the R2 content
                 const videoTexture = {
                     id: video.id,
                     name: video.filename,
                     file_path: video.r2_url,
-                    type: 'r2_video' as const,
+                    type: (isImageFile ? 'image' : 'r2_video') as 'image' | 'r2_video',
                 };
 
-                // Clear existing content and add only this video
+                // Clear existing content and add only this
                 setContentTextures([videoTexture]);
                 setActiveContent(video.id);
 
-                // Auto-play the video
-                setVideoPlaying(true);
+                // Auto-play only for videos
+                if (!isImageFile) setVideoPlaying(true);
             } else if (data.r2Videos && data.r2Videos.length > 0) {
-                // No specific video requested, play the first one
                 const firstVideo = data.r2Videos[0];
-                setVideoFilename(firstVideo.filename);
+                setVideoFilename(stripExtension(firstVideo.filename));
+
+                // Detect if this is an image
+                const isFirstImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(firstVideo.filename) ||
+                    /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(firstVideo.r2_url);
 
                 const videoTexture = {
                     id: firstVideo.id,
                     name: firstVideo.filename,
                     file_path: firstVideo.r2_url,
-                    type: 'r2_video' as const,
+                    type: (isFirstImage ? 'image' : 'r2_video') as 'image' | 'r2_video',
                 };
 
                 setContentTextures([videoTexture]);
                 setActiveContent(firstVideo.id);
-                setVideoPlaying(true);
+                if (!isFirstImage) setVideoPlaying(true);
             } else {
                 // Load existing content textures if no R2 videos
                 if (data.contentTextures) setContentTextures(data.contentTextures);
@@ -148,6 +160,15 @@ function SharePageContent() {
 
             // Set active view if available
             if (data.activeViewId) setActiveView(data.activeViewId);
+
+            // Apply cue if specified in URL (or from video's associated cue)
+            const targetCueId = cueId ||
+                (videoId && data.r2Videos?.find((v: { id: string; cueId?: string }) => v.id === videoId)?.cueId) ||
+                (!videoId && data.r2Videos?.[0]?.cueId);
+            if (targetCueId && data.cues?.length) {
+                // Small delay to ensure store is hydrated
+                setTimeout(() => applyCue(targetCueId), 200);
+            }
 
         } catch (err) {
             console.error('Failed to load project:', err);

@@ -8,6 +8,8 @@ import ClientControls from '@/components/client/ClientControls';
 import { VideoControls } from '@/components/client/VideoControls';
 import { BottomLeftPanel } from '@/components/client/BottomLeftPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ClientToolbar } from '@/components/client/ClientToolbar';
+import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
 
@@ -97,6 +99,20 @@ export default function VideoProgressEditorPage() {
     const setActiveContent = useStore(state => state.setActiveContent);
     const setCues = useStore(state => state.setCues);
     const setR2Videos = useStore(state => state.setR2Videos);
+    // Lighting settings sync
+    const setAmbientIntensity = useStore(state => state.setAmbientIntensity);
+    const setDirectionalIntensity = useStore(state => state.setDirectionalIntensity);
+    const setBloomIntensity = useStore(state => state.setBloomIntensity);
+    const setBloomThreshold = useStore(state => state.setBloomThreshold);
+    // Perfect Render settings sync
+    const setPerfectRenderEnabled = useStore(state => state.setPerfectRenderEnabled);
+    const setEnvPreset = useStore(state => state.setEnvPreset);
+    const setEnvIntensity = useStore(state => state.setEnvIntensity);
+    const setContactShadow = useStore(state => state.setContactShadow);
+    const setToneMapping = useStore(state => state.setToneMapping);
+    const setReflectionMirror = useStore(state => state.setReflectionMirror);
+    const setReflectionBlur = useStore(state => state.setReflectionBlur);
+    const setReflectionMetalness = useStore(state => state.setReflectionMetalness);
 
     // Current state for auto-save
     const stageObjects = useStore(state => state.stageObjects);
@@ -106,6 +122,20 @@ export default function VideoProgressEditorPage() {
     const activeContentId = useStore(state => state.activeContentId);
     const cues = useStore(state => state.cues);
     const r2Videos = useStore(state => state.r2Videos);
+    const ambientIntensity = useStore(state => state.ambientIntensity);
+    const directionalIntensity = useStore(state => state.directionalIntensity);
+    const bloomIntensity = useStore(state => state.bloomIntensity);
+    const bloomThreshold = useStore(state => state.bloomThreshold);
+    // Perfect Render state for auto-save
+    const perfectRenderEnabled = useStore(state => state.perfectRenderEnabled);
+    const envPreset = useStore(state => state.envPreset);
+    const envIntensity = useStore(state => state.envIntensity);
+    const contactShadow = useStore(state => state.contactShadow);
+    const toneMapping = useStore(state => state.toneMapping);
+    const spotLights = useStore(state => state.spotLights);
+    const reflectionMirror = useStore(state => state.reflectionMirror);
+    const reflectionBlur = useStore(state => state.reflectionBlur);
+    const reflectionMetalness = useStore(state => state.reflectionMetalness);
 
     useEffect(() => {
         // Check sessionStorage for auth
@@ -124,7 +154,6 @@ export default function VideoProgressEditorPage() {
             const data = await ProjectService.loadProject(projectId);
 
             if (data) {
-                // Load project state into store
                 // Load project state into store (always reset to ensure isolation)
                 if (data.name) setCurrentProjectName(data.name);
                 setStageObjects(data.stageObjects || []);
@@ -134,6 +163,21 @@ export default function VideoProgressEditorPage() {
                 setActiveContent(data.activeContentId || null);
                 setCues(data.cues || []);
                 setR2Videos(data.r2Videos || []);
+                // Restore lighting settings from project
+                if (data.ambientIntensity !== undefined) setAmbientIntensity(data.ambientIntensity);
+                if (data.directionalIntensity !== undefined) setDirectionalIntensity(data.directionalIntensity);
+                if (data.bloomIntensity !== undefined) setBloomIntensity(data.bloomIntensity);
+                if (data.bloomThreshold !== undefined) setBloomThreshold(data.bloomThreshold);
+                // Restore perfect render settings
+                if (data.perfectRenderEnabled !== undefined) setPerfectRenderEnabled(data.perfectRenderEnabled);
+                if (data.envPreset !== undefined) setEnvPreset(data.envPreset);
+                if (data.envIntensity !== undefined) setEnvIntensity(data.envIntensity);
+                if (data.contactShadow !== undefined) setContactShadow(data.contactShadow);
+                if (data.toneMapping !== undefined) setToneMapping(data.toneMapping);
+                if (data.spotLights !== undefined) useStore.setState({ spotLights: data.spotLights });
+                if (data.reflectionMirror !== undefined) setReflectionMirror(data.reflectionMirror);
+                if (data.reflectionBlur !== undefined) setReflectionBlur(data.reflectionBlur);
+                if (data.reflectionMetalness !== undefined) setReflectionMetalness(data.reflectionMetalness);
             }
         } catch (error) {
             console.error('Failed to load project:', error);
@@ -154,11 +198,26 @@ export default function VideoProgressEditorPage() {
                 activeContentId,
                 cues,
                 r2Videos,
+                // Lighting settings
+                ambientIntensity,
+                directionalIntensity,
+                bloomIntensity,
+                bloomThreshold,
+                // Perfect Render settings
+                perfectRenderEnabled,
+                envPreset,
+                envIntensity,
+                contactShadow,
+                toneMapping,
+                spotLights,
+                reflectionMirror,
+                reflectionBlur,
+                reflectionMetalness,
             });
         } catch (error) {
             console.error('Save failed:', error);
         }
-    }, [projectId, stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos]);
+    }, [projectId, stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness]);
 
     // Auto-save effect (debounced)
     useEffect(() => {
@@ -174,6 +233,21 @@ export default function VideoProgressEditorPage() {
                     activeContentId,
                     cues,
                     r2Videos,
+                    // Lighting settings
+                    ambientIntensity,
+                    directionalIntensity,
+                    bloomIntensity,
+                    bloomThreshold,
+                    // Perfect Render settings
+                    perfectRenderEnabled,
+                    envPreset,
+                    envIntensity,
+                    contactShadow,
+                    toneMapping,
+                    spotLights,
+                    reflectionMirror,
+                    reflectionBlur,
+                    reflectionMetalness,
                 });
             } catch (error) {
                 console.error('Auto-save failed:', error);
@@ -181,7 +255,7 @@ export default function VideoProgressEditorPage() {
         }, 2000); // Debounce 2 seconds
 
         return () => clearTimeout(timeoutId);
-    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, isAuthenticated, isLoading, projectId]);
+    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, isAuthenticated, isLoading, projectId]);
 
     // Show loading while checking auth
     if (isChecking) {
@@ -203,6 +277,12 @@ export default function VideoProgressEditorPage() {
 
     return (
         <main className="relative w-full h-full">
+            {/* Client Toolbar - Left side tools (models, perfect render, etc.) */}
+            <ClientToolbar projectId={projectId} />
+
+            {/* Drawing Overlay */}
+            <DrawingOverlay projectId={projectId} />
+
             {/* Admin Controls with video-progress mode */}
             <AdminControls
                 projectName={currentProjectName}

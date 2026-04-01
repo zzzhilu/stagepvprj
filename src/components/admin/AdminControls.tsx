@@ -252,8 +252,8 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                     </div>
                 </div>
 
-                {/* Share Button - Hidden in video-progress mode */}
-                {!isVideoProgress && (
+                {/* Share Button */}
+                {(
                     <button
                         onClick={handleShare}
                         className="w-full bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 text-white py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2"
@@ -267,8 +267,8 @@ export default function AdminControls({ projectName, mode = 'free-test', project
             </div>
 
             <div className="p-4 space-y-4">
-                {/* Model Uploader Section - Hidden in video-progress mode */}
-                {!isVideoProgress && (
+                {/* Model Uploader Section */}
+                {(
                     <div>
                         <button
                             onClick={() => toggleSection('models')}
@@ -376,8 +376,8 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                     )}
                 </div>
 
-                {/* Object Inspector Section - Hidden in video-progress mode */}
-                {!isVideoProgress && (
+                {/* Object Inspector Section */}
+                {(
                     <div>
                         <button
                             onClick={() => toggleSection('inspector')}
@@ -402,7 +402,7 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                 )}
 
                 {/* Floor Plan Uploader - Auto-shows when PLANE object exists */}
-                {!isVideoProgress && (
+                {(
                     <FloorPlanUploader />
                 )}
 
