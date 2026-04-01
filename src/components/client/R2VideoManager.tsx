@@ -351,100 +351,106 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
                     }).map((video) => (
                         <div
                             key={video.id}
-                            className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors"
+                            className="flex flex-col gap-3 p-3 bg-gray-900/50 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors"
                         >
-                            {/* Content Icon - differentiate image vs video */}
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${video.filename.match(/\.(jpg|jpeg|png)$/i) ? 'bg-emerald-600/20' : 'bg-violet-600/20'}`}>
-                                {video.filename.match(/\.(jpg|jpeg|png)$/i) ? (
-                                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                                    </svg>
-                                ) : (
-                                    <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                )}
-                            </div>
-
-                            {/* Video Info */}
-                            <div className="flex-1 min-w-0">
-                                <div className="text-white text-sm font-medium truncate">
-                                    {video.filename}
-                                </div>
-                                <div className="text-gray-500 text-xs">
-                                    {formatDate(video.uploadedAt)}
-                                </div>
-                            </div>
-
-                            {/* Cue Selector */}
-                            {cues.length > 0 && (
-                                <div className="flex-shrink-0">
-                                    <select
-                                        value={video.cueId || ''}
-                                        onChange={(e) => {
-                                            const newCueId = e.target.value || undefined;
-                                            updateR2Video(video.id, { cueId: newCueId });
-                                            // Trigger save after state update
-                                            setTimeout(() => onSave?.(), 100);
-                                        }}
-                                        className="bg-gray-700/80 border border-gray-600 text-gray-300 text-xs rounded-md px-2 py-1 appearance-none cursor-pointer hover:border-violet-500/50 focus:border-violet-500 focus:outline-none transition-colors"
-                                        title="分享時套用的 Cue"
-                                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239ca3af' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', paddingRight: '20px' }}
-                                    >
-                                        <option value="">Cue: 未指定</option>
-                                        {cues.map((cue) => (
-                                            <option key={cue.id} value={cue.id}>
-                                                Cue: {cue.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-
-                            {/* Actions */}
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                                {/* Play Button */}
-                                <button
-                                    onClick={() => handlePlay(video)}
-                                    className="p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-                                    title="播放"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                    </svg>
-                                </button>
-
-                                {/* Share Button */}
-                                <button
-                                    onClick={() => handleShare(video)}
-                                    className={`p-2 rounded-lg transition-colors ${copiedId === video.id
-                                        ? 'bg-green-600 text-white'
-                                        : 'hover:bg-gray-700 text-gray-400 hover:text-white'
-                                        }`}
-                                    title={copiedId === video.id ? '已複製!' : '複製分享連結'}
-                                >
-                                    {copiedId === video.id ? (
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            {/* Top Row: Icon and Info */}
+                            <div className="flex items-center gap-3">
+                                {/* Content Icon - differentiate image vs video */}
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${video.filename.match(/\.(jpg|jpeg|png)$/i) ? 'bg-emerald-600/20' : 'bg-violet-600/20'}`}>
+                                    {video.filename.match(/\.(jpg|jpeg|png)$/i) ? (
+                                        <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
                                         </svg>
                                     ) : (
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                        <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
                                     )}
-                                </button>
+                                </div>
 
-                                {/* Delete Button */}
-                                <button
-                                    onClick={() => handleDelete(video)}
-                                    className="p-2 rounded-lg hover:bg-red-600/20 text-gray-400 hover:text-red-400 transition-colors"
-                                    title="刪除"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                </button>
+                                {/* Video Info */}
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-white text-sm font-medium truncate">
+                                        {video.filename}
+                                    </div>
+                                    <div className="text-gray-500 text-xs truncate">
+                                        {formatDate(video.uploadedAt)}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Bottom Row: Selector and Actions */}
+                            <div className="flex items-center justify-between pl-[52px]">
+                                {/* Cue Selector */}
+                                <div>
+                                    {cues.length > 0 && (
+                                        <select
+                                            value={video.cueId || ''}
+                                            onChange={(e) => {
+                                                const newCueId = e.target.value || undefined;
+                                                updateR2Video(video.id, { cueId: newCueId });
+                                                // Trigger save after state update
+                                                setTimeout(() => onSave?.(), 100);
+                                            }}
+                                            className="bg-gray-700/80 border border-gray-600 text-gray-300 text-xs rounded-md px-2 py-1 appearance-none cursor-pointer hover:border-violet-500/50 focus:border-violet-500 focus:outline-none transition-colors max-w-[120px] truncate"
+                                            title="分享時套用的 Cue"
+                                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239ca3af' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', paddingRight: '20px' }}
+                                        >
+                                            <option value="">Cue: 未指定</option>
+                                            {cues.map((cue) => (
+                                                <option key={cue.id} value={cue.id}>
+                                                    Cue: {cue.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                    {/* Play Button */}
+                                    <button
+                                        onClick={() => handlePlay(video)}
+                                        className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                                        title="播放"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                        </svg>
+                                    </button>
+
+                                    {/* Share Button */}
+                                    <button
+                                        onClick={() => handleShare(video)}
+                                        className={`p-1.5 rounded-lg transition-colors ${copiedId === video.id
+                                            ? 'bg-green-600 text-white'
+                                            : 'hover:bg-gray-700 text-gray-400 hover:text-white'
+                                            }`}
+                                        title={copiedId === video.id ? '已複製!' : '複製分享連結'}
+                                    >
+                                        {copiedId === video.id ? (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                            </svg>
+                                        )}
+                                    </button>
+
+                                    {/* Delete Button */}
+                                    <button
+                                        onClick={() => handleDelete(video)}
+                                        className="p-1.5 rounded-lg hover:bg-red-600/20 text-gray-400 hover:text-red-400 transition-colors"
+                                        title="刪除"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     ))}

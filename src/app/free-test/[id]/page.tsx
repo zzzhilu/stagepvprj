@@ -280,8 +280,8 @@ function ProjectEditorContent() {
             {/* Bottom Left Panel - Views & Cues */}
             <BottomLeftPanel />
 
-            {/* Client Uploader for Share Mode */}
-            {isShareMode && <div data-ui-element><ClientUploader /></div>}
+            {/* Client Uploader - Hidden per user request for share links */}
+            {/* {isShareMode && <div data-ui-element><ClientUploader /></div>} */}
 
             {/* 3D Scene */}
             <ErrorBoundary>

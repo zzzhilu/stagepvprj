@@ -11,8 +11,8 @@ export function BottomLeftPanel() {
     const activeCueId = useStore((state) => state.activeCueId);
     const applyCue = useStore((state) => state.applyCue);
 
-    // Default expanded
-    const [collapsed, setCollapsed] = useState(false);
+    // Default collapsed (per user request for a cleaner initial view)
+    const [collapsed, setCollapsed] = useState(true);
 
     // Only auto-select first view on initial mount (not when user clears it by rotating)
     const hasAutoSelected = useRef(false);

@@ -267,45 +267,7 @@ export default function AdminControls({ projectName, mode = 'free-test', project
             </div>
 
             <div className="p-4 space-y-4">
-                {/* Model Uploader Section */}
-                {(
-                    <div>
-                        <button
-                            onClick={() => toggleSection('models')}
-                            className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
-                        >
-                            <span className="font-semibold flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg> 模型上傳</span>
-                            <svg
-                                className={`w-5 h-5 transition-transform ${expandedSections.includes('models') ? 'rotate-180' : ''}`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </button>
-                        {expandedSections.includes('models') && <ModelUploader />}
-
-                {/* Quick Add Panel - Box + Preset Models */}
-                <div>
-                    <button
-                        onClick={() => toggleSection('quick-add')}
-                        className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2 mt-2"
-                    >
-                        <span className="font-semibold flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> 快速新增</span>
-                        <svg
-                            className={`w-5 h-5 transition-transform ${expandedSections.includes('quick-add') ? 'rotate-180' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedSections.includes('quick-add') && <QuickAddPanel />}
-                </div>
-                    </div>
-                )}
+                {/* Model Uploader Section and Quick Add are currently hidden per user request */}
 
                 {/* Content Input Section - R2VideoManager for video-progress, TextureUploader for free-test */}
                 <div>
