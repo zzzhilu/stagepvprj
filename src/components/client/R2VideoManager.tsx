@@ -29,11 +29,15 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
         if (!file) return;
 
         // Validate file type
-        const validTypes = ['video/mp4', 'video/x-m4v', 'video/webm', 'video/quicktime'];
+        const validVideoTypes = ['video/mp4', 'video/x-m4v', 'video/webm', 'video/quicktime'];
+        const validImageTypes = ['image/jpeg', 'image/png'];
+        const validTypes = [...validVideoTypes, ...validImageTypes];
         if (!validTypes.includes(file.type)) {
-            setError('請上傳 MP4、M4V、WebM 或 MOV 格式的影片');
+            setError('請上傳 MP4、M4V、WebM、MOV、JPG 或 PNG 格式的檔案');
             return;
         }
+
+        const isImage = validImageTypes.includes(file.type);
 
         setError(null);
         setUploading(true);
@@ -98,7 +102,7 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
                 id: videoId,
                 name: filename,
                 file_path: publicUrl,
-                type: 'r2_video',
+                type: isImage ? 'image' : 'r2_video',
             });
 
             // Trigger save callback after state updates
@@ -244,11 +248,11 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
                             : 'bg-violet-600 hover:bg-violet-700'
                         } text-white
                     `}>
-                        {uploading ? '上傳中...' : (<>上傳影片 <svg className="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></>)}
+                        {uploading ? '上傳中...' : (<>上傳內容 <svg className="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></>)}
                         <input
                             ref={fileInputRef}
                             type="file"
-                            accept="video/mp4,video/x-m4v,video/webm,video/quicktime"
+                            accept="video/mp4,video/x-m4v,video/webm,video/quicktime,image/jpeg,image/png"
                             onChange={handleFileSelect}
                             disabled={uploading}
                             className="hidden"
@@ -264,7 +268,11 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
                         <ul className="space-y-1.5 text-[11px] text-gray-300">
                             <li className="flex items-start gap-1.5">
                                 <span className="text-violet-400 mt-0.5">▸</span>
-                                <span>支援格式：<span className="text-white font-medium">MP4、M4V、WebM、MOV</span></span>
+                                <span>影片格式：<span className="text-white font-medium">MP4、M4V、WebM、MOV</span></span>
+                            </li>
+                            <li className="flex items-start gap-1.5">
+                                <span className="text-violet-400 mt-0.5">▸</span>
+                                <span>圖片格式：<span className="text-white font-medium">JPG、PNG</span></span>
                             </li>
                             <li className="flex items-start gap-1.5">
                                 <span className="text-violet-400 mt-0.5">▸</span>
@@ -272,15 +280,11 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
                             </li>
                             <li className="flex items-start gap-1.5">
                                 <span className="text-violet-400 mt-0.5">▸</span>
-                                <span>上傳連結有效期：<span className="text-white font-medium">1 小時</span></span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-violet-400 mt-0.5">▸</span>
                                 <span>儲存服務：<span className="text-white font-medium">Cloudflare R2</span></span>
                             </li>
                             <li className="flex items-start gap-1.5">
                                 <span className="text-yellow-400 mt-0.5">⚠</span>
-                                <span className="text-yellow-200/80">建議影片大小不超過 <span className="font-medium">500MB</span>，過大可能導致上傳逾時</span>
+                                <span className="text-yellow-200/80">建議檔案大小不超過 <span className="font-medium">500MB</span>，過大可能導致上傳逾時</span>
                             </li>
                         </ul>
                     </div>
@@ -320,8 +324,8 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
             {r2Videos.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                     <div className="text-4xl mb-2"><svg className="w-10 h-10 mx-auto text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg></div>
-                    <p>尚無上傳影片</p>
-                    <p className="text-sm mt-1">上傳影片以產生分享連結</p>
+                    <p>尚無上傳內容</p>
+                    <p className="text-sm mt-1">上傳影片或圖片以產生分享連結</p>
                 </div>
             ) : (
                 <div className="space-y-2">
@@ -330,12 +334,18 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
                             key={video.id}
                             className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors"
                         >
-                            {/* Video Icon */}
-                            <div className="w-10 h-10 bg-violet-600/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                                <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
+                            {/* Content Icon - differentiate image vs video */}
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${video.filename.match(/\.(jpg|jpeg|png)$/i) ? 'bg-emerald-600/20' : 'bg-violet-600/20'}`}>
+                                {video.filename.match(/\.(jpg|jpeg|png)$/i) ? (
+                                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                                    </svg>
+                                ) : (
+                                    <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                )}
                             </div>
 
                             {/* Video Info */}
