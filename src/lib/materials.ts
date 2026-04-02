@@ -22,7 +22,8 @@ export type MaterialId =
     | 'concrete'
     | 'copper'
     | 'neonGlow'
-    | 'emissiveMesh';
+    | 'emissiveMesh'
+    | 'projectionScreen';
 
 export interface MaterialDefinition {
     id: MaterialId;
@@ -506,6 +507,15 @@ export const MATERIAL_LIBRARY: Record<MaterialId, MaterialDefinition> = {
         emissiveIntensity: 1.0,
         transparent: true,
         opacity: 0.5
+    },
+    projectionScreen: {
+        id: 'projectionScreen',
+        name: '投影紗 (透明磨砂)',
+        color: '#dde4ec',
+        roughness: 0.65,
+        metalness: 0.0,
+        transparent: true,
+        opacity: 0.35
     },
 };
 

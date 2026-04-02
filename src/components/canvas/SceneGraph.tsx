@@ -2,6 +2,7 @@ import { OrbitControls, PerspectiveCamera, TransformControls } from '@react-thre
 import { useStore, StageObject } from '@/store/useStore';
 import { StageObjectRenderer } from './StageObjectRenderer';
 import { BoxPrimitiveRenderer } from './BoxPrimitiveRenderer';
+import { ProjectionScreenRenderer } from './ProjectionScreenRenderer';
 import { PaperFigureRenderer } from './PaperFigureRenderer';
 import { CameraCapture } from './CameraCapture';
 import { VideoManager } from './VideoManager';
@@ -257,7 +258,11 @@ export function SceneGraph() {
             {/* Stage Objects from Store */}
             {stageObjects.map((obj) => {
                 const objRef = objectRefsRef.current.get(obj.id);
-                const Renderer = obj.model_path === '__box__' ? BoxPrimitiveRenderer : StageObjectRenderer;
+                const Renderer = obj.model_path === '__box__'
+                    ? BoxPrimitiveRenderer
+                    : obj.model_path === '__projection_screen__'
+                        ? ProjectionScreenRenderer
+                        : StageObjectRenderer;
 
                 return (
                     <ErrorBoundary

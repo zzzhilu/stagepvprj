@@ -162,6 +162,7 @@ EffectComposer (multisampling=0)
 |------|------|
 | **當前進度** | AO 渲染已完成，擴充媒體格式已完成，地面渲染優化已完成 |
 | **下次首要 TODO** | 建立自訂材質球系統架構（支援 diffuse/normal/roughness 貼圖上傳及 PBR 參數調整） |
+| **未來開發事項** | 支援 Arena (Resolume) 透過 HLS 即時串流至 3D 空間 (OBS -> NGINX RTMP -> HLS)。線上環境需使用 Cloudflare Tunnel 或 Ngrok 提供 HTTPS 穿透以解決 Mixed Content 問題 (解法B)。 |
 | **已解決問題** | AO 陰影顯示異常（透過調整 ContactShadows opacity + N8AO 參數解決）|
 
 ---

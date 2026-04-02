@@ -35,6 +35,7 @@ export interface StageObject {
     type: ModelType; // Model category type
     meshNames?: string[]; // Optional: specific mesh names to filter from the GLB
     parentId?: string; // [NEW] ID of parent object for linked movement
+    curvature?: number; // [NEW] Arc curvature for projection screens (-1 to 1)
 }
 
 
