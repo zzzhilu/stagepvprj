@@ -168,6 +168,9 @@ interface State {
     drawingMode: boolean;
     screenshotToast: boolean;
 
+    // Measurement Mode [NEW]
+    measureMode: boolean;
+
     // Paper Figure State [NEW]
     paperFigures: PaperFigure[];
     paperFigureMode: boolean;
@@ -257,6 +260,9 @@ interface State {
     setDrawingMode: (enabled: boolean) => void;
     showScreenshotToast: () => void;
 
+    // Measurement Mode Actions [NEW]
+    setMeasureMode: (enabled: boolean) => void;
+
     // Paper Figure Actions [NEW]
     setPaperFigureMode: (enabled: boolean) => void;
     addPaperFigure: (figure: PaperFigure) => void;
@@ -317,6 +323,9 @@ export const useStore = create<State>()(
             // Drawing & Screenshot defaults
             drawingMode: false,
             screenshotToast: false,
+
+            // Measurement Mode default
+            measureMode: false,
 
             // Paper Figure defaults
             paperFigures: [],
@@ -610,6 +619,12 @@ export const useStore = create<State>()(
                 set({ screenshotToast: true });
                 setTimeout(() => set({ screenshotToast: false }), 2000);
             },
+
+            // Measurement Mode (mutually exclusive with other interactive modes)
+            setMeasureMode: (enabled) => set({
+                measureMode: enabled,
+                ...(enabled ? { drawingMode: false, paperFigureMode: false, walkMode: false } : {}),
+            }),
 
             // Paper Figure Actions
             setPaperFigureMode: (enabled) => set({ paperFigureMode: enabled }),

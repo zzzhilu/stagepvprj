@@ -8,6 +8,7 @@ import { CameraCapture } from './CameraCapture';
 import { VideoManager } from './VideoManager';
 import { StageLightRenderer, StageLightRendererHandle } from './StageLightRenderer';
 import { WalkModeController } from './WalkModeController';
+import { MeasurementScene } from '@/components/client/MeasurementOverlay';
 import { EffectComposer, Bloom, SMAA, ToneMapping, N8AO } from '@react-three/postprocessing';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
 import { useRef, useEffect, useCallback, createRef, useState } from 'react';
@@ -62,6 +63,9 @@ export function SceneGraph() {
 
     // Walk Mode (first person)
     const walkMode = useStore((state) => state.walkMode);
+
+    // Measurement Mode
+    const measureMode = useStore((state) => state.measureMode);
 
     // Create/update refs for all objects (using mutable ref objects)
     useEffect(() => {
@@ -225,6 +229,9 @@ export function SceneGraph() {
 
             {/* Paper Figures (Billboard Sprites) */}
             <PaperFigureRenderer />
+
+            {/* 3D Measurement Overlay */}
+            <MeasurementScene />
 
             {/* Enhanced lighting for better model visibility */}
             <ambientLight intensity={ambientIntensity} />

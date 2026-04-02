@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
 import { TouchJoystick } from './TouchJoystick';
+import { MeasurementPanel } from './MeasurementOverlay';
 
 interface ClientToolbarProps {
     projectId?: string;
@@ -23,6 +24,8 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
     const setBloomIntensity = useStore(s => s.setBloomIntensity);
     const walkMode = useStore(s => s.walkMode);
     const setWalkMode = useStore(s => s.setWalkMode);
+    const measureMode = useStore(s => s.measureMode);
+    const setMeasureMode = useStore(s => s.setMeasureMode);
 
     // Detect touch device (mobile/tablet) — robust multi-signal detection
     const setIsMobile = useStore(s => s.setIsMobile);
@@ -194,6 +197,25 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
                         </svg>
                     </button>
 
+                    {/* Measurement Toggle */}
+                    <button
+                        onClick={() => setMeasureMode(!measureMode)}
+                        className={`group w-10 h-10 rounded-lg flex items-center justify-center transition-all active:scale-90 ${measureMode
+                            ? 'bg-emerald-500/30 ring-1 ring-emerald-400/50 shadow-lg shadow-emerald-500/20'
+                            : 'hover:bg-white/15'
+                            }`}
+                        title={measureMode ? '關閉測量模式' : '開啟測量模式'}
+                    >
+                        <svg className={`w-5 h-5 ${measureMode ? 'text-emerald-400' : 'text-white/80 group-hover:text-white'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                            {/* Ruler icon */}
+                            <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/>
+                            <path d="m14.5 12.5 2-2"/>
+                            <path d="m11.5 9.5 2-2"/>
+                            <path d="m8.5 6.5 2-2"/>
+                            <path d="m17.5 15.5 2-2"/>
+                        </svg>
+                    </button>
+
                     {/* Paper Figure Toggle */}
                     <button
                         onClick={() => setPaperFigureMode(!paperFigureMode)}
@@ -330,6 +352,36 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
                             onClick={() => setPaperFigureMode(false)}
                             className="ml-1 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
                             title="關閉紙片小人模式"
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Measurement Panel */}
+            <MeasurementPanel projectId={projectId} />
+
+            {/* Measurement Mode Banner */}
+            {measureMode && (
+                <div
+                    data-ui-element
+                    className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] animate-fade-in-down pointer-events-auto"
+                >
+                    <div className="bg-emerald-500/90 backdrop-blur-md text-white px-5 py-2.5 rounded-full shadow-2xl flex items-center gap-3 font-medium border border-emerald-400/50">
+                        <div className="flex items-center gap-2">
+                            <svg className="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 21L21 3M3 21l4-1 1-3M21 3l-4 1-1 3" />
+                            </svg>
+                            <span className="text-sm">測量模式啟動中</span>
+                            <span className="text-emerald-200/80 text-xs">（點擊模型表面放置測量點）</span>
+                        </div>
+                        <button
+                            onClick={() => setMeasureMode(false)}
+                            className="ml-1 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+                            title="關閉測量模式"
                         >
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
