@@ -99,6 +99,9 @@ export default function VideoProgressEditorPage() {
     const setActiveContent = useStore(state => state.setActiveContent);
     const setCues = useStore(state => state.setCues);
     const setR2Videos = useStore(state => state.setR2Videos);
+    const setVideoFolders = useStore(state => state.setVideoFolders);
+    const setFloorPlanTexture = useStore(state => state.setFloorPlanTexture);
+    const setMode = useStore(state => state.setMode);
     // Lighting settings sync
     const setAmbientIntensity = useStore(state => state.setAmbientIntensity);
     const setDirectionalIntensity = useStore(state => state.setDirectionalIntensity);
@@ -122,6 +125,8 @@ export default function VideoProgressEditorPage() {
     const activeContentId = useStore(state => state.activeContentId);
     const cues = useStore(state => state.cues);
     const r2Videos = useStore(state => state.r2Videos);
+    const videoFolders = useStore(state => state.videoFolders);
+    const floorPlanTextureUrl = useStore(state => state.floorPlanTextureUrl);
     const ambientIntensity = useStore(state => state.ambientIntensity);
     const directionalIntensity = useStore(state => state.directionalIntensity);
     const bloomIntensity = useStore(state => state.bloomIntensity);
@@ -156,13 +161,16 @@ export default function VideoProgressEditorPage() {
             if (data) {
                 // Load project state into store (always reset to ensure isolation)
                 if (data.name) setCurrentProjectName(data.name);
+                setMode('admin'); // Explicitly set to admin mode for the editor
                 setStageObjects(data.stageObjects || []);
                 setViews(data.views || []);
                 setContentTextures(data.contentTextures || []);
                 setActiveView(data.activeViewId || null);
                 setActiveContent(data.activeContentId || null);
-                setCues(data.cues || []);
-                setR2Videos(data.r2Videos || []);
+                if (data.cues) setCues(data.cues);
+                if (data.r2Videos) setR2Videos(data.r2Videos);
+                if (data.videoFolders) setVideoFolders(data.videoFolders);
+                if (data.floorPlanTextureUrl !== undefined) setFloorPlanTexture(data.floorPlanTextureUrl);
                 // Restore lighting settings from project
                 if (data.ambientIntensity !== undefined) setAmbientIntensity(data.ambientIntensity);
                 if (data.directionalIntensity !== undefined) setDirectionalIntensity(data.directionalIntensity);
@@ -198,6 +206,8 @@ export default function VideoProgressEditorPage() {
                 activeContentId,
                 cues,
                 r2Videos,
+                videoFolders,
+                floorPlanTextureUrl,
                 // Lighting settings
                 ambientIntensity,
                 directionalIntensity,
@@ -217,7 +227,7 @@ export default function VideoProgressEditorPage() {
         } catch (error) {
             console.error('Save failed:', error);
         }
-    }, [projectId, stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness]);
+    }, [projectId, stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness]);
 
     // Auto-save effect (debounced)
     useEffect(() => {
@@ -233,6 +243,8 @@ export default function VideoProgressEditorPage() {
                     activeContentId,
                     cues,
                     r2Videos,
+                    videoFolders,
+                    floorPlanTextureUrl,
                     // Lighting settings
                     ambientIntensity,
                     directionalIntensity,
@@ -255,7 +267,7 @@ export default function VideoProgressEditorPage() {
         }, 2000); // Debounce 2 seconds
 
         return () => clearTimeout(timeoutId);
-    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, isAuthenticated, isLoading, projectId]);
+    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, isAuthenticated, isLoading, projectId]);
 
     // Show loading while checking auth
     if (isChecking) {

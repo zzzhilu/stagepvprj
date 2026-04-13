@@ -12,6 +12,8 @@ export interface ProjectState {
     activeContentId: string | null;
     cues?: any[]; // Store cues
     r2Videos?: R2Video[]; // R2 videos for Image Progress
+    videoFolders?: any[];
+    floorPlanTextureUrl?: string | null;
     // Lighting & Post-processing settings (synced to client)
     ambientIntensity?: number;
     directionalIntensity?: number;

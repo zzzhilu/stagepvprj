@@ -36,6 +36,9 @@ export function useHlsTexture(src: string) {
 
         return () => {
             if (hls) hls.destroy();
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
         };
     }, [src, videoElement]);
 

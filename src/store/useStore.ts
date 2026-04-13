@@ -48,6 +48,7 @@ export interface ContentTexture {
     type: TextureType; // 'image', 'video', or 'r2_video'
     thumbnail_url?: string;
     file_size?: number; // bytes
+    timelineCues?: VideoTimelineCue[]; // [NEW] Time-based cue sequence
 }
 
 export interface SpotLightConfig {
@@ -96,12 +97,28 @@ export interface StageLight {
 }
 
 // R2 Video for Image Progress feature
+export interface VideoTimelineCue {
+    id: string;        // Unique ID for the timeline cue marker
+    time: number;      // Video timecode in seconds
+    cueId: string;     // Target StageCue ID to transition to
+    duration?: number; // [NEW] Transition duration in seconds to this cue
+}
+
+export interface VideoFolder {
+    id: string;
+    name: string;
+    createdAt: number;
+    isCollapsed: boolean;
+}
+
 export interface R2Video {
     id: string;           // Unique video ID (for share links)
     filename: string;     // Original filename (for watermark)
     r2_url: string;       // Full R2 URL
     uploadedAt: number;   // Timestamp
+    folderId?: string;    // [NEW] Folder assignment
     cueId?: string;       // [NEW] Associated cue ID for sharing with a specific scene state
+    timelineCues?: VideoTimelineCue[]; // [NEW] Time-based cue sequence
 }
 
 // Paper Figure (Billboard Sprite) for scale reference
@@ -134,6 +151,7 @@ interface State {
     cues: StageCue[];          // [NEW] List of saved cues
     activeCueId: string | null; // [NEW] Current applied cue
     r2Videos: R2Video[];        // [NEW] R2 videos for Image Progress
+    videoFolders: VideoFolder[]; // [NEW] Folders for R2 videos
 
     capturePending: boolean;
     activeViewId: string | null;
@@ -170,6 +188,11 @@ interface State {
 
     // Measurement Mode [NEW]
     measureMode: boolean;
+
+    // Camera Stream State [NEW]
+    cameraStreamActive: boolean;
+    cameraStreamDeviceId: string | null;
+    cameraStreamError: string | null;
 
     // Paper Figure State [NEW]
     paperFigures: PaperFigure[];
@@ -263,6 +286,11 @@ interface State {
     // Measurement Mode Actions [NEW]
     setMeasureMode: (enabled: boolean) => void;
 
+    // Camera Stream Actions [NEW]
+    setCameraStreamActive: (active: boolean) => void;
+    setCameraStreamDeviceId: (deviceId: string | null) => void;
+    setCameraStreamError: (error: string | null) => void;
+
     // Paper Figure Actions [NEW]
     setPaperFigureMode: (enabled: boolean) => void;
     addPaperFigure: (figure: PaperFigure) => void;
@@ -287,9 +315,18 @@ interface State {
 
     // R2 Video Actions [NEW]
     setR2Videos: (videos: R2Video[]) => void;
+    setVideoFolders: (folders: VideoFolder[]) => void;
     addR2Video: (video: R2Video) => void;
     removeR2Video: (id: string) => void;
     updateR2Video: (id: string, updates: Partial<R2Video>) => void;
+    addVideoFolder: (folder: VideoFolder) => void;
+    updateVideoFolder: (id: string, updates: Partial<VideoFolder>) => void;
+    removeVideoFolder: (id: string) => void;
+
+    // Timeline Cues [NEW]
+    addTimelineCue: (videoId: string, cue: VideoTimelineCue) => void;
+    removeTimelineCue: (videoId: string, cueId: string) => void;
+    updateTimelineCue: (videoId: string, cueId: string, updates: Partial<VideoTimelineCue>) => void;
 }
 
 export const useStore = create<State>()(
@@ -302,6 +339,7 @@ export const useStore = create<State>()(
             cues: [],
             activeCueId: null,
             r2Videos: [],
+            videoFolders: [],
             capturePending: false,
             activeViewId: null,
             contentTextures: [],
@@ -326,6 +364,11 @@ export const useStore = create<State>()(
 
             // Measurement Mode default
             measureMode: false,
+
+            // Camera Stream defaults [NEW]
+            cameraStreamActive: false,
+            cameraStreamDeviceId: null,
+            cameraStreamError: null,
 
             // Paper Figure defaults
             paperFigures: [],
@@ -626,6 +669,16 @@ export const useStore = create<State>()(
                 ...(enabled ? { drawingMode: false, paperFigureMode: false, walkMode: false } : {}),
             }),
 
+            // Camera Stream Actions [NEW]
+            setCameraStreamActive: (active) => set({ cameraStreamActive: active }),
+            setCameraStreamDeviceId: (deviceId) => set({ cameraStreamDeviceId: deviceId }),
+            setCameraStreamError: (error) => {
+                set({ cameraStreamError: error });
+                if (error) {
+                    setTimeout(() => set({ cameraStreamError: null }), 2000);
+                }
+            },
+
             // Paper Figure Actions
             setPaperFigureMode: (enabled) => set({ paperFigureMode: enabled }),
             addPaperFigure: (figure) => set((state) => ({
@@ -664,6 +717,7 @@ export const useStore = create<State>()(
 
             // R2 Video Actions [NEW]
             setR2Videos: (videos) => set({ r2Videos: videos }),
+            setVideoFolders: (folders) => set({ videoFolders: folders }),
             addR2Video: (video) => set((state) => ({
                 r2Videos: [...state.r2Videos, video]
             })),
@@ -675,6 +729,42 @@ export const useStore = create<State>()(
                     v.id === id ? { ...v, ...updates } : v
                 ),
             })),
+            addVideoFolder: (folder) => set((state) => ({
+                videoFolders: [...state.videoFolders, folder]
+            })),
+            updateVideoFolder: (id, updates) => set((state) => ({
+                videoFolders: state.videoFolders.map(f =>
+                    f.id === id ? { ...f, ...updates } : f
+                ),
+            })),
+            removeVideoFolder: (id) => set((state) => ({
+                videoFolders: state.videoFolders.filter(f => f.id !== id),
+                // Move videos back to uncategorized by dropping the folderId
+                r2Videos: state.r2Videos.map(v => v.folderId === id ? { ...v, folderId: undefined } : v)
+            })),
+
+            // Timeline Cues
+            addTimelineCue: (videoId, cue) => set((state) => {
+                const mapCues = (cues: VideoTimelineCue[] = []) => [...cues, cue].sort((a, b) => a.time - b.time);
+                return {
+                    r2Videos: state.r2Videos.map(v => v.id === videoId ? { ...v, timelineCues: mapCues(v.timelineCues) } : v),
+                    contentTextures: state.contentTextures.map(t => t.id === videoId ? { ...t, timelineCues: mapCues(t.timelineCues) } : t),
+                };
+            }),
+            removeTimelineCue: (videoId, cueId) => set((state) => {
+                const filterCues = (cues: VideoTimelineCue[] = []) => cues.filter(c => c.id !== cueId);
+                return {
+                    r2Videos: state.r2Videos.map(v => v.id === videoId ? { ...v, timelineCues: filterCues(v.timelineCues) } : v),
+                    contentTextures: state.contentTextures.map(t => t.id === videoId ? { ...t, timelineCues: filterCues(t.timelineCues) } : t),
+                };
+            }),
+            updateTimelineCue: (videoId, cueId, updates) => set((state) => {
+                const updateCues = (cues: VideoTimelineCue[] = []) => cues.map(c => c.id === cueId ? { ...c, ...updates } : c).sort((a, b) => a.time - b.time);
+                return {
+                    r2Videos: state.r2Videos.map(v => v.id === videoId ? { ...v, timelineCues: updateCues(v.timelineCues) } : v),
+                    contentTextures: state.contentTextures.map(t => t.id === videoId ? { ...t, timelineCues: updateCues(t.timelineCues) } : t),
+                };
+            }),
         }),
         {
             name: 'stage-preview-storage', // localStorage key
@@ -690,6 +780,7 @@ export const useStore = create<State>()(
                 activeCueId: state.activeCueId, // [NEW]
                 fov: state.fov, // [NEW]
                 r2Videos: state.r2Videos, // [NEW]
+                videoFolders: state.videoFolders, // [NEW]
                 paperFigures: state.paperFigures, // [NEW]
                 floorPlanTextureUrl: state.floorPlanTextureUrl, // [NEW]
                 stageLights: state.stageLights, // Stage lighting system

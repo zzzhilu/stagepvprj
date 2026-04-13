@@ -27,6 +27,15 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
     const measureMode = useStore(s => s.measureMode);
     const setMeasureMode = useStore(s => s.setMeasureMode);
 
+    // Camera stream state [NEW]
+    const cameraStreamActive = useStore(s => s.cameraStreamActive);
+    const setCameraStreamActive = useStore(s => s.setCameraStreamActive);
+    const setCameraStreamDeviceId = useStore(s => s.setCameraStreamDeviceId);
+    const cameraStreamError = useStore(s => s.cameraStreamError);
+    const [showCameraPanel, setShowCameraPanel] = useState(false);
+    const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
+    const cameraPanelRef = useRef<HTMLDivElement>(null);
+
     // Detect touch device (mobile/tablet) — robust multi-signal detection
     const setIsMobile = useStore(s => s.setIsMobile);
     const [isTouchDevice, setIsTouchDevice] = useState(false);
@@ -60,6 +69,53 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
             window.removeEventListener('touchstart', onFirstTouch);
         };
     }, [setIsMobile]);
+
+    // Camera device enumeration [NEW]
+    const enumerateCameraDevices = useCallback(async () => {
+        try {
+            // Request initial permission to access device labels
+            const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            tempStream.getTracks().forEach(t => t.stop());
+
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(d => d.kind === 'videoinput');
+            setCameraDevices(videoDevices);
+        } catch (err) {
+            console.error('Failed to enumerate camera devices:', err);
+            setCameraDevices([]);
+        }
+    }, []);
+
+    const handleCameraButtonClick = useCallback(async () => {
+        if (cameraStreamActive) {
+            // Turn off camera
+            setCameraStreamActive(false);
+            setCameraStreamDeviceId(null);
+            setShowCameraPanel(false);
+            return;
+        }
+        // Enumerate and show panel
+        await enumerateCameraDevices();
+        setShowCameraPanel(prev => !prev);
+    }, [cameraStreamActive, setCameraStreamActive, setCameraStreamDeviceId, enumerateCameraDevices]);
+
+    const selectCameraDevice = useCallback((deviceId: string) => {
+        setCameraStreamDeviceId(deviceId);
+        setCameraStreamActive(true);
+        setShowCameraPanel(false);
+    }, [setCameraStreamDeviceId, setCameraStreamActive]);
+
+    // Close camera panel on outside click
+    useEffect(() => {
+        if (!showCameraPanel) return;
+        const handleClick = (e: MouseEvent) => {
+            if (cameraPanelRef.current && !cameraPanelRef.current.contains(e.target as Node)) {
+                setShowCameraPanel(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, [showCameraPanel]);
 
     const takeScreenshot = useCallback(async () => {
         try {
@@ -196,6 +252,60 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                         </svg>
                     </button>
+
+                    {/* Camera Stream Toggle [NEW] */}
+                    <div className="relative" ref={cameraPanelRef}>
+                        <button
+                            onClick={handleCameraButtonClick}
+                            className={`group w-10 h-10 rounded-lg flex items-center justify-center transition-all active:scale-90 ${cameraStreamActive
+                                ? 'bg-cyan-500/30 ring-1 ring-cyan-400/50 shadow-lg shadow-cyan-500/20'
+                                : 'hover:bg-white/15'
+                                }`}
+                            title={cameraStreamActive ? '關閉攝影機串流' : '開啟攝影機串流'}
+                        >
+                            {/* Video camera icon */}
+                            <svg className={`w-5 h-5 ${cameraStreamActive ? 'text-cyan-400' : 'text-white/80 group-hover:text-white'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            {cameraStreamActive && (
+                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-cyan-400 rounded-full animate-pulse" />
+                            )}
+                        </button>
+
+                        {/* Device selection panel */}
+                        {showCameraPanel && (
+                            <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 bg-black/80 backdrop-blur-xl rounded-xl border border-white/15 shadow-2xl min-w-[240px] z-50 overflow-hidden">
+                                <div className="px-3 py-2 border-b border-white/10 flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                    <span className="text-white/70 text-xs font-medium">選擇攝影機訊號</span>
+                                </div>
+                                {cameraDevices.length === 0 ? (
+                                    <div className="px-3 py-4 text-white/40 text-xs text-center">
+                                        未偵測到攝影機裝置
+                                    </div>
+                                ) : (
+                                    <div className="max-h-[200px] overflow-y-auto">
+                                        {cameraDevices.map((device, idx) => (
+                                            <button
+                                                key={device.deviceId}
+                                                onClick={() => selectCameraDevice(device.deviceId)}
+                                                className="w-full text-left px-3 py-2.5 text-white/80 text-xs hover:bg-white/10 transition-colors flex items-center gap-2 border-b border-white/5 last:border-b-0"
+                                            >
+                                                <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-bold text-white/50 shrink-0">
+                                                    {idx + 1}
+                                                </span>
+                                                <span className="truncate">
+                                                    {device.label || `攝影機 ${idx + 1}`}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
 
                     {/* Measurement Toggle */}
                     <button
@@ -387,6 +497,48 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Camera Stream Active Indicator [NEW] */}
+            {cameraStreamActive && (
+                <div
+                    data-ui-element
+                    className="fixed bottom-6 right-6 z-[100] animate-fade-in pointer-events-auto"
+                >
+                    <div className="bg-black/60 backdrop-blur-md text-white px-4 py-2 rounded-full flex items-center gap-2.5 border border-cyan-500/30 shadow-lg shadow-cyan-500/10">
+                        <span className="relative flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-400" />
+                        </span>
+                        <span className="text-xs font-medium text-cyan-300">LIVE</span>
+                        <button
+                            onClick={() => {
+                                setCameraStreamActive(false);
+                                setCameraStreamDeviceId(null);
+                            }}
+                            className="ml-1 w-5 h-5 rounded-full bg-white/10 hover:bg-red-500/30 flex items-center justify-center transition-colors"
+                            title="停止串流"
+                        >
+                            <svg className="w-3 h-3 text-white/70 hover:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Camera Error Toast [NEW] */}
+            {cameraStreamError && (
+                <div
+                    className="fixed top-8 left-1/2 -translate-x-1/2 z-[9999] animate-fade-in-down"
+                >
+                    <div className="bg-red-500/90 backdrop-blur-md text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 font-medium text-sm">
+                        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        {cameraStreamError}
                     </div>
                 </div>
             )}

@@ -120,8 +120,10 @@ function SharePageContent() {
                 const isImageFile = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(video.filename) ||
                     /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(video.r2_url);
 
+                const originalTexture = data.contentTextures?.find((c: any) => c.id === video.id);
                 // Create ContentTexture for the R2 content
                 const videoTexture = {
+                    ...originalTexture,
                     id: video.id,
                     name: video.filename,
                     file_path: video.r2_url,
@@ -142,7 +144,9 @@ function SharePageContent() {
                 const isFirstImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(firstVideo.filename) ||
                     /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(firstVideo.r2_url);
 
+                const originalTexture = data.contentTextures?.find((c: any) => c.id === firstVideo.id);
                 const videoTexture = {
+                    ...originalTexture,
                     id: firstVideo.id,
                     name: firstVideo.filename,
                     file_path: firstVideo.r2_url,

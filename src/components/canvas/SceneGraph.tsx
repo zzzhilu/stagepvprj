@@ -6,6 +6,7 @@ import { ProjectionScreenRenderer } from './ProjectionScreenRenderer';
 import { PaperFigureRenderer } from './PaperFigureRenderer';
 import { CameraCapture } from './CameraCapture';
 import { VideoManager } from './VideoManager';
+import { VideoTimelineController } from './VideoTimelineController';
 import { StageLightRenderer, StageLightRendererHandle } from './StageLightRenderer';
 import { WalkModeController } from './WalkModeController';
 import { MeasurementScene } from '@/components/client/MeasurementOverlay';
@@ -224,8 +225,9 @@ export function SceneGraph() {
             {/* Helper component to capture camera state when triggered from Admin UI */}
             <CameraCapture controlsRef={controlsRef} />
 
-            {/* Video Manager */}
+            {/* Video Manager and its Timeline Cue Controller */}
             <VideoManager />
+            <VideoTimelineController />
 
             {/* Paper Figures (Billboard Sprites) */}
             <PaperFigureRenderer />

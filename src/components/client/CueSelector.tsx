@@ -33,7 +33,7 @@ export function CueSelector() {
                         `}
                         title={`Cue ${cue.order}: ${cue.name}`}
                     >
-                        {cue.order}
+                        {cue.name}
                     </button>
                 ))}
             </div>

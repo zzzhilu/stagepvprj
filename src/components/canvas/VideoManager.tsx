@@ -17,8 +17,17 @@ export function VideoManager() {
     const videoVolume = useStore((state) => state.videoVolume);
     const setVideoDuration = useStore((state) => state.setVideoDuration);
     const setVideoCurrentTime = useStore((state) => state.setVideoCurrentTime);
+
+    // Camera stream state [NEW]
+    const cameraStreamActive = useStore((state) => state.cameraStreamActive);
+    const cameraStreamDeviceId = useStore((state) => state.cameraStreamDeviceId);
+    const setCameraStreamActive = useStore((state) => state.setCameraStreamActive);
+    const setCameraStreamError = useStore((state) => state.setCameraStreamError);
+
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const hlsRef = useRef<Hls | null>(null);
+    const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
+    const cameraStreamRef = useRef<MediaStream | null>(null);
 
     // Find active video texture using activeContentId
     // Support both local 'video' and cloud 'r2_video' types
@@ -26,7 +35,109 @@ export function VideoManager() {
         ? contentTextures.find(t => t.id === activeContentId && (t.type === 'video' || t.type === 'r2_video'))
         : null;
 
+    // ========== CAMERA STREAM (HIGHEST PRIORITY) ==========
     useEffect(() => {
+        if (!cameraStreamActive || !cameraStreamDeviceId) {
+            // Cleanup camera stream
+            if (cameraStreamRef.current) {
+                cameraStreamRef.current.getTracks().forEach(t => t.stop());
+                cameraStreamRef.current = null;
+            }
+            if (cameraVideoRef.current) {
+                cameraVideoRef.current.pause();
+                cameraVideoRef.current.remove();
+                cameraVideoRef.current = null;
+            }
+            // When camera turns off, let the video useEffect below take over
+            // globalVideoElement will be restored by the video effect
+            if (!cameraStreamActive) {
+                // Only clear if we were the one occupying globalVideoElement
+                if (globalVideoElement === cameraVideoRef.current || (!videoRef.current && globalVideoElement)) {
+                    globalVideoElement = null;
+                }
+            }
+            return;
+        }
+
+        let cancelled = false;
+
+        const startCamera = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        deviceId: { exact: cameraStreamDeviceId },
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                    },
+                    audio: false,
+                });
+
+                if (cancelled) {
+                    stream.getTracks().forEach(t => t.stop());
+                    return;
+                }
+
+                // Cleanup any previous content video
+                if (hlsRef.current) {
+                    hlsRef.current.destroy();
+                    hlsRef.current = null;
+                }
+                if (videoRef.current) {
+                    videoRef.current.pause();
+                    videoRef.current = null;
+                }
+
+                // Create camera video element
+                const camVideo = document.createElement('video');
+                camVideo.playsInline = true;
+                camVideo.muted = true;
+                camVideo.autoplay = true;
+                camVideo.srcObject = stream;
+
+                cameraVideoRef.current = camVideo;
+                cameraStreamRef.current = stream;
+                globalVideoElement = camVideo;
+
+                await camVideo.play();
+            } catch (err: any) {
+                if (cancelled) return;
+                console.error('Camera stream error:', err);
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    setCameraStreamError('請在瀏覽器設定中允許攝影機權限');
+                } else if (err.name === 'NotFoundError') {
+                    setCameraStreamError('找不到所選的攝影機裝置');
+                } else {
+                    setCameraStreamError('攝影機啟動失敗：' + err.message);
+                }
+                setCameraStreamActive(false);
+            }
+        };
+
+        startCamera();
+
+        return () => {
+            cancelled = true;
+            if (cameraStreamRef.current) {
+                cameraStreamRef.current.getTracks().forEach(t => t.stop());
+                cameraStreamRef.current = null;
+            }
+            if (cameraVideoRef.current) {
+                cameraVideoRef.current.pause();
+                cameraVideoRef.current.srcObject = null;
+                cameraVideoRef.current.removeAttribute('src');
+                cameraVideoRef.current.load();
+                cameraVideoRef.current.remove();
+                cameraVideoRef.current = null;
+            }
+            // Don't clear globalVideoElement here — let the video effect handle it
+        };
+    }, [cameraStreamActive, cameraStreamDeviceId, setCameraStreamActive, setCameraStreamError]);
+
+    // ========== CONTENT VIDEO (lower priority — skipped when camera is active) ==========
+    useEffect(() => {
+        // If camera stream is active, skip video loading entirely
+        if (cameraStreamActive) return;
+
         // Cleanup previous HLS instance
         if (hlsRef.current) {
             hlsRef.current.destroy();
@@ -124,16 +235,18 @@ export function VideoManager() {
                 hlsRef.current = null;
             }
             video.pause();
+            video.removeAttribute('src');
+            video.load();
             video.removeEventListener('timeupdate', updateTime);
             video.removeEventListener('loadedmetadata', updateDuration);
             video.remove();
             globalVideoElement = null;
         };
-    }, [activeVideo, setVideoCurrentTime, setVideoDuration]);
+    }, [activeVideo?.file_path, cameraStreamActive, setVideoCurrentTime, setVideoDuration]);
 
-    // Handle play/pause
+    // Handle play/pause (only for content videos, not camera)
     useEffect(() => {
-        if (!videoRef.current) return;
+        if (!videoRef.current || cameraStreamActive) return;
 
         if (videoPlaying) {
             // Unmute after user interaction (play button)
@@ -142,15 +255,15 @@ export function VideoManager() {
         } else {
             videoRef.current.pause();
         }
-    }, [videoPlaying, videoVolume]);
+    }, [videoPlaying, videoVolume, cameraStreamActive]);
 
-    // Handle volume changes
+    // Handle volume changes (only for content videos)
     useEffect(() => {
-        if (!videoRef.current) return;
+        if (!videoRef.current || cameraStreamActive) return;
 
         videoRef.current.volume = videoVolume;
         videoRef.current.muted = videoVolume === 0;
-    }, [videoVolume]);
+    }, [videoVolume, cameraStreamActive]);
 
     return null; // This is a non-visual component
 }

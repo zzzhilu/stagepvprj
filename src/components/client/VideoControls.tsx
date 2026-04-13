@@ -21,6 +21,14 @@ export function VideoControls() {
     const setVideoPlaying = useStore((state) => state.setVideoPlaying);
     const setVideoVolume = useStore((state) => state.setVideoVolume);
 
+    const mode = useStore((state) => state.mode);
+    const r2Videos = useStore((state) => state.r2Videos);
+    const activeCueId = useStore((state) => state.activeCueId);
+    const cuesList = useStore((state) => state.cues);
+    const addTimelineCue = useStore((state) => state.addTimelineCue);
+    const removeTimelineCue = useStore((state) => state.removeTimelineCue);
+    const updateTimelineCue = useStore((state) => state.updateTimelineCue);
+
     const [isRecording, setIsRecording] = useState(false);
     const [recordingStatus, setRecordingStatus] = useState<string>('');
     const [showRecordTooltip, setShowRecordTooltip] = useState(false);
@@ -39,7 +47,16 @@ export function VideoControls() {
     const activeContent = activeContentId
         ? contentTextures.find(t => t.id === activeContentId)
         : null;
-    const isVideoActive = activeContent?.type === 'video' || activeContent?.type === 'r2_video';
+        
+    // Get cues from either local or r2 versions by falling back
+    const activeR2Video = activeContentId ? r2Videos.find(v => v.id === activeContentId) : null;
+    
+    const isVideoActive = 
+        activeContent?.type === 'video' || 
+        activeContent?.type === 'r2_video' || 
+        !!activeR2Video;
+
+    const videoCues = activeContent?.timelineCues || activeR2Video?.timelineCues || [];
 
     // --- Click-to-unmute: show hint when video starts playing muted ---
     useEffect(() => {
@@ -261,6 +278,25 @@ export function VideoControls() {
         }
     };
 
+    const handleCueTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!activeContentId || mode !== 'admin') return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const ratio = clickX / rect.width;
+        const cueTime = ratio * (videoDuration || 0);
+
+        if (!activeCueId) {
+            alert("請先從右側面板選擇一個 Cue 以便進行標記！");
+            return;
+        }
+
+        addTimelineCue(activeContentId, {
+            id: crypto.randomUUID(),
+            time: cueTime,
+            cueId: activeCueId
+        });
+    };
+
     // Seek from collapsed bar click
     const handleCollapsedSeek = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -343,10 +379,76 @@ export function VideoControls() {
                 )}
 
                 {/* Timeline */}
-                <div className="flex items-center gap-3">
-                    <span className="text-white text-xs font-mono w-12 text-right">
-                        {formatTime(videoCurrentTime)}
-                    </span>
+                <div className="flex flex-col gap-1">
+                    {/* Admin Cue Timeline */}
+                    {isVideoActive && (
+                        <div className="flex items-center gap-3">
+                            <span className="w-12 text-right text-[10px] text-violet-400 font-medium">Cues</span>
+                            <div 
+                                className={`flex-1 h-3 relative bg-gray-800/80 rounded border border-gray-700/50 transition-colors ${mode === 'admin' ? 'cursor-crosshair hover:border-violet-500/50' : 'cursor-default'}`}
+                                onClick={handleCueTimelineClick}
+                                title={mode === 'admin' ? "點擊以在當前時間點新增所選的 Cue" : "場景提示序列 (唯讀)"}
+                            >
+                                {videoCues.map(cue => {
+                                    const leftPercent = (cue.time / Math.max(videoDuration || 1, 1)) * 100;
+                                    const durationPercent = ((cue.duration || 0) / Math.max(videoDuration || 1, 1)) * 100;
+                                    const cueInfo = cuesList.find(c => c.id === cue.cueId);
+                                    return (
+                                        <div key={cue.id}>
+                                            {(cue.duration || 0) > 0 && (
+                                                <div 
+                                                    className="absolute top-0 bottom-0 bg-amber-500/30 rounded-r z-0 pointer-events-none transition-all"
+                                                    style={{ 
+                                                        left: `${leftPercent}%`, 
+                                                        width: `${durationPercent}%` 
+                                                    }}
+                                                />
+                                            )}
+                                            <div
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (globalVideoElement) {
+                                                        globalVideoElement.currentTime = cue.time;
+                                                    }
+                                                }}
+                                                onContextMenu={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    if (mode !== 'admin') return;
+                                                    if (confirm(`確定移除此 Cue [${cueInfo?.name || '未知'}] 嗎？`)) {
+                                                        removeTimelineCue(activeContentId!, cue.id);
+                                                    }
+                                                }}
+                                                onDoubleClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (mode !== 'admin') return;
+                                                    const currentDuration = cue.duration || 0;
+                                                    const res = prompt(`設定到此 Cue [${cueInfo?.name || '未知'}] 的變化時間 (秒):\n目前: ${currentDuration}秒\n設定為 0 表示瞬間切換`, currentDuration.toString());
+                                                    if (res !== null) {
+                                                        const parsed = parseFloat(res);
+                                                        if (!isNaN(parsed) && parsed >= 0) {
+                                                            updateTimelineCue(activeContentId!, cue.id, { duration: parsed });
+                                                        }
+                                                    }
+                                                }}
+                                                className={`absolute top-0 bottom-0 w-1.5 -ml-[3px] rounded-full cursor-pointer transition-all z-10 shadow-[0_0_8px_rgba(139,92,246,0.8)] ${
+                                                    (cue.duration || 0) > 0 ? 'bg-amber-400 hover:bg-amber-300 shadow-[0_0_8px_rgba(251,191,36,0.8)]' : 'bg-violet-500 hover:bg-violet-400 hover:scale-[2]'
+                                                }`}
+                                                style={{ left: `${leftPercent}%` }}
+                                                title={`Cue: ${cueInfo?.name || '未知'}\n過渡時間: ${cue.duration || 0}s\n左鍵：跳轉至此時間${mode === 'admin' ? '\n右鍵：移除\n雙擊：設定過渡時間 (Duration)' : ''}`}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <span className="w-12"></span>
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-3">
+                        <span className="text-white text-xs font-mono w-12 text-right">
+                            {formatTime(videoCurrentTime)}
+                        </span>
                     <input
                         type="range"
                         min="0"
@@ -360,9 +462,10 @@ export function VideoControls() {
                             background: `linear-gradient(to right, #10b981 0%, #10b981 ${progressPercent}%, #4b5563 ${progressPercent}%, #4b5563 100%)`
                         }}
                     />
-                    <span className="text-white text-xs font-mono w-12">
-                        {formatTime(videoDuration)}
-                    </span>
+                        <span className="text-white text-xs font-mono w-12">
+                            {formatTime(videoDuration)}
+                        </span>
+                    </div>
                 </div>
 
                 {/* Controls */}

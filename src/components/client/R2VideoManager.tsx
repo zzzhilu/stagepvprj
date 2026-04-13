@@ -1,6 +1,6 @@
 'use client';
 
-import { useStore, R2Video } from '@/store/useStore';
+import { useStore, R2Video, VideoFolder } from '@/store/useStore';
 import { useState, useRef } from 'react';
 
 interface R2VideoManagerProps {
@@ -19,6 +19,11 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
     const contentTextures = useStore((state) => state.contentTextures);
     const setLoading = useStore((state) => state.setLoading);
     const cues = useStore((state) => state.cues);
+    const applyCue = useStore((state) => state.applyCue);
+    const videoFolders = useStore((state) => state.videoFolders);
+    const addVideoFolder = useStore((state) => state.addVideoFolder);
+    const removeVideoFolder = useStore((state) => state.removeVideoFolder);
+    const updateVideoFolder = useStore((state) => state.updateVideoFolder);
 
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
@@ -205,10 +210,7 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
     };
 
     const handleShare = (video: R2Video) => {
-        let shareUrl = `${window.location.origin}/share/${projectId}?video=${video.id}`;
-        if (video.cueId) {
-            shareUrl += `&cue=${video.cueId}`;
-        }
+        const shareUrl = `${window.location.origin}/share/${projectId}?video=${video.id}`;
         navigator.clipboard.writeText(shareUrl);
         setCopiedId(video.id);
         setTimeout(() => setCopiedId(null), 2000);
@@ -236,6 +238,10 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
         }
 
         setActiveContent(video.id);
+
+        if (video.cueId) {
+            applyCue(video.cueId);
+        }
     };
 
     const formatDate = (timestamp: number) => {
@@ -247,57 +253,208 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
         });
     };
 
+    const handleCreateFolder = () => {
+        const name = prompt('請輸入資料夾名稱：');
+        if (!name) return;
+        addVideoFolder({
+            id: `folder_${Date.now()}`,
+            name,
+            createdAt: Date.now(),
+            isCollapsed: false,
+        });
+        setTimeout(() => onSave?.(), 100);
+    };
+
+    const handleRenameFolder = (folder: VideoFolder) => {
+        const name = prompt('請輸入新的資料夾名稱：', folder.name);
+        if (!name) return;
+        updateVideoFolder(folder.id, { name });
+        setTimeout(() => onSave?.(), 100);
+    };
+
+    const handleDeleteFolder = (folder: VideoFolder) => {
+        if (!confirm(`確定要刪除資料夾「${folder.name}」嗎？\n資料夾內的檔案將被移至未分類。`)) return;
+        removeVideoFolder(folder.id);
+        setTimeout(() => onSave?.(), 100);
+    };
+
+    // Sort function for videos
+    const sortVideos = (videos: R2Video[]) => {
+        return [...videos].sort((a, b) => {
+            const numA = a.filename.match(/^(\d+)/);
+            const numB = b.filename.match(/^(\d+)/);
+            if (numA && numB) return parseInt(numA[1]) - parseInt(numB[1]);
+            if (numA) return -1;
+            if (numB) return 1;
+            return a.filename.localeCompare(b.filename);
+        });
+    };
+
+    const renderVideo = (video: R2Video) => (
+        <div
+            key={video.id}
+            className="flex flex-col gap-3 p-3 bg-gray-900/50 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors"
+        >
+            {/* Top Row: Icon and Info */}
+            <div className="flex items-center gap-3">
+                {/* Content Icon - differentiate image vs video */}
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${video.filename.match(/\.(jpg|jpeg|png)$/i) ? 'bg-emerald-600/20' : 'bg-violet-600/20'}`}>
+                    {video.filename.match(/\.(jpg|jpeg|png)$/i) ? (
+                        <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                        </svg>
+                    ) : (
+                        <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    )}
+                </div>
+
+                {/* Video Info */}
+                <div className="flex-1 min-w-0">
+                    <div className="text-white text-sm font-medium truncate">
+                        {video.filename}
+                    </div>
+                    <div className="text-gray-500 text-xs truncate">
+                        {formatDate(video.uploadedAt)}
+                    </div>
+                </div>
+            </div>
+
+            {/* Bottom Row: Selector and Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pl-[52px]">
+                {/* Folder and Cue Selector */}
+                <div className="flex items-center gap-2">
+                    {videoFolders.length > 0 && (
+                        <select
+                            value={video.folderId || ''}
+                            onChange={(e) => {
+                                const newFolderId = e.target.value || undefined;
+                                updateR2Video(video.id, { folderId: newFolderId });
+                                setTimeout(() => onSave?.(), 100);
+                            }}
+                            className="bg-gray-700/80 border border-gray-600 text-gray-300 text-xs rounded-md px-2 py-1 appearance-none cursor-pointer hover:border-violet-500/50 focus:border-violet-500 focus:outline-none transition-colors max-w-[120px] truncate"
+                            title="放入資料夾"
+                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239ca3af' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', paddingRight: '20px' }}
+                        >
+                            <option value="">(未分類)</option>
+                            {videoFolders.map((f) => (
+                                <option key={f.id} value={f.id}>
+                                    📁 {f.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+
+                    {cues.length > 0 && (
+                        <select
+                            value={video.cueId || ''}
+                            onChange={(e) => {
+                                const newCueId = e.target.value || undefined;
+                                updateR2Video(video.id, { cueId: newCueId });
+                                setTimeout(() => onSave?.(), 100);
+                            }}
+                            className="bg-gray-700/80 border border-gray-600 text-gray-300 text-xs rounded-md px-2 py-1 appearance-none cursor-pointer hover:border-violet-500/50 focus:border-violet-500 focus:outline-none transition-colors max-w-[120px] truncate"
+                            title="分享時套用的 Cue"
+                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239ca3af' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', paddingRight: '20px' }}
+                        >
+                            <option value="">Cue: 未指定</option>
+                            {cues.map((cue) => (
+                                <option key={cue.id} value={cue.id}>
+                                    Cue: {cue.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={() => handlePlay(video)} className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors" title="播放">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        </svg>
+                    </button>
+                    <button onClick={() => handleShare(video)} className={`p-1.5 rounded-lg transition-colors ${copiedId === video.id ? 'bg-green-600 text-white' : 'hover:bg-gray-700 text-gray-400 hover:text-white'}`} title={copiedId === video.id ? '已複製!' : '複製分享連結'}>
+                        {copiedId === video.id ? (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        ) : (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                        )}
+                    </button>
+                    <button onClick={() => handleDelete(video)} className="p-1.5 rounded-lg hover:bg-red-600/20 text-gray-400 hover:text-red-400 transition-colors" title="刪除">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-white">內容管理</h3>
-                <div className="relative group">
-                    <label className={`
-                        px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all flex items-center gap-1.5
-                        ${uploading
-                            ? 'bg-gray-600 cursor-not-allowed'
-                            : 'bg-violet-600 hover:bg-violet-700'
-                        } text-white
-                    `}>
-                        {uploading ? '上傳中...' : (<>上傳內容 <svg className="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></>)}
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="video/mp4,video/x-m4v,video/webm,video/quicktime,image/jpeg,image/png"
-                            onChange={handleFileSelect}
-                            disabled={uploading}
-                            className="hidden"
-                        />
-                    </label>
-                    {/* Info Tooltip Bubble */}
-                    <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 absolute right-0 top-full mt-2 w-64 bg-gray-900 border border-gray-600 rounded-lg p-3 shadow-xl z-50">
-                        <div className="absolute -top-1.5 right-6 w-3 h-3 bg-gray-900 border-l border-t border-gray-600 rotate-45" />
-                        <p className="text-xs font-bold text-white mb-2 flex items-center gap-1.5">
-                            <svg className="w-3.5 h-3.5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            上傳限制與說明
-                        </p>
-                        <ul className="space-y-1.5 text-[11px] text-gray-300">
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-violet-400 mt-0.5">▸</span>
-                                <span>影片格式：<span className="text-white font-medium">MP4、M4V、WebM、MOV</span></span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-violet-400 mt-0.5">▸</span>
-                                <span>圖片格式：<span className="text-white font-medium">JPG、PNG</span></span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-violet-400 mt-0.5">▸</span>
-                                <span>上傳頻率限制：<span className="text-white font-medium">每分鐘 10 次</span></span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-violet-400 mt-0.5">▸</span>
-                                <span>儲存服務：<span className="text-white font-medium">Cloudflare R2</span></span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-yellow-400 mt-0.5">⚠</span>
-                                <span className="text-yellow-200/80">建議檔案大小不超過 <span className="font-medium">500MB</span>，過大可能導致上傳逾時</span>
-                            </li>
-                        </ul>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleCreateFolder}
+                        className="px-3 py-2 rounded-lg text-sm font-medium bg-gray-700 hover:bg-gray-600 text-white transition-colors flex items-center gap-1.5"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                        </svg>
+                        新資料夾
+                    </button>
+                    <div className="relative group">
+                        <label className={`
+                            px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all flex items-center gap-1.5
+                            ${uploading
+                                ? 'bg-gray-600 cursor-not-allowed'
+                                : 'bg-violet-600 hover:bg-violet-700'
+                            } text-white
+                        `}>
+                            {uploading ? '上傳中...' : (<>上傳內容 <svg className="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></>)}
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="video/mp4,video/x-m4v,video/webm,video/quicktime,image/jpeg,image/png"
+                                onChange={handleFileSelect}
+                                disabled={uploading}
+                                className="hidden"
+                            />
+                        </label>
+                        {/* Info Tooltip Bubble */}
+                        <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 absolute right-0 top-full mt-2 w-64 bg-gray-900 border border-gray-600 rounded-lg p-3 shadow-xl z-50">
+                            <div className="absolute -top-1.5 right-6 w-3 h-3 bg-gray-900 border-l border-t border-gray-600 rotate-45" />
+                            <p className="text-xs font-bold text-white mb-2 flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                上傳限制與說明
+                            </p>
+                            <ul className="space-y-1.5 text-[11px] text-gray-300">
+                                <li className="flex items-start gap-1.5">
+                                    <span className="text-violet-400 mt-0.5">▸</span>
+                                    <span>影片格式：<span className="text-white font-medium">MP4、M4V、WebM、MOV</span></span>
+                                </li>
+                                <li className="flex items-start gap-1.5">
+                                    <span className="text-violet-400 mt-0.5">▸</span>
+                                    <span>圖片格式：<span className="text-white font-medium">JPG、PNG</span></span>
+                                </li>
+                                <li className="flex items-start gap-1.5">
+                                    <span className="text-violet-400 mt-0.5">▸</span>
+                                    <span>上傳頻率限制：<span className="text-white font-medium">每分鐘 10 次</span></span>
+                                </li>
+                                <li className="flex items-start gap-1.5">
+                                    <span className="text-violet-400 mt-0.5">▸</span>
+                                    <span>儲存服務：<span className="text-white font-medium">Cloudflare R2</span></span>
+                                </li>
+                                <li className="flex items-start gap-1.5">
+                                    <span className="text-yellow-400 mt-0.5">⚠</span>
+                                    <span className="text-yellow-200/80">建議檔案大小不超過 <span className="font-medium">500MB</span>，過大可能導致上傳逾時</span>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -332,128 +489,64 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
             )}
 
             {/* Video List */}
-            {r2Videos.length === 0 ? (
+            {r2Videos.length === 0 && videoFolders.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                     <div className="text-4xl mb-2"><svg className="w-10 h-10 mx-auto text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg></div>
                     <p>尚無上傳內容</p>
-                    <p className="text-sm mt-1">上傳影片或圖片以產生分享連結</p>
+                    <p className="text-sm mt-1">建立資料夾或上傳影片/圖片來管理您的內容</p>
                 </div>
             ) : (
-                <div className="space-y-2">
-                    {[...r2Videos].sort((a, b) => {
-                        // Extract leading number from filename (e.g. "00_xxx.mp4" → 0, "12 title.png" → 12)
-                        const numA = a.filename.match(/^(\d+)/);
-                        const numB = b.filename.match(/^(\d+)/);
-                        if (numA && numB) return parseInt(numA[1]) - parseInt(numB[1]);
-                        if (numA) return -1; // numbers first
-                        if (numB) return 1;
-                        return a.filename.localeCompare(b.filename); // fallback: alphabetical
-                    }).map((video) => (
-                        <div
-                            key={video.id}
-                            className="flex flex-col gap-3 p-3 bg-gray-900/50 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors"
-                        >
-                            {/* Top Row: Icon and Info */}
-                            <div className="flex items-center gap-3">
-                                {/* Content Icon - differentiate image vs video */}
-                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${video.filename.match(/\.(jpg|jpeg|png)$/i) ? 'bg-emerald-600/20' : 'bg-violet-600/20'}`}>
-                                    {video.filename.match(/\.(jpg|jpeg|png)$/i) ? (
-                                        <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                <div className="space-y-4">
+                    {/* Folders */}
+                    {videoFolders.map(folder => {
+                        const folderVideos = r2Videos.filter(v => v.folderId === folder.id);
+                        return (
+                            <div key={folder.id} className="bg-gray-800/80 border border-gray-700/80 rounded-lg overflow-hidden">
+                                <div className="flex items-center justify-between p-3 bg-gray-800 border-b border-gray-700/80">
+                                    <div
+                                        className="flex items-center gap-2 cursor-pointer select-none flex-1 group"
+                                        onClick={() => updateVideoFolder(folder.id, { isCollapsed: !folder.isCollapsed })}
+                                    >
+                                        <svg className={`w-4 h-4 text-gray-400 transition-transform ${folder.isCollapsed ? '-rotate-90' : ''} group-hover:text-white`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                         </svg>
-                                    ) : (
-                                        <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        <svg className="w-5 h-5 text-indigo-400 group-hover:text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                                         </svg>
-                                    )}
-                                </div>
-
-                                {/* Video Info */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="text-white text-sm font-medium truncate">
-                                        {video.filename}
+                                        <span className="font-medium text-white text-sm">{folder.name}</span>
+                                        <span className="text-xs text-gray-500 ml-2">{folderVideos.length} 個檔案</span>
                                     </div>
-                                    <div className="text-gray-500 text-xs truncate">
-                                        {formatDate(video.uploadedAt)}
+                                    <div className="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
+                                        <button onClick={() => handleRenameFolder(folder)} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white" title="重新命名">
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                        </button>
+                                        <button onClick={() => handleDeleteFolder(folder)} className="p-1 hover:bg-red-900/50 rounded text-gray-400 hover:text-red-400" title="刪除資料夾">
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        </button>
                                     </div>
                                 </div>
-                            </div>
-
-                            {/* Bottom Row: Selector and Actions */}
-                            <div className="flex items-center justify-between pl-[52px]">
-                                {/* Cue Selector */}
-                                <div>
-                                    {cues.length > 0 && (
-                                        <select
-                                            value={video.cueId || ''}
-                                            onChange={(e) => {
-                                                const newCueId = e.target.value || undefined;
-                                                updateR2Video(video.id, { cueId: newCueId });
-                                                // Trigger save after state update
-                                                setTimeout(() => onSave?.(), 100);
-                                            }}
-                                            className="bg-gray-700/80 border border-gray-600 text-gray-300 text-xs rounded-md px-2 py-1 appearance-none cursor-pointer hover:border-violet-500/50 focus:border-violet-500 focus:outline-none transition-colors max-w-[120px] truncate"
-                                            title="分享時套用的 Cue"
-                                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239ca3af' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', paddingRight: '20px' }}
-                                        >
-                                            <option value="">Cue: 未指定</option>
-                                            {cues.map((cue) => (
-                                                <option key={cue.id} value={cue.id}>
-                                                    Cue: {cue.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    )}
-                                </div>
-
-                                {/* Actions */}
-                                <div className="flex items-center gap-1 flex-shrink-0">
-                                    {/* Play Button */}
-                                    <button
-                                        onClick={() => handlePlay(video)}
-                                        className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-                                        title="播放"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                        </svg>
-                                    </button>
-
-                                    {/* Share Button */}
-                                    <button
-                                        onClick={() => handleShare(video)}
-                                        className={`p-1.5 rounded-lg transition-colors ${copiedId === video.id
-                                            ? 'bg-green-600 text-white'
-                                            : 'hover:bg-gray-700 text-gray-400 hover:text-white'
-                                            }`}
-                                        title={copiedId === video.id ? '已複製!' : '複製分享連結'}
-                                    >
-                                        {copiedId === video.id ? (
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
+                                {!folder.isCollapsed && (
+                                    <div className="p-3 bg-gray-900/30">
+                                        {folderVideos.length === 0 ? (
+                                            <div className="text-center py-4 text-gray-500 text-sm">此資料夾為空</div>
                                         ) : (
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                                            </svg>
+                                            <div className="space-y-2">
+                                                {sortVideos(folderVideos).map(renderVideo)}
+                                            </div>
                                         )}
-                                    </button>
-
-                                    {/* Delete Button */}
-                                    <button
-                                        onClick={() => handleDelete(video)}
-                                        className="p-1.5 rounded-lg hover:bg-red-600/20 text-gray-400 hover:text-red-400 transition-colors"
-                                        title="刪除"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                    </button>
-                                </div>
+                                    </div>
+                                )}
                             </div>
+                        );
+                    })}
+
+                    {/* Uncategorized Videos */}
+                    {r2Videos.filter(v => !v.folderId).length > 0 && (
+                        <div className="space-y-2 mt-4 pt-2">
+                            {videoFolders.length > 0 && <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">未分類</div>}
+                            {sortVideos(r2Videos.filter(v => !v.folderId)).map(renderVideo)}
                         </div>
-                    ))}
+                    )}
                 </div>
             )}
         </div>

@@ -132,7 +132,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                 videoTexture.dispose();
             }
         };
-    }, [activeTexture]);
+    }, [activeTexture?.type, activeTexture?.file_path]);
 
     // Create static image texture (for non-GIF images)
     const imageTexture = useMemo(() => {
@@ -158,7 +158,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         texture.flipY = false; // Important: GLTF uses top-left origin
 
         return texture;
-    }, [activeTexture]);
+    }, [activeTexture?.type, activeTexture?.file_path]);
 
     // Animated GIF texture using gifuct-js decoder
     // Decodes GIF binary → pre-renders all frames → plays back at correct timing
@@ -269,7 +269,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
             gifFramesRef.current = [];
             setGifReady(false);
         };
-    }, [activeTexture]);
+    }, [activeTexture?.type, activeTexture?.file_path]);
 
     // Advance GIF frames at correct timing
     useFrame(() => {

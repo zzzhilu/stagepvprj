@@ -68,9 +68,13 @@ export function generateVideoThumbnail(
         video.src = videoUrl;
         video.muted = true;
 
-        // 超時處理
+        const cleanupVideo = () => {
+            video.removeAttribute('src');
+            video.load();
+        };
+
         const timeout = setTimeout(() => {
-            video.src = '';
+            cleanupVideo();
             resolve('');
         }, opts.timeout);
 
@@ -90,14 +94,17 @@ export function generateVideoThumbnail(
             const ctx = canvas.getContext('2d');
             if (ctx) {
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                cleanupVideo();
                 resolve(canvas.toDataURL('image/jpeg', opts.quality));
             } else {
+                cleanupVideo();
                 resolve('');
             }
         };
 
         video.onerror = () => {
             cleanup();
+            cleanupVideo();
             resolve('');
         };
     });

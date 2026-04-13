@@ -1,6 +1,6 @@
 # 🤖 AI Context Index
 
-> **生成時間:** 2026-03-30 11:55:00
+> **生成時間:** 2026-04-09 22:17:54
 > **專案路徑:** `E:\work\AI_Antigravity\stagepv_1`
 > **掃描深度:** 3 層
 >
@@ -54,7 +54,7 @@
 │   │   ├── 📁 share
 │   │   ├── 📁 simulation
 │   │   ├── 📁 video-progress
-│   │   ├── favicon.ico
+│   │   ├── apple-icon.tsx
 │   │   ├── globals.css
 │   │   ├── icon.svg
 │   │   ├── layout.tsx
@@ -95,6 +95,7 @@
 ├── eslint.config.mjs
 ├── firebase-debug.log
 ├── firebase.json
+├── git-push.bat
 ├── next-env.d.ts
 ├── next.config.ts
 ├── package-lock.json
@@ -112,47 +113,31 @@
 ## 🔄 活躍工作區 (Active Workspace)
 
 **當前分支:** `main`
-
+### 未提交變更 (Uncommitted Changes)
+```
+M src/app/free-test/[id]/page.tsx
+ M src/app/share/[id]/page.tsx
+ M src/app/video-progress/[id]/page.tsx
+M  src/components/canvas/SceneGraph.tsx
+M  src/components/canvas/StageObjectRenderer.tsx
+M  src/components/canvas/VideoManager.tsx
+AM src/components/canvas/VideoTimelineController.tsx
+M  src/components/client/ClientToolbar.tsx
+MM src/components/client/R2VideoManager.tsx
+MM src/components/client/VideoControls.tsx
+M  src/hooks/useHlsTexture.ts
+ M src/lib/project-service.ts
+M  src/lib/thumbnail.ts
+MM src/store/useStore.ts
+```
 ### 最近 Commits
 ```
-feat: AO rendering, expanded media formats, ground optimization
-d502655 feat: free-fly walk mode with wall collision (LED passthrough)
-453a6f7 fix: read walkMoveInput via getState() in useFrame to fix stale closure on mobile joystick
-c3047ac fix: robust touch detection for walk mode joystick on mobile
-280058c style: replace all violet/purple with silver gradient across client UI
+d47e2ae measuretool
+bc05611 PROJECTION
+339cd34 fix
+e5b82f8 fix progress
+73b77f4 fix alot
 ```
-
-### 本次變更摘要
-
-| 檔案 | 變更內容 |
-|------|---------|
-| `SceneGraph.tsx` | ✅ 加入 N8AO 後處理 (aoRadius=2, intensity=3, quality=medium)；移除預設反射地面 (MeshReflectorMaterial)，改用簡單 meshStandardMaterial 提高效能；移除 reflectionMirror/Blur/Metalness 狀態；multisampling 從 4→0 (避免與 N8AO 衝突) |
-| `PerfectRenderEnvironment.tsx` | ✅ ContactShadows opacity 從 0.75→0.35 (避免與 AO 疊加過重) |
-| `ClientUploader.tsx` | ✅ 擴充支持格式：圖片新增 WebP/AVIF/GIF/SVG/BMP；影片新增 MOV；更新 tooltip 與 accept 屬性 |
-| `R2VideoManager.tsx` | ✅ 錯誤提示新增 MOV 格式說明 |
-
----
-
-## 🏗️ 架構筆記
-
-### 渲染管線 (Post-Processing)
-```
-EffectComposer (multisampling=0)
-├── N8AO (aoRadius=2, intensity=3, quality=medium, halfRes=false)
-├── Bloom (luminanceThreshold, intensity, radius)
-├── SMAA
-└── ToneMapping (ACES_FILMIC)
-```
-
-### 支持的上傳格式
-- **圖片**: PNG, JPG, WebP, AVIF, GIF, SVG, BMP
-- **影片**: MP4, MOV, WebM, M4V
-
-### 關鍵技術決策
-- N8AO 取代 baked AO map，提供即時環境遮蔽
-- 移除 MeshReflectorMaterial 預設地面，減少 GPU draw calls 與 render target 開銷
-- ContactShadows 與 N8AO 並存，降低 ContactShadows opacity 避免陰影過重
-- multisampling 設為 0 因 N8AO 已包含自身的抗鋸齒處理
 
 ---
 
@@ -160,10 +145,8 @@ EffectComposer (multisampling=0)
 
 | 項目 | 內容 |
 |------|------|
-| **當前進度** | AO 渲染已完成，擴充媒體格式已完成，地面渲染優化已完成 |
-| **下次首要 TODO** | 建立自訂材質球系統架構（支援 diffuse/normal/roughness 貼圖上傳及 PBR 參數調整） |
-| **未來開發事項** | 支援 Arena (Resolume) 透過 HLS 即時串流至 3D 空間 (OBS -> NGINX RTMP -> HLS)。線上環境需使用 Cloudflare Tunnel 或 Ngrok 提供 HTTPS 穿透以解決 Mixed Content 問題 (解法B)。 |
-| **已解決問題** | AO 陰影顯示異常（透過調整 ContactShadows opacity + N8AO 參數解決）|
+| **當前進度/阻礙** | 1. 修復了包含 `activeContentId`, `videoCurrentTime` 以及 `r2Videos` 的專案儲存機制 (`project-service.ts`, `useProjectSave.ts`)，避免時間軸標記重整後丟失。<br>2. 時間軸過渡 (Timeline Cue) 邏輯確認使用「後過渡 (Post-transition)」機關啟動設計：抵達 Cue 時觸發漸變並持續 `duration` 秒。<br>3. VideoControls 介面上的橘色過渡區塊已正確修改為顯示在標記右側。 |
+| **下次首要 TODO** | 依據目前修復後的時間軸過渡與存檔機制進行測試，若有針對機關邏輯的細節與表現需強化，再行微調。 |
 
 ---
 

@@ -61,7 +61,7 @@ export function BottomLeftPanel({ defaultCollapsed = false }: BottomLeftPanelPro
                                             `}
                                             title={`Cue ${cue.order}: ${cue.name}`}
                                         >
-                                            {cue.order}
+                                            {cue.name}
                                         </button>
                                     ))}
                                 </div>
