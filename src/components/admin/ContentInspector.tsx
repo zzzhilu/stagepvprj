@@ -36,6 +36,8 @@ export function ContentInspector() {
     return null;
 
     const handleUpdate = (updates: Partial<typeof localState>) => {
+        if (!activeTexture) return;
+
         const newState = { ...localState, ...updates };
         setLocalState(newState);
         
