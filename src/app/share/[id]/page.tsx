@@ -35,6 +35,8 @@ function SharePageContent() {
     const stripExtension = (name: string) => name.replace(/\.[^.]+$/, '');
 
     // Get store methods
+    const activeContentId = useStore(state => state.activeContentId);
+    const contentTextures = useStore(state => state.contentTextures);
     const setStageObjects = useStore(state => state.setStageObjects);
     const setViews = useStore(state => state.setViews);
     const setContentTextures = useStore(state => state.setContentTextures);
@@ -243,14 +245,17 @@ function SharePageContent() {
         );
     }
 
+    const activeTexture = contentTextures?.find((c: any) => c.id === activeContentId);
+    const displayVideoFilename = activeTexture?.name ? stripExtension(activeTexture.name) : videoFilename;
+
     return (
         <main className="relative w-full h-full">
             {/* Watermark - Bottom Right */}
-            {(projectName || videoFilename) && (
+            {(projectName || displayVideoFilename) && (
                 <div data-ui-element className="absolute bottom-6 right-6 z-50 pointer-events-none">
                     <div className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-lg">
                         <span className="text-white/90 font-medium tracking-wide text-sm">
-                            {projectName}{videoFilename ? ` - ${videoFilename}` : ''}
+                            {projectName}{displayVideoFilename ? ` - ${displayVideoFilename}` : ''}
                         </span>
                     </div>
                 </div>
