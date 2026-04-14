@@ -66,12 +66,111 @@ export function ClientPlaylistSidebar({ projectId }: { projectId: string }) {
     };
 
     useEffect(() => {
-        // Automatically play the first item in the playlist if we haven't yet and it exists
-        if (projectVideos.length > 0 && !hasAutoPlayed) {
-            handleVideoSelect(projectVideos[0]);
-            setHasAutoPlayed(true);
-        }
-    }, [projectVideos, hasAutoPlayed]);
+        let isMounted = true;
+        
+        const fetchLatestVideos = async () => {
+            if (!currentFolderId) return;
+            try {
+                const res = await fetch(`/api/drive/sync?folderId=${currentFolderId}`);
+                if (!res.ok) return;
+                
+                const data = await res.json();
+                if (!isMounted) return;
+                
+                const currentState = useStore.getState();
+                const currentGDriveVideos = currentState.gdriveVideos || [];
+                const currentCues = currentState.cues || [];
+                const currentProjectVideos = currentGDriveVideos.filter((v: any) => v.folderId === currentFolderId);
+                
+                const newVideos = data.videos.map((vid: any) => {
+                    const existing = currentProjectVideos.find((p: any) => p.driveFileId === vid.id);
+                    
+                    let autoCueId = undefined;
+                    if (vid.name) {
+                        const lowerFilename = vid.name.toLowerCase();
+                        
+                        const cueMatch = lowerFilename.match(/cue\s*[-_]?\s*(\d+)/i);
+                        if (cueMatch) {
+                            const numStr = cueMatch[1];
+                            const numInt = parseInt(numStr, 10).toString();
+                            
+                            const exactCue = currentCues.find((c: any) => {
+                                if (!c.name) return false;
+                                const n = c.name.toLowerCase().trim();
+                                return n === numStr || n === numInt || 
+                                       n === `cue${numStr}` || n === `cue${numInt}` ||
+                                       n === `cue ${numStr}` || n === `cue ${numInt}`;
+                            });
+                            if (exactCue) autoCueId = exactCue.id;
+                        }
+
+                        if (!autoCueId) {
+                            const sortedCues = [...currentCues].filter(c => c.name).sort((a, b) => b.name.length - a.name.length);
+                            for (const c of sortedCues) {
+                                const cNameLower = c.name.toLowerCase().trim();
+                                if (/^\d+$/.test(cNameLower)) {
+                                    const regex = new RegExp(`(^|[^\\d])${cNameLower}([^\\d]|$)`, 'i');
+                                    if (regex.test(lowerFilename)) {
+                                        autoCueId = c.id; break;
+                                    }
+                                } else {
+                                    if (lowerFilename.includes(cNameLower)) {
+                                        autoCueId = c.id; break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (existing) {
+                        return {
+                            ...existing,
+                            cueId: existing.cueId || autoCueId,
+                            filename: vid.name,
+                            thumbnail_url: vid.thumbnail_url,
+                            size: vid.size
+                        };
+                    }
+
+                    return {
+                        id: Math.random().toString(36).substring(2, 9),
+                        driveFileId: vid.id,
+                        filename: vid.name,
+                        thumbnail_url: vid.thumbnail_url,
+                        uploadedAt: new Date(vid.createdTime).getTime(),
+                        size: vid.size,
+                        folderId: currentFolderId,
+                        cueId: autoCueId,
+                    };
+                });
+
+                const otherVideos = currentGDriveVideos.filter((v: any) => v.folderId !== currentFolderId);
+                const updatedVideos = [...otherVideos, ...newVideos];
+                
+                currentState.setGDriveVideos(updatedVideos);
+
+                // Auto-play the first video if this is initial load
+                if (!hasAutoPlayed && newVideos.length > 0) {
+                    handleVideoSelect(newVideos[0]);
+                    setHasAutoPlayed(true);
+                }
+
+            } catch (error) {
+                console.error("Client sync failed:", error);
+                
+                // Fallback: Auto-play the first video from cached global state if sync failed
+                if (!hasAutoPlayed && projectVideos.length > 0) {
+                    handleVideoSelect(projectVideos[0]);
+                    setHasAutoPlayed(true);
+                }
+            }
+        };
+
+        fetchLatestVideos();
+
+        return () => { isMounted = false; };
+    }, [currentFolderId, hasAutoPlayed]);
+
 
     return (
         <div 

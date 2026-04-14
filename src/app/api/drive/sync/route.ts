@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getDriveClient } from '@/lib/drive';
 
+// 記憶體快取以防在分享頁面被頻繁重新載入造成 Google Drive API 率限制
+const cache = new Map<string, { data: any, timestamp: number }>();
+const CACHE_TTL = 30000; // 30 seconds
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -8,6 +12,12 @@ export async function GET(request: Request) {
 
     if (!folderId) {
       return NextResponse.json({ error: 'folderId is required' }, { status: 400 });
+    }
+
+    // 檢查快取
+    const cached = cache.get(folderId);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+       return NextResponse.json(cached.data);
     }
 
     const drive = getDriveClient();
@@ -49,7 +59,10 @@ export async function GET(request: Request) {
       size: file.size,
     }));
 
-    return NextResponse.json({ folder, videos });
+    const resultData = { folder, videos };
+    cache.set(folderId, { data: resultData, timestamp: Date.now() });
+
+    return NextResponse.json(resultData);
   } catch (error: any) {
     console.error('Drive Sync Error:', error);
     return NextResponse.json({ error: `Failed to sync drive folder: ${error.message || error}` }, { status: error.status || 500 });
