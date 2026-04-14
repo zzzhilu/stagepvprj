@@ -52,6 +52,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ folder, videos });
   } catch (error: any) {
     console.error('Drive Sync Error:', error);
-    return NextResponse.json({ error: 'Failed to sync drive folder' }, { status: error.status || 500 });
+    return NextResponse.json({ error: `Failed to sync drive folder: ${error.message || error}` }, { status: error.status || 500 });
   }
 }
