@@ -104,6 +104,8 @@ function ProjectEditorContent() {
     const setCues = useStore(state => state.setCues); // [NEW]
     const setR2Videos = useStore(state => state.setR2Videos);
     const setVideoFolders = useStore(state => state.setVideoFolders);
+    const setGDriveVideos = useStore(state => state.setGDriveVideos);
+    const setAllGDriveFolders = useStore(state => state.setAllGDriveFolders);
     const setFloorPlanTexture = useStore(state => state.setFloorPlanTexture);
     // Lighting settings sync
     const setAmbientIntensity = useStore(state => state.setAmbientIntensity);
@@ -129,6 +131,8 @@ function ProjectEditorContent() {
     const cues = useStore(state => state.cues); // [NEW]
     const r2Videos = useStore(state => state.r2Videos);
     const videoFolders = useStore(state => state.videoFolders);
+    const gdriveVideos = useStore(state => state.gdriveVideos);
+    const gdriveFolders = useStore(state => state.gdriveFolders);
     const floorPlanTextureUrl = useStore(state => state.floorPlanTextureUrl);
     const ambientIntensity = useStore(state => state.ambientIntensity);
     const directionalIntensity = useStore(state => state.directionalIntensity);
@@ -180,6 +184,8 @@ function ProjectEditorContent() {
                 if (data.cues) setCues(data.cues); // [NEW]
                 if (data.r2Videos) setR2Videos(data.r2Videos);
                 if (data.videoFolders) setVideoFolders(data.videoFolders);
+                if (data.gdriveVideos) setGDriveVideos(data.gdriveVideos);
+                if (data.gdriveFolders) setAllGDriveFolders(data.gdriveFolders);
                 if (data.floorPlanTextureUrl !== undefined) setFloorPlanTexture(data.floorPlanTextureUrl);
                 // Restore lighting settings from project (if saved)
                 if (data.ambientIntensity !== undefined) setAmbientIntensity(data.ambientIntensity);
@@ -220,6 +226,8 @@ function ProjectEditorContent() {
                     cues, // [NEW]
                     r2Videos,
                     videoFolders,
+                    gdriveVideos,
+                    gdriveFolders,
                     floorPlanTextureUrl,
                     // Lighting settings
                     ambientIntensity,
@@ -243,7 +251,7 @@ function ProjectEditorContent() {
         }, 2000); // Debounce 2 seconds
 
         return () => clearTimeout(timeoutId);
-    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, isAuthenticated, isShareMode, isLoading, projectId]);
+    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, isAuthenticated, isShareMode, isLoading, projectId]);
 
     // Show loading while checking auth
     if (isChecking) {

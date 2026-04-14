@@ -49,6 +49,13 @@ export interface ContentTexture {
     thumbnail_url?: string;
     file_size?: number; // bytes
     timelineCues?: VideoTimelineCue[]; // [NEW] Time-based cue sequence
+    
+    // Multi-screen / Mapping Properties
+    targetNodeId?: string; // target stage object internal ID to apply to
+    width?: number;
+    height?: number;
+    x?: number;
+    y?: number;
 }
 
 export interface SpotLightConfig {
@@ -121,6 +128,20 @@ export interface R2Video {
     timelineCues?: VideoTimelineCue[]; // [NEW] Time-based cue sequence
 }
 
+
+export interface GDriveVideo {
+    id: string;           // Global internal unique ID
+    driveFileId: string;  // Google Drive File ID
+    filename: string;
+    thumbnail_url?: string;
+    uploadedAt: number;
+    folderId?: string;
+    cueId?: string;
+    cuePoint?: number | null;
+    size?: string;
+    timelineCues?: VideoTimelineCue[];
+}
+
 // Paper Figure (Billboard Sprite) for scale reference
 export interface PaperFigure {
     id: string;
@@ -141,6 +162,12 @@ export interface CameraView {
     order: number;
 }
 
+export interface MaterialSlot {
+    id: string;
+    name: string;
+    materialId: MaterialId;
+}
+
 export type RenderMode = 'wireframe' | 'beauty' | 'clay';
 
 interface State {
@@ -152,6 +179,8 @@ interface State {
     activeCueId: string | null; // [NEW] Current applied cue
     r2Videos: R2Video[];        // [NEW] R2 videos for Image Progress
     videoFolders: VideoFolder[]; // [NEW] Folders for R2 videos
+    gdriveVideos: GDriveVideo[];
+    gdriveFolders: Record<string, string>; // Maps projectId to folderId
 
     capturePending: boolean;
     activeViewId: string | null;
@@ -216,12 +245,19 @@ interface State {
     toneMapping: boolean;
     spotLights: SpotLightConfig[];  // Legacy - kept for migration
     stageLights: StageLight[];     // Dynamic stage lighting system
+    materialSlots: MaterialSlot[]; // [NEW] Custom material slots
 
     setMode: (mode: 'admin' | 'client') => void;
     setIsMobile: (isMobile: boolean) => void;
     addObject: (obj: StageObject) => void;
     updateObjectInstances: (id: string, instances: Instance[]) => void;
     updateObjectMaterial: (id: string, materialId: MaterialId) => void;
+
+    // Material Slots Actions
+    addMaterialSlot: (slot: MaterialSlot) => void;
+    updateMaterialSlot: (id: string, updates: Partial<MaterialSlot>) => void;
+    removeMaterialSlot: (id: string) => void;
+    setMaterialSlots: (slots: MaterialSlot[]) => void;
 
     // Cue Actions [NEW]
     addCue: (name: string) => void;
@@ -259,6 +295,7 @@ interface State {
     removeObject: (id: string) => void;
     addContentTexture: (texture: ContentTexture) => void;
     removeContentTexture: (id: string) => void;
+    updateContentTexture: (id: string, updates: Partial<ContentTexture>) => void;
     setActiveContent: (id: string | null) => void;
     setRenderMode: (mode: RenderMode) => void;
     setAmbientIntensity: (intensity: number) => void;
@@ -323,6 +360,14 @@ interface State {
     updateVideoFolder: (id: string, updates: Partial<VideoFolder>) => void;
     removeVideoFolder: (id: string) => void;
 
+    // GDrive Actions
+    setGDriveVideos: (videos: GDriveVideo[]) => void;
+    setAllGDriveFolders: (mapping: Record<string, string>) => void;
+    setGDriveFolder: (projectId: string, folderId: string) => void;
+    addGDriveVideo: (video: GDriveVideo) => void;
+    removeGDriveVideo: (id: string) => void;
+    updateGDriveVideo: (id: string, updates: Partial<GDriveVideo>) => void;
+
     // Timeline Cues [NEW]
     addTimelineCue: (videoId: string, cue: VideoTimelineCue) => void;
     removeTimelineCue: (videoId: string, cueId: string) => void;
@@ -340,6 +385,9 @@ export const useStore = create<State>()(
             activeCueId: null,
             r2Videos: [],
             videoFolders: [],
+            gdriveVideos: [],
+            gdriveFolders: {},
+            materialSlots: [],
             capturePending: false,
             activeViewId: null,
             contentTextures: [],
@@ -625,6 +673,11 @@ export const useStore = create<State>()(
                 // Clear selection if deleted content was active
                 activeContentId: state.activeContentId === id ? null : state.activeContentId
             })),
+            updateContentTexture: (id, updates) => set((state) => ({
+                contentTextures: state.contentTextures.map(t =>
+                    t.id === id ? { ...t, ...updates } : t
+                )
+            })),
             setActiveContent: (id) => set({ activeContentId: id }),
             setRenderMode: (mode) => set({ renderMode: mode }),
             setAmbientIntensity: (intensity) => set({ ambientIntensity: intensity }),
@@ -743,11 +796,30 @@ export const useStore = create<State>()(
                 r2Videos: state.r2Videos.map(v => v.folderId === id ? { ...v, folderId: undefined } : v)
             })),
 
+            // GDrive Actions
+            setGDriveVideos: (videos) => set({ gdriveVideos: videos }),
+            setAllGDriveFolders: (mapping) => set({ gdriveFolders: mapping }),
+            setGDriveFolder: (projectId, folderId) => set((state) => ({
+                gdriveFolders: { ...state.gdriveFolders, [projectId]: folderId }
+            })),
+            addGDriveVideo: (video) => set((state) => ({
+                gdriveVideos: [...state.gdriveVideos, video]
+            })),
+            removeGDriveVideo: (id) => set((state) => ({
+                gdriveVideos: state.gdriveVideos.filter(v => v.id !== id),
+            })),
+            updateGDriveVideo: (id, updates) => set((state) => ({
+                gdriveVideos: state.gdriveVideos.map(v =>
+                    v.id === id ? { ...v, ...updates } : v
+                ),
+            })),
+
             // Timeline Cues
             addTimelineCue: (videoId, cue) => set((state) => {
                 const mapCues = (cues: VideoTimelineCue[] = []) => [...cues, cue].sort((a, b) => a.time - b.time);
                 return {
                     r2Videos: state.r2Videos.map(v => v.id === videoId ? { ...v, timelineCues: mapCues(v.timelineCues) } : v),
+                    gdriveVideos: state.gdriveVideos.map(v => v.id === videoId ? { ...v, timelineCues: mapCues(v.timelineCues) } : v),
                     contentTextures: state.contentTextures.map(t => t.id === videoId ? { ...t, timelineCues: mapCues(t.timelineCues) } : t),
                 };
             }),
@@ -755,6 +827,7 @@ export const useStore = create<State>()(
                 const filterCues = (cues: VideoTimelineCue[] = []) => cues.filter(c => c.id !== cueId);
                 return {
                     r2Videos: state.r2Videos.map(v => v.id === videoId ? { ...v, timelineCues: filterCues(v.timelineCues) } : v),
+                    gdriveVideos: state.gdriveVideos.map(v => v.id === videoId ? { ...v, timelineCues: filterCues(v.timelineCues) } : v),
                     contentTextures: state.contentTextures.map(t => t.id === videoId ? { ...t, timelineCues: filterCues(t.timelineCues) } : t),
                 };
             }),
@@ -762,9 +835,20 @@ export const useStore = create<State>()(
                 const updateCues = (cues: VideoTimelineCue[] = []) => cues.map(c => c.id === cueId ? { ...c, ...updates } : c).sort((a, b) => a.time - b.time);
                 return {
                     r2Videos: state.r2Videos.map(v => v.id === videoId ? { ...v, timelineCues: updateCues(v.timelineCues) } : v),
+                    gdriveVideos: state.gdriveVideos.map(v => v.id === videoId ? { ...v, timelineCues: updateCues(v.timelineCues) } : v),
                     contentTextures: state.contentTextures.map(t => t.id === videoId ? { ...t, timelineCues: updateCues(t.timelineCues) } : t),
                 };
             }),
+
+            // Material Slots Actions
+            addMaterialSlot: (slot) => set((state) => ({ materialSlots: [...state.materialSlots, slot] })),
+            updateMaterialSlot: (id, updates) => set((state) => ({ 
+                materialSlots: state.materialSlots.map(s => s.id === id ? { ...s, ...updates } : s) 
+            })),
+            removeMaterialSlot: (id) => set((state) => ({ 
+                materialSlots: state.materialSlots.filter(s => s.id !== id) 
+            })),
+            setMaterialSlots: (slots) => set({ materialSlots: slots }),
         }),
         {
             name: 'stage-preview-storage', // localStorage key
@@ -781,9 +865,12 @@ export const useStore = create<State>()(
                 fov: state.fov, // [NEW]
                 r2Videos: state.r2Videos, // [NEW]
                 videoFolders: state.videoFolders, // [NEW]
+                gdriveVideos: state.gdriveVideos,
+                gdriveFolders: state.gdriveFolders,
                 paperFigures: state.paperFigures, // [NEW]
                 floorPlanTextureUrl: state.floorPlanTextureUrl, // [NEW]
                 stageLights: state.stageLights, // Stage lighting system
+                materialSlots: state.materialSlots, // Custom material slots
             }),
             // Migration: convert old spotLights to stageLights on hydration
             onRehydrateStorage: () => (state) => {

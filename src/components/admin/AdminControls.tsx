@@ -11,6 +11,8 @@ import CueManager from './CueManager';
 import { QuickAddPanel } from './QuickAddPanel';
 import { StageLightingPanel } from './StageLightingPanel';
 import { R2VideoManager } from '@/components/client/R2VideoManager';
+import { GDriveVideoManager } from './GDriveVideoManager';
+import ContentInspector from './ContentInspector';
 import { useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 
@@ -202,25 +204,27 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
                         </a>
-                        <button
-                            onClick={() => {
-                                const newGizmoState = !gizmoEnabled;
-                                setGizmoEnabled(newGizmoState);
-                                if (newGizmoState) {
-                                    startMode('admin');
-                                }
-                            }}
-                            className={`text-xs px-3 py-1 rounded flex items-center gap-1 ${gizmoEnabled
-                                ? 'bg-violet-600 hover:bg-violet-700'
-                                : 'bg-gray-700 hover:bg-gray-600'
-                                }`}
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg> Gizmo
-                        </button>
+                        {!isVideoProgress && (
+                            <button
+                                onClick={() => {
+                                    const newGizmoState = !gizmoEnabled;
+                                    setGizmoEnabled(newGizmoState);
+                                    if (newGizmoState) {
+                                        startMode('admin');
+                                    }
+                                }}
+                                className={`text-xs px-3 py-1 rounded flex items-center gap-1 ${gizmoEnabled
+                                    ? 'bg-violet-600 hover:bg-violet-700'
+                                    : 'bg-gray-700 hover:bg-gray-600'
+                                    }`}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg> Gizmo
+                            </button>
+                        )}
                     </div>
 
                     {/* Transform Mode Buttons - Shown when Gizmo is enabled */}
-                    {gizmoEnabled && (
+                    {!isVideoProgress && gizmoEnabled && (
                         <div className="flex gap-1 mt-2">
                             <button
                                 onClick={() => setTransformMode('translate')}
@@ -253,7 +257,7 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                 </div>
 
                 {/* Share Button */}
-                {(
+                {!isVideoProgress && (
                     <button
                         onClick={handleShare}
                         className="w-full bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 text-white py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2"
@@ -268,42 +272,46 @@ export default function AdminControls({ projectName, mode = 'free-test', project
 
             <div className="p-4 space-y-4">
                 {/* Model Uploader Section */}
-                <div>
-                    <button
-                        onClick={() => toggleSection('models')}
-                        className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
-                    >
-                        <span className="font-semibold flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg> 模型上傳</span>
-                        <svg
-                            className={`w-5 h-5 transition-transform ${expandedSections.includes('models') ? 'rotate-180' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                {!isVideoProgress && (
+                    <div>
+                        <button
+                            onClick={() => toggleSection('models')}
+                            className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
                         >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedSections.includes('models') && <ModelUploader />}
-                </div>
+                            <span className="font-semibold flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg> 模型上傳</span>
+                            <svg
+                                className={`w-5 h-5 transition-transform ${expandedSections.includes('models') ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {expandedSections.includes('models') && <ModelUploader />}
+                    </div>
+                )}
 
                 {/* Quick Add Panel */}
-                <div>
-                    <button
-                        onClick={() => toggleSection('quickadd')}
-                        className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
-                    >
-                        <span className="font-semibold flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg> 快速新增</span>
-                        <svg
-                            className={`w-5 h-5 transition-transform ${expandedSections.includes('quickadd') ? 'rotate-180' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                {!isVideoProgress && (
+                    <div>
+                        <button
+                            onClick={() => toggleSection('quickadd')}
+                            className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
                         >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedSections.includes('quickadd') && <QuickAddPanel />}
-                </div>
+                            <span className="font-semibold flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg> 快速新增</span>
+                            <svg
+                                className={`w-5 h-5 transition-transform ${expandedSections.includes('quickadd') ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {expandedSections.includes('quickadd') && <QuickAddPanel />}
+                    </div>
+                )}
 
                 {/* Content Input Section - R2VideoManager for video-progress, TextureUploader for free-test */}
                 <div>
@@ -322,60 +330,73 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                         </svg>
                     </button>
                     {expandedSections.includes('videos') && (
-                        isVideoProgress
-                            ? <R2VideoManager projectId={projectId} onSave={onSave} />
-                            : <TextureUploader />
+                        <div className="space-y-3">
+                            {isVideoProgress ? (
+                                <R2VideoManager projectId={projectId} onSave={onSave} />
+                            ) : (
+                                <TextureUploader />
+                            )}
+                            {/* 始終顯示 Google Drive 同步，不論在哪個模式 */}
+                            <GDriveVideoManager projectId={projectId} onSave={onSave} />
+                        </div>
                     )}
                 </div>
+
+                {/* Content Inspector Section [NEW] */}
+                <ContentInspector />
 
                 {/* View Management Section */}
-                <div>
-                    <button
-                        onClick={() => toggleSection('views')}
-                        className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
-                    >
-                        <span className="font-semibold flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg> 視角管理</span>
-                        <svg
-                            className={`w-5 h-5 transition-transform ${expandedSections.includes('views') ? 'rotate-180' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                {!isVideoProgress && (
+                    <div>
+                        <button
+                            onClick={() => toggleSection('views')}
+                            className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
                         >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedSections.includes('views') && (
-                        <div className="bg-gray-900 text-white rounded-lg p-4">
-                            <ViewManager />
-                        </div>
-                    )}
-                </div>
+                            <span className="font-semibold flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg> 視角管理</span>
+                            <svg
+                                className={`w-5 h-5 transition-transform ${expandedSections.includes('views') ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {expandedSections.includes('views') && (
+                            <div className="bg-gray-900 text-white rounded-lg p-4">
+                                <ViewManager />
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Cue Management Section [NEW] */}
-                <div>
-                    <button
-                        onClick={() => toggleSection('cues')}
-                        className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
-                    >
-                        <span className="font-semibold flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg> 場景 (Cues)</span>
-                        <svg
-                            className={`w-5 h-5 transition-transform ${expandedSections.includes('cues') ? 'rotate-180' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                {!isVideoProgress && (
+                    <div>
+                        <button
+                            onClick={() => toggleSection('cues')}
+                            className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
                         >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedSections.includes('cues') && (
-                        <div className="bg-gray-900 text-white rounded-lg">
-                            <CueManager />
-                        </div>
-                    )}
-                </div>
+                            <span className="font-semibold flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg> 場景 (Cues)</span>
+                            <svg
+                                className={`w-5 h-5 transition-transform ${expandedSections.includes('cues') ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {expandedSections.includes('cues') && (
+                            <div className="bg-gray-900 text-white rounded-lg">
+                                <CueManager />
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Object Inspector Section */}
-                {(
+                {!isVideoProgress && (
                     <div>
                         <button
                             onClick={() => toggleSection('inspector')}
@@ -400,50 +421,56 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                 )}
 
                 {/* Floor Plan Uploader - Auto-shows when PLANE object exists */}
-                {(
+                {!isVideoProgress && (
                     <FloorPlanUploader />
                 )}
 
                 {/* Stage Lighting System Section [NEW] */}
-                <div>
-                    <button
-                        onClick={() => toggleSection('stage-lights')}
-                        className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
-                    >
-                        <span className="font-semibold flex items-center gap-1.5">💡 燈光系統</span>
-                        <svg
-                            className={`w-5 h-5 transition-transform ${expandedSections.includes('stage-lights') ? 'rotate-180' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                {!isVideoProgress && (
+                    <div>
+                        <button
+                            onClick={() => toggleSection('stage-lights')}
+                            className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
                         >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedSections.includes('stage-lights') && <StageLightingPanel />}
-                </div>
+                            <span className="font-semibold flex items-center gap-1.5">💡 燈光系統</span>
+                            <svg
+                                className={`w-5 h-5 transition-transform ${expandedSections.includes('stage-lights') ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {expandedSections.includes('stage-lights') && <StageLightingPanel />}
+                    </div>
+                )}
 
                 {/* Lighting Controls Section */}
-                <div>
-                    <button
-                        onClick={() => toggleSection('lighting')}
-                        className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
-                    >
-                        <span className="font-semibold flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg> 全域照明</span>
-                        <svg
-                            className={`w-5 h-5 transition-transform ${expandedSections.includes('lighting') ? 'rotate-180' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                {!isVideoProgress && (
+                    <div>
+                        <button
+                            onClick={() => toggleSection('lighting')}
+                            className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
                         >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedSections.includes('lighting') && <LightingControls />}
-                </div>
+                            <span className="font-semibold flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg> 全域照明</span>
+                            <svg
+                                className={`w-5 h-5 transition-transform ${expandedSections.includes('lighting') ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {expandedSections.includes('lighting') && <LightingControls />}
+                    </div>
+                )}
 
                 {/* Reflection Settings Section - Show only when Perfect Render is enabled */}
-                <ReflectionControls />
+                {!isVideoProgress && (
+                    <ReflectionControls />
+                )}
             </div>
         </div>
     );

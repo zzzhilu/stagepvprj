@@ -1,6 +1,6 @@
 # 🤖 AI Context Index
 
-> **生成時間:** 2026-04-09 22:17:54
+> **生成時間:** 2026-04-14 10:39:47
 > **專案路徑:** `E:\work\AI_Antigravity\stagepv_1`
 > **掃描深度:** 3 層
 >
@@ -71,6 +71,7 @@
 │   │   └── useRecorder.ts
 │   ├── 📁 lib
 │   │   ├── draco.ts
+│   │   ├── drive.ts
 │   │   ├── firebase.ts
 │   │   ├── materials.ts
 │   │   ├── presets.tsx
@@ -103,6 +104,7 @@
 ├── postcss.config.mjs
 ├── README.md
 ├── TASK_IMAGE_PROGRESS.md
+├── test_old_store.txt
 ├── tsconfig.json
 ├── tsconfig.tsbuildinfo
 └── USER_GUIDE.md
@@ -115,38 +117,47 @@
 **當前分支:** `main`
 ### 未提交變更 (Uncommitted Changes)
 ```
-M src/app/free-test/[id]/page.tsx
+M .env.example
+ M .gemini/implementation_plan.md
+ M package-lock.json
+ M package.json
+ M src/app/free-test/[id]/page.tsx
  M src/app/share/[id]/page.tsx
  M src/app/video-progress/[id]/page.tsx
-M  src/components/canvas/SceneGraph.tsx
-M  src/components/canvas/StageObjectRenderer.tsx
-M  src/components/canvas/VideoManager.tsx
-AM src/components/canvas/VideoTimelineController.tsx
-M  src/components/client/ClientToolbar.tsx
-MM src/components/client/R2VideoManager.tsx
-MM src/components/client/VideoControls.tsx
-M  src/hooks/useHlsTexture.ts
+ M src/components/admin/AdminControls.tsx
+ M src/components/admin/StageLightingPanel.tsx
+ M src/components/canvas/StageObjectRenderer.tsx
+ M src/components/canvas/VideoManager.tsx
+ M src/components/canvas/VideoTimelineController.tsx
  M src/lib/project-service.ts
-M  src/lib/thumbnail.ts
-MM src/store/useStore.ts
+ M src/store/useStore.ts
+?? src/app/api/drive/
+?? src/components/admin/ContentInspector.tsx
+?? src/components/admin/GDriveVideoManager.tsx
+?? src/components/client/ClientPlaylistSidebar.tsx
+?? src/lib/drive.ts
+?? test_old_store.txt
 ```
 ### 最近 Commits
 ```
+6ce1b80 add cue setting
 d47e2ae measuretool
 bc05611 PROJECTION
 339cd34 fix
 e5b82f8 fix progress
-73b77f4 fix alot
 ```
 
 ---
 
 ## 🧠 開發者認知 (Developer State)
 
-| 項目 | 內容 |
+| 功能模組 | 內容狀態 |
 |------|------|
-| **當前進度/阻礙** | 1. 修復了包含 `activeContentId`, `videoCurrentTime` 以及 `r2Videos` 的專案儲存機制 (`project-service.ts`, `useProjectSave.ts`)，避免時間軸標記重整後丟失。<br>2. 時間軸過渡 (Timeline Cue) 邏輯確認使用「後過渡 (Post-transition)」機關啟動設計：抵達 Cue 時觸發漸變並持續 `duration` 秒。<br>3. VideoControls 介面上的橘色過渡區塊已正確修改為顯示在標記右側。 |
-| **下次首要 TODO** | 依據目前修復後的時間軸過渡與存檔機制進行測試，若有針對機關邏輯的細節與表現需強化，再行微調。 |
+| **1. 專案核心架構與狀態** | 使用 Next.js + React Three Fiber + Firebase。<br>所有的 3D 狀態與編輯資訊皆由 `src/store/useStore.ts` (Zustand) 集中管理，包含節點屬性、目前影片播放、Cues事件等。 |
+| **2. 3D發光材質與媒體映射** | 針對 `StageObject` (具有 emissive 屬性的 3D 節點) 支援動態貼圖。<br>透過 `ContentInspector.tsx` 可配置套用的影片/圖片 (`ContentTexture`)，並可個別設定縮放 (`width`/`height`)、偏移 (`x`/`y`) 以及選擇「特定畫布顯示 (`targetNodeId`)」。<br>這段邏輯在 `StageObjectRenderer.tsx` 透過 `textureMap.clone()` 處理。 |
+| **3. 雲端影音與CORS整合** | 實作了 Google Drive 影片同步 (`GDriveVideoManager.tsx`) 及 Cloudflare R2 影音流的載入。<br>已處理 iOS WebGL CORS 在 R2 Video 的相容性問題（`VideoManager.tsx` 配置單純化的隱藏 `<video>`，由 WebGL 同步讀取 frame）。 |
+| **4. 浮動式管理介面 (UI)** | 後台管理頁面實裝了拖曳式浮動視窗系統，容許諸如 Scene Graph、Content Inspector、Stage Lighting 等多個面板同時存在並操作，提升佈展操作流暢度。 |
+| **5. 當前阻礙點/預期TODO** | 目前 `VideoManager.tsx` 僅透過維護一個全域的隱藏 `<video>` 來提供材質給 3D 世界使用，故**全場景同時只能播放一支影片**。<br>若未來需求包含支援「同時多影片異步播放」，將須擴充為「多個影片標籤與獨立管理 VideoTexture」架構。 |
 
 ---
 

@@ -30,7 +30,7 @@
 目標：允許用戶上傳材質貼圖並調整 PBR 參數，替換或增強模型表面效果。
 
 ### 3.1 材質資料模型
-- [ ] 在 `useStore.ts` 中定義 `MaterialSlot` 介面
+- [x] 在 `useStore.ts` 中定義 `MaterialSlot` 介面
   - diffuseMap, normalMap, roughnessMap, metalnessMap (Optional Blob URLs)
   - roughness, metalness, emissive, emissiveIntensity (PBR 浮點參數)
   - color (hex string)

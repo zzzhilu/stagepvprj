@@ -22,7 +22,11 @@ export function VideoTimelineController() {
         if (!activeContentId) return;
 
         const content = state.contentTextures.find(c => c.id === activeContentId);
-        if (!content || !content.timelineCues || content.timelineCues.length === 0) return;
+        const r2Video = state.r2Videos?.find(v => v.id === activeContentId);
+        const gdriveVideo = state.gdriveVideos?.find(v => v.id === activeContentId);
+        
+        const cues = content?.timelineCues || r2Video?.timelineCues || gdriveVideo?.timelineCues;
+        if (!cues || cues.length === 0) return;
 
         // Use global video element time for more precision at 60fps, fallback to Zustand state if unmounted
         const videoTime = globalVideoElement ? globalVideoElement.currentTime : state.videoCurrentTime;
@@ -41,8 +45,7 @@ export function VideoTimelineController() {
         lastUpdateRef.current = now;
         lastTimeRef.current = videoTime;
         
-        const cues = content.timelineCues;
-        if (cues.length === 0) return;
+
         
         const sortedCues = [...cues].sort((a, b) => a.time - b.time);
 

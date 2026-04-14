@@ -11,6 +11,7 @@ import { ClientToolbar } from '@/components/client/ClientToolbar';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
+import { ClientPlaylistSidebar } from '@/components/client/ClientPlaylistSidebar';
 
 const Scene = dynamic(() => import('@/components/canvas/Scene'), {
     ssr: false,
@@ -23,6 +24,7 @@ function SharePageContent() {
     const projectId = params.id as string;
     const videoId = searchParams.get('video');
     const cueId = searchParams.get('cue');
+    const playlistParam = searchParams.get('playlist');
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -40,6 +42,7 @@ function SharePageContent() {
     const setActiveContent = useStore(state => state.setActiveContent);
     const setCues = useStore(state => state.setCues);
     const setR2Videos = useStore(state => state.setR2Videos);
+    const setGDriveVideos = useStore(state => state.setGDriveVideos);
     const addContentTexture = useStore(state => state.addContentTexture);
     const setVideoPlaying = useStore(state => state.setVideoPlaying);
     const applyCue = useStore(state => state.applyCue);
@@ -87,6 +90,7 @@ function SharePageContent() {
             if (data.views) setViews(data.views);
             if (data.cues) setCues(data.cues);
             if (data.r2Videos) setR2Videos(data.r2Videos);
+            if (data.gdriveVideos) setGDriveVideos(data.gdriveVideos);
 
             // Restore lighting settings from project (if saved)
             if (data.ambientIntensity !== undefined) setAmbientIntensity(data.ambientIntensity);
@@ -105,8 +109,17 @@ function SharePageContent() {
             if (data.reflectionMetalness !== undefined) setReflectionMetalness(data.reflectionMetalness);
 
             // Find the specified video
-            if (videoId && data.r2Videos) {
-                const video = data.r2Videos.find(v => v.id === videoId);
+            if (videoId) {
+                let video: any = null;
+                let isR2 = false;
+
+                if (data.r2Videos) {
+                    video = data.r2Videos.find((v: any) => v.id === videoId);
+                    if (video) isR2 = true;
+                }
+                if (!video && data.gdriveVideos) {
+                    video = data.gdriveVideos.find((v: any) => v.id === videoId);
+                }
 
                 if (!video) {
                     setError('找不到指定的影片');
@@ -117,17 +130,19 @@ function SharePageContent() {
                 setVideoFilename(stripExtension(video.filename));
 
                 // Detect if this is an image based on file extension
+                const urlToCheck = isR2 ? video.r2_url : video.filename;
                 const isImageFile = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(video.filename) ||
-                    /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(video.r2_url);
+                    /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(urlToCheck);
 
                 const originalTexture = data.contentTextures?.find((c: any) => c.id === video.id);
-                // Create ContentTexture for the R2 content
+                // Create ContentTexture for the content
                 const videoTexture = {
                     ...originalTexture,
                     id: video.id,
                     name: video.filename,
-                    file_path: video.r2_url,
+                    file_path: isR2 ? video.r2_url : `/api/drive/stream/${video.driveFileId}`,
                     type: (isImageFile ? 'image' : 'r2_video') as 'image' | 'r2_video',
+                    timelineCues: video.timelineCues || originalTexture?.timelineCues,
                 };
 
                 // Clear existing content and add only this
@@ -136,28 +151,41 @@ function SharePageContent() {
 
                 // Auto-play only for videos
                 if (!isImageFile) setVideoPlaying(true);
-            } else if (data.r2Videos && data.r2Videos.length > 0) {
-                const firstVideo = data.r2Videos[0];
-                setVideoFilename(stripExtension(firstVideo.filename));
+            } else if ((data.r2Videos && data.r2Videos.length > 0) || (data.gdriveVideos && data.gdriveVideos.length > 0)) {
+                let firstVideo: any = null;
+                let isR2 = false;
 
-                // Detect if this is an image
-                const isFirstImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(firstVideo.filename) ||
-                    /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(firstVideo.r2_url);
+                if (data.r2Videos && data.r2Videos.length > 0) {
+                    firstVideo = data.r2Videos[0];
+                    isR2 = true;
+                } else if (data.gdriveVideos && data.gdriveVideos.length > 0) {
+                    firstVideo = data.gdriveVideos[0];
+                }
 
-                const originalTexture = data.contentTextures?.find((c: any) => c.id === firstVideo.id);
-                const videoTexture = {
-                    ...originalTexture,
-                    id: firstVideo.id,
-                    name: firstVideo.filename,
-                    file_path: firstVideo.r2_url,
-                    type: (isFirstImage ? 'image' : 'r2_video') as 'image' | 'r2_video',
-                };
+                if (firstVideo) {
+                    setVideoFilename(stripExtension(firstVideo.filename));
 
-                setContentTextures([videoTexture]);
-                setActiveContent(firstVideo.id);
-                if (!isFirstImage) setVideoPlaying(true);
+                    const urlToCheck = isR2 ? firstVideo.r2_url : firstVideo.filename;
+                    // Detect if this is an image
+                    const isFirstImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(firstVideo.filename) ||
+                        /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(urlToCheck);
+
+                    const originalTexture = data.contentTextures?.find((c: any) => c.id === firstVideo.id);
+                    const videoTexture = {
+                        ...originalTexture,
+                        id: firstVideo.id,
+                        name: firstVideo.filename,
+                        file_path: isR2 ? firstVideo.r2_url : `/api/drive/stream/${firstVideo.driveFileId}`,
+                        type: (isFirstImage ? 'image' : 'r2_video') as 'image' | 'r2_video',
+                        timelineCues: firstVideo.timelineCues || originalTexture?.timelineCues,
+                    };
+
+                    setContentTextures([videoTexture]);
+                    setActiveContent(firstVideo.id);
+                    if (!isFirstImage) setVideoPlaying(true);
+                }
             } else {
-                // Load existing content textures if no R2 videos
+                // Load existing content textures if no videos found
                 if (data.contentTextures) setContentTextures(data.contentTextures);
                 if (data.activeContentId) setActiveContent(data.activeContentId);
             }
@@ -166,9 +194,17 @@ function SharePageContent() {
             if (data.activeViewId) setActiveView(data.activeViewId);
 
             // Apply cue if specified in URL (or from video's associated cue)
+            const getAllVideos = () => {
+                const arr: any[] = [];
+                if (data.r2Videos) arr.push(...data.r2Videos);
+                if (data.gdriveVideos) arr.push(...data.gdriveVideos);
+                return arr;
+            };
+            const allVideos = getAllVideos();
+
             const targetCueId = cueId ||
-                (videoId && data.r2Videos?.find((v: { id: string; cueId?: string }) => v.id === videoId)?.cueId) ||
-                (!videoId && data.r2Videos?.[0]?.cueId);
+                (videoId && allVideos.find((v: { id: string; cueId?: string }) => v.id === videoId)?.cueId) ||
+                (!videoId && allVideos[0]?.cueId);
             if (targetCueId && data.cues?.length) {
                 // Small delay to ensure store is hydrated
                 setTimeout(() => applyCue(targetCueId), 200);
@@ -239,6 +275,13 @@ function SharePageContent() {
             <ErrorBoundary>
                 <Scene />
             </ErrorBoundary>
+
+            {/* GDrive Playlist Sidebar */}
+            {playlistParam === 'gdrive' && (
+                <div data-ui-element>
+                    <ClientPlaylistSidebar projectId={projectId} />
+                </div>
+            )}
         </main>
     );
 }

@@ -22,7 +22,8 @@ export function VideoControls() {
     const setVideoVolume = useStore((state) => state.setVideoVolume);
 
     const mode = useStore((state) => state.mode);
-    const r2Videos = useStore((state) => state.r2Videos);
+    const r2Videos = useStore((state) => state.r2Videos) || [];
+    const gdriveVideos = useStore((state) => state.gdriveVideos) || [];
     const activeCueId = useStore((state) => state.activeCueId);
     const cuesList = useStore((state) => state.cues);
     const addTimelineCue = useStore((state) => state.addTimelineCue);
@@ -50,13 +51,15 @@ export function VideoControls() {
         
     // Get cues from either local or r2 versions by falling back
     const activeR2Video = activeContentId ? r2Videos.find(v => v.id === activeContentId) : null;
+    const activeGDriveVideo = activeContentId ? gdriveVideos.find(v => v.id === activeContentId) : null;
     
     const isVideoActive = 
         activeContent?.type === 'video' || 
         activeContent?.type === 'r2_video' || 
-        !!activeR2Video;
+        !!activeR2Video ||
+        !!activeGDriveVideo;
 
-    const videoCues = activeContent?.timelineCues || activeR2Video?.timelineCues || [];
+    const videoCues = activeContent?.timelineCues || activeR2Video?.timelineCues || activeGDriveVideo?.timelineCues || [];
 
     // --- Click-to-unmute: show hint when video starts playing muted ---
     useEffect(() => {

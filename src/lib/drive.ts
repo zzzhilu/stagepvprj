@@ -1,0 +1,15 @@
+import { google } from 'googleapis';
+
+export const getDriveAuth = () => {
+  return new google.auth.GoogleAuth({
+    credentials: {
+      client_email: process.env.GOOGLE_CLIENT_EMAIL,
+      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    },
+    scopes: ['https://www.googleapis.com/auth/drive.readonly'],
+  });
+};
+
+export const getDriveClient = () => {
+  return google.drive({ version: 'v3', auth: getDriveAuth() });
+};

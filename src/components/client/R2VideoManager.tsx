@@ -290,7 +290,13 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
         });
     };
 
-    const renderVideo = (video: R2Video) => (
+    const renderVideo = (video: R2Video) => {
+        const formatDisplayName = (name: string) => {
+            let formatted = name.replace(/\.[^.]+$/, ''); 
+            formatted = formatted.replace(/[_\-\s]?cue\s*\d+[_\-\s]?/gi, ' ').replace(/\s+/g, ' ').trim(); 
+            return formatted || name.replace(/\.[^.]+$/, ''); 
+        };
+        return (
         <div
             key={video.id}
             className="flex flex-col gap-3 p-3 bg-gray-900/50 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors"
@@ -313,8 +319,8 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
 
                 {/* Video Info */}
                 <div className="flex-1 min-w-0">
-                    <div className="text-white text-sm font-medium truncate">
-                        {video.filename}
+                    <div className="text-white text-sm font-medium truncate" title={video.filename}>
+                        {formatDisplayName(video.filename)}
                     </div>
                     <div className="text-gray-500 text-xs truncate">
                         {formatDate(video.uploadedAt)}
@@ -392,6 +398,7 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
             </div>
         </div>
     );
+    }
 
     return (
         <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">

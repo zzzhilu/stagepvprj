@@ -50,6 +50,13 @@ function computeWorldTransform(
     return { pos: worldPos, rot: worldRot, scale: inst.scale };
 }
 
+const globalImageTextureCache: Record<string, THREE.Texture> = {};
+const globalGifCache: Record<string, {
+    fullFrames: { imageData: ImageData; delay: number }[];
+    gifWidth: number;
+    gifHeight: number;
+}> = {};
+
 export const StageObjectRenderer = forwardRef<THREE.Group, {
     object: StageObject;
     onClick?: (e: any) => void;
@@ -105,6 +112,10 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
             return;
         }
 
+        let currentTexture: THREE.VideoTexture | null = null;
+        let onSeeked: (() => void) | null = null;
+        let onTimeUpdate: (() => void) | null = null;
+
         // Wait for global video element to be available
         const checkVideo = setInterval(() => {
             if (globalVideoElement) {
@@ -122,13 +133,39 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                 // texture.offset.x = 1;
 
                 setVideoTexture(texture);
+                currentTexture = texture;
+
+                // Force update on seek or manual time change when paused
+                onSeeked = () => {
+                    if (currentTexture && globalVideoElement?.paused) {
+                        currentTexture.needsUpdate = true;
+                    }
+                };
+                
+                onTimeUpdate = () => {
+                    if (currentTexture && globalVideoElement?.paused) {
+                        currentTexture.needsUpdate = true;
+                    }
+                };
+
+                globalVideoElement.addEventListener('seeked', onSeeked);
+                globalVideoElement.addEventListener('timeupdate', onTimeUpdate);
+
                 console.log('Video texture created from global video element');
             }
         }, 100);
 
         return () => {
             clearInterval(checkVideo);
-            if (videoTexture) {
+            if (onSeeked && globalVideoElement) {
+                globalVideoElement.removeEventListener('seeked', onSeeked);
+            }
+            if (onTimeUpdate && globalVideoElement) {
+                globalVideoElement.removeEventListener('timeupdate', onTimeUpdate);
+            }
+            if (currentTexture) {
+                currentTexture.dispose();
+            } else if (videoTexture) { // Fallback just in case
                 videoTexture.dispose();
             }
         };
@@ -138,9 +175,15 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     const imageTexture = useMemo(() => {
         if (!activeTexture || activeTexture.type !== 'image') return null;
 
-        console.log('Loading image texture from:', activeTexture.file_path);
+        const url = activeTexture.file_path;
+        if (globalImageTextureCache[url]) {
+            console.log('Using cached image texture for:', url);
+            return globalImageTextureCache[url];
+        }
+
+        console.log('Loading image texture from:', url);
         const texture = new THREE.TextureLoader().load(
-            activeTexture.file_path,
+            url,
             (tex) => {
                 console.log('Image texture loaded successfully', tex);
             },
@@ -157,6 +200,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         texture.magFilter = THREE.LinearFilter;
         texture.flipY = false; // Important: GLTF uses top-left origin
 
+        globalImageTextureCache[url] = texture;
         return texture;
     }, [activeTexture?.type, activeTexture?.file_path]);
 
@@ -186,51 +230,64 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
 
         (async () => {
             try {
-                // Fetch GIF as binary
-                const response = await fetch(activeTexture.file_path);
-                const buffer = await response.arrayBuffer();
-                if (cancelled) return;
+                const url = activeTexture.file_path;
+                let fullFrames: { imageData: ImageData; delay: number }[] = [];
+                let gifWidth = 0;
+                let gifHeight = 0;
 
-                // Decode with gifuct-js
-                const gif = parseGIF(buffer);
-                const rawFrames = decompressFrames(gif, true);
-                if (cancelled || rawFrames.length === 0) return;
+                if (globalGifCache[url]) {
+                    console.log('Using cached GIF data for:', url);
+                    const cached = globalGifCache[url];
+                    fullFrames = cached.fullFrames;
+                    gifWidth = cached.gifWidth;
+                    gifHeight = cached.gifHeight;
+                } else {
+                    // Fetch GIF as binary
+                    const response = await fetch(url);
+                    const buffer = await response.arrayBuffer();
+                    if (cancelled) return;
 
-                const gifWidth = gif.lsd.width;
-                const gifHeight = gif.lsd.height;
+                    // Decode with gifuct-js
+                    const gif = parseGIF(buffer);
+                    const rawFrames = decompressFrames(gif, true);
+                    if (cancelled || rawFrames.length === 0) return;
 
-                // Pre-render all frames with proper disposal handling
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = gifWidth;
-                tempCanvas.height = gifHeight;
-                const tempCtx = tempCanvas.getContext('2d')!;
+                    gifWidth = gif.lsd.width;
+                    gifHeight = gif.lsd.height;
 
-                const fullFrames: { imageData: ImageData; delay: number }[] = [];
+                    // Pre-render all frames with proper disposal handling
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = gifWidth;
+                    tempCanvas.height = gifHeight;
+                    const tempCtx = tempCanvas.getContext('2d')!;
 
-                for (let i = 0; i < rawFrames.length; i++) {
-                    const frame = rawFrames[i];
+                    for (let i = 0; i < rawFrames.length; i++) {
+                        const frame = rawFrames[i];
 
-                    // Handle disposal of previous frame
-                    if (i > 0) {
-                        const prev = rawFrames[i - 1];
-                        if (prev.disposalType === 2) {
-                            tempCtx.clearRect(prev.dims.left, prev.dims.top, prev.dims.width, prev.dims.height);
+                        // Handle disposal of previous frame
+                        if (i > 0) {
+                            const prev = rawFrames[i - 1];
+                            if (prev.disposalType === 2) {
+                                tempCtx.clearRect(prev.dims.left, prev.dims.top, prev.dims.width, prev.dims.height);
+                            }
                         }
+
+                        // Composite this frame's patch onto the canvas
+                        const frameImageData = tempCtx.createImageData(frame.dims.width, frame.dims.height);
+                        frameImageData.data.set(frame.patch);
+                        tempCtx.putImageData(frameImageData, frame.dims.left, frame.dims.top);
+
+                        // Save full canvas state as this frame
+                        fullFrames.push({
+                            imageData: tempCtx.getImageData(0, 0, gifWidth, gifHeight),
+                            delay: Math.max(frame.delay, 20), // Minimum 20ms
+                        });
                     }
+                    
+                    if (cancelled) return;
 
-                    // Composite this frame's patch onto the canvas
-                    const frameImageData = tempCtx.createImageData(frame.dims.width, frame.dims.height);
-                    frameImageData.data.set(frame.patch);
-                    tempCtx.putImageData(frameImageData, frame.dims.left, frame.dims.top);
-
-                    // Save full canvas state as this frame
-                    fullFrames.push({
-                        imageData: tempCtx.getImageData(0, 0, gifWidth, gifHeight),
-                        delay: Math.max(frame.delay, 20), // Minimum 20ms
-                    });
+                    globalGifCache[url] = { fullFrames, gifWidth, gifHeight };
                 }
-
-                if (cancelled) return;
 
                 // Create display canvas and texture
                 const canvas = document.createElement('canvas');
@@ -253,7 +310,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                 gifLastTimeRef.current = performance.now();
                 gifTextureRef.current = texture;
                 setGifReady(true);
-                console.log(`GIF decoded: ${fullFrames.length} frames, ${gifWidth}x${gifHeight}`);
+                console.log(`GIF loaded and prepared: ${fullFrames.length} frames, ${gifWidth}x${gifHeight}`);
             } catch (err) {
                 console.error('GIF decode error:', err);
             }
@@ -293,11 +350,32 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     });
 
     // Select active texture map - support 'video', 'r2_video', and 'gif' types
-    const textureMap = (activeTexture?.type === 'video' || activeTexture?.type === 'r2_video')
+    const rawTextureMap = (activeTexture?.type === 'video' || activeTexture?.type === 'r2_video')
         ? videoTexture
         : activeTexture?.type === 'gif'
             ? (gifReady ? gifTextureRef.current : null)
             : imageTexture;
+
+    // Clone texture map to apply per-object property offsets/repeats and filter by targetNodeId
+    const textureMap = useMemo(() => {
+        if (!rawTextureMap) return null;
+        if (activeTexture?.targetNodeId && activeTexture.targetNodeId !== object.id) {
+            return null;
+        }
+
+        const cloned = rawTextureMap.clone();
+        
+        const w = activeTexture?.width ?? 1;
+        const h = activeTexture?.height ?? 1;
+        const x = activeTexture?.x ?? 0;
+        const y = activeTexture?.y ?? 0;
+
+        cloned.repeat.set(w, h);
+        cloned.offset.set(x, y);
+        cloned.needsUpdate = true;
+
+        return cloned;
+    }, [rawTextureMap, activeTexture, object.id]);
 
     // Floor plan texture
     const floorPlanTexture = useMemo(() => {

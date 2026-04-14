@@ -100,6 +100,8 @@ export default function VideoProgressEditorPage() {
     const setCues = useStore(state => state.setCues);
     const setR2Videos = useStore(state => state.setR2Videos);
     const setVideoFolders = useStore(state => state.setVideoFolders);
+    const setGDriveVideos = useStore(state => state.setGDriveVideos);
+    const setAllGDriveFolders = useStore(state => state.setAllGDriveFolders);
     const setFloorPlanTexture = useStore(state => state.setFloorPlanTexture);
     const setMode = useStore(state => state.setMode);
     // Lighting settings sync
@@ -126,6 +128,8 @@ export default function VideoProgressEditorPage() {
     const cues = useStore(state => state.cues);
     const r2Videos = useStore(state => state.r2Videos);
     const videoFolders = useStore(state => state.videoFolders);
+    const gdriveVideos = useStore(state => state.gdriveVideos);
+    const gdriveFolders = useStore(state => state.gdriveFolders);
     const floorPlanTextureUrl = useStore(state => state.floorPlanTextureUrl);
     const ambientIntensity = useStore(state => state.ambientIntensity);
     const directionalIntensity = useStore(state => state.directionalIntensity);
@@ -170,6 +174,8 @@ export default function VideoProgressEditorPage() {
                 if (data.cues) setCues(data.cues);
                 if (data.r2Videos) setR2Videos(data.r2Videos);
                 if (data.videoFolders) setVideoFolders(data.videoFolders);
+                if (data.gdriveVideos) setGDriveVideos(data.gdriveVideos);
+                if (data.gdriveFolders) setAllGDriveFolders(data.gdriveFolders);
                 if (data.floorPlanTextureUrl !== undefined) setFloorPlanTexture(data.floorPlanTextureUrl);
                 // Restore lighting settings from project
                 if (data.ambientIntensity !== undefined) setAmbientIntensity(data.ambientIntensity);
@@ -207,6 +213,8 @@ export default function VideoProgressEditorPage() {
                 cues,
                 r2Videos,
                 videoFolders,
+                gdriveVideos,
+                gdriveFolders,
                 floorPlanTextureUrl,
                 // Lighting settings
                 ambientIntensity,
@@ -227,7 +235,7 @@ export default function VideoProgressEditorPage() {
         } catch (error) {
             console.error('Save failed:', error);
         }
-    }, [projectId, stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness]);
+    }, [projectId, stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness]);
 
     // Auto-save effect (debounced)
     useEffect(() => {
@@ -244,6 +252,8 @@ export default function VideoProgressEditorPage() {
                     cues,
                     r2Videos,
                     videoFolders,
+                    gdriveVideos,
+                    gdriveFolders,
                     floorPlanTextureUrl,
                     // Lighting settings
                     ambientIntensity,
@@ -267,7 +277,7 @@ export default function VideoProgressEditorPage() {
         }, 2000); // Debounce 2 seconds
 
         return () => clearTimeout(timeoutId);
-    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, isAuthenticated, isLoading, projectId]);
+    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, isAuthenticated, isLoading, projectId]);
 
     // Show loading while checking auth
     if (isChecking) {

@@ -228,7 +228,7 @@ function StageLightCard({ light }: { light: StageLight }) {
                             <option value="">無 (獨立)</option>
                             {stageObjects.map(obj => (
                                 <option key={obj.id} value={obj.id}>
-                                    {obj.model_path.split('/').pop()?.replace('.glb', '') || obj.id.slice(0, 8)}
+                                    {obj.model_path?.split('/').pop()?.replace('.glb', '') || `[${obj.type}] ${obj.id.slice(0, 8)}`}
                                 </option>
                             ))}
                         </select>

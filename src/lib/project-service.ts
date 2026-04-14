@@ -13,6 +13,8 @@ export interface ProjectState {
     cues?: any[]; // Store cues
     r2Videos?: R2Video[]; // R2 videos for Image Progress
     videoFolders?: any[];
+    gdriveVideos?: any[]; // GDrive videos
+    gdriveFolders?: Record<string, string>; // GDrive folders mapping
     floorPlanTextureUrl?: string | null;
     // Lighting & Post-processing settings (synced to client)
     ambientIntensity?: number;
@@ -38,6 +40,15 @@ export interface ProjectSummary {
     name: string;
     createdAt: any;
     updatedAt: any;
+}
+
+/**
+ * Recursively strip `undefined` values from an object.
+ * Firestore updateDoc() rejects any field whose value is `undefined`.
+ * JSON.parse(JSON.stringify()) naturally drops `undefined` keys.
+ */
+function stripUndefined<T>(obj: T): T {
+    return JSON.parse(JSON.stringify(obj));
 }
 
 export const ProjectService = {
@@ -93,7 +104,7 @@ export const ProjectService = {
         try {
             const docRef = doc(db, 'projects', id);
             await updateDoc(docRef, {
-                ...state,
+                ...stripUndefined(state),
                 updatedAt: serverTimestamp(),
             });
         } catch (error) {

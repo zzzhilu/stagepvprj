@@ -179,6 +179,17 @@ export function VideoManager() {
 
         const videoUrl = activeVideo.file_path;
 
+        const attemptPlay = () => {
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(err => {
+                    console.warn('Playback blocked on load:', err);
+                    video.muted = true;
+                    video.play().catch(e => console.error('Fallback muted play failed:', e));
+                });
+            }
+        };
+
         // Check if HLS stream
         if (isHlsUrl(videoUrl)) {
             if (Hls.isSupported()) {
@@ -193,7 +204,7 @@ export function VideoManager() {
                 hls.attachMedia(video);
 
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                    video.play().catch(err => console.warn('HLS autoplay blocked:', err));
+                    attemptPlay();
                 });
 
                 hls.on(Hls.Events.ERROR, (event, data) => {
@@ -218,15 +229,19 @@ export function VideoManager() {
                 // Native HLS support (Safari)
                 video.src = videoUrl;
                 video.addEventListener('loadedmetadata', () => {
-                    video.play().catch(err => console.warn('Native HLS autoplay blocked:', err));
+                    attemptPlay();
                 });
             } else {
                 console.error('HLS not supported in this browser');
             }
         } else {
             // Non-HLS video (MP4, etc.)
+            // Wait for canplay before attempting playback — critical for proxy-streamed
+            // GDrive URLs that need time to fetch initial metadata.
+            video.addEventListener('canplay', () => {
+                attemptPlay();
+            }, { once: true });
             video.src = videoUrl;
-            video.play().catch(err => console.warn('Video autoplay blocked:', err));
         }
 
         return () => {
@@ -249,13 +264,25 @@ export function VideoManager() {
         if (!videoRef.current || cameraStreamActive) return;
 
         if (videoPlaying) {
-            // Unmute after user interaction (play button)
+            // Apply volume before playing
+            videoRef.current.volume = videoVolume;
             videoRef.current.muted = videoVolume === 0;
-            videoRef.current.play().catch(err => console.warn('Video play error:', err));
+            
+            const playPromise = videoRef.current.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(err => {
+                    console.warn('Video play error (possibly autoplay policy):', err);
+                    // Fallback to muted playback if browser blocks unmuted audio
+                    if (videoRef.current) {
+                        videoRef.current.muted = true;
+                        videoRef.current.play().catch(e => console.warn('Fallback play failed:', e));
+                    }
+                });
+            }
         } else {
             videoRef.current.pause();
         }
-    }, [videoPlaying, videoVolume, cameraStreamActive]);
+    }, [videoPlaying, videoVolume, cameraStreamActive, activeVideo?.file_path]);
 
     // Handle volume changes (only for content videos)
     useEffect(() => {
@@ -263,7 +290,25 @@ export function VideoManager() {
 
         videoRef.current.volume = videoVolume;
         videoRef.current.muted = videoVolume === 0;
-    }, [videoVolume, cameraStreamActive]);
+    }, [videoVolume, cameraStreamActive, activeVideo?.file_path]);
+
+    // Global interaction listener: unmute video if it was forcefully muted by browser policy
+    useEffect(() => {
+        const handleInteraction = () => {
+            if (videoRef.current && videoRef.current.muted && videoVolume > 0 && videoPlaying) {
+                videoRef.current.muted = false;
+                videoRef.current.volume = videoVolume;
+            }
+        };
+
+        window.addEventListener('pointerdown', handleInteraction, { capture: true });
+        window.addEventListener('keydown', handleInteraction, { capture: true });
+
+        return () => {
+            window.removeEventListener('pointerdown', handleInteraction, { capture: true });
+            window.removeEventListener('keydown', handleInteraction, { capture: true });
+        };
+    }, [videoVolume, videoPlaying, activeVideo?.file_path]);
 
     return null; // This is a non-visual component
 }
