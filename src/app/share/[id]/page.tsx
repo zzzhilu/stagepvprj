@@ -31,8 +31,12 @@ function SharePageContent() {
     const [projectName, setProjectName] = useState('');
     const [videoFilename, setVideoFilename] = useState('');
 
-    // Helper: strip file extension from display name
-    const stripExtension = (name: string) => name.replace(/\.[^.]+$/, '');
+    // Helper: format display name
+    const formatDisplayName = (name: string) => {
+        let formatted = name.replace(/\.[^.]+$/, ''); 
+        formatted = formatted.replace(/[_\-\s]?cue\s*\d+[_\-\s]?/gi, ' ').replace(/\s+/g, ' ').trim(); 
+        return formatted || name.replace(/\.[^.]+$/, ''); 
+    };
 
     // Get store methods
     const activeContentId = useStore(state => state.activeContentId);
@@ -129,7 +133,7 @@ function SharePageContent() {
                     return;
                 }
 
-                setVideoFilename(stripExtension(video.filename));
+                setVideoFilename(formatDisplayName(video.filename));
 
                 // Detect if this is an image based on file extension
                 const urlToCheck = isR2 ? video.r2_url : video.filename;
@@ -165,7 +169,7 @@ function SharePageContent() {
                 }
 
                 if (firstVideo) {
-                    setVideoFilename(stripExtension(firstVideo.filename));
+                    setVideoFilename(formatDisplayName(firstVideo.filename));
 
                     const urlToCheck = isR2 ? firstVideo.r2_url : firstVideo.filename;
                     // Detect if this is an image
@@ -246,7 +250,7 @@ function SharePageContent() {
     }
 
     const activeTexture = contentTextures?.find((c: any) => c.id === activeContentId);
-    const displayVideoFilename = activeTexture?.name ? stripExtension(activeTexture.name) : videoFilename;
+    const displayVideoFilename = activeTexture?.name ? formatDisplayName(activeTexture.name) : videoFilename;
 
     return (
         <main className="relative w-full h-full">

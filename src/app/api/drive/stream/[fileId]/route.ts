@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDriveClient } from '@/lib/drive';
 
+export async function OPTIONS(request: NextRequest) {
+  const headers = new Headers();
+  headers.set('Access-Control-Allow-Origin', '*');
+  headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  headers.set('Access-Control-Allow-Headers', 'Origin, Range, Accept-Ranges, Content-Type');
+  return new NextResponse(null, { status: 204, headers });
+}
+
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ fileId: string }> }
@@ -14,8 +22,8 @@ export async function GET(
     let metadata;
     try {
         metadata = await drive.files.get({
-        fileId,
-        fields: 'size, mimeType',
+            fileId,
+            fields: 'size, mimeType',
         });
     } catch (e) {
         console.error("Failed to get metadata for", fileId, e);
@@ -23,7 +31,10 @@ export async function GET(
     }
 
     const fileSize = parseInt(metadata.data.size || '0', 10);
-    const mimeType = metadata.data.mimeType || 'video/mp4';
+    
+    // Coerce octet-stream to video/mp4 to ensure HTMLVideoElement plays it
+    const rawMimeType = metadata.data.mimeType || 'video/mp4';
+    const mimeType = rawMimeType === 'application/octet-stream' ? 'video/mp4' : rawMimeType;
 
     // 2. Parse Range header
     const rangeHeader = request.headers.get('range');
@@ -41,7 +52,8 @@ export async function GET(
         return new NextResponse("Requested Range Not Satisfiable", {
             status: 416,
             headers: {
-                "Content-Range": `bytes */${fileSize}`
+                "Content-Range": `bytes */${fileSize}`,
+                "Access-Control-Allow-Origin": "*"
             }
         });
       }
@@ -49,36 +61,69 @@ export async function GET(
 
     const chunkSize = (end - start) + 1;
 
-    // 3. Fetch stream from Google Drive with exact Range
-    const driveRes = await drive.files.get(
-      {
-        fileId,
-        alt: 'media',
-      },
-      {
-        responseType: 'stream',
-        headers: {
-          Range: `bytes=${start}-${end}`,
-        },
-      }
-    );
+    const driveReqHeaders: Record<string, string> = {};
+    if (rangeHeader) {
+        driveReqHeaders['Range'] = `bytes=${start}-${end}`;
+    }
 
-    // 4. Set headers for 206 Partial Content
+    // 3. Fetch stream from Google Drive with exact Range (uses axios/node http underlyingly)
+    let driveRes;
+    try {
+        driveRes = await drive.files.get(
+        {
+            fileId,
+            alt: 'media',
+            acknowledgeAbuse: true, // critical for large files so the API doesn't throw Abusive File error
+        },
+        {
+            responseType: 'stream',
+            headers: driveReqHeaders,
+        }
+        );
+    } catch (apiErr: any) {
+        console.error(`[Drive Stream] Google API Error:`, apiErr.message);
+        return new NextResponse(`Upstream Drive Error: ${apiErr.message}`, { status: apiErr.status || 500 });
+    }
+
+    // 4. Set Response Headers
     const headers = new Headers();
-    headers.set('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+    headers.set('Access-Control-Allow-Origin', '*');
+    headers.set('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges, Content-Type');
+    headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    
     headers.set('Accept-Ranges', 'bytes');
-    headers.set('Content-Length', chunkSize.toString());
     headers.set('Content-Type', mimeType);
+
+    // Disable caching directly for partial streams
+    headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    headers.set('Pragma', 'no-cache');
+    headers.set('Expires', '0');
+
+    let status = 200;
+    if (rangeHeader || driveRes.status === 206) {
+        status = 206;
+        const upstreamContentRange = driveRes.headers['content-range'];
+        headers.set('Content-Range', upstreamContentRange || `bytes ${start}-${end}/${fileSize}`);
+        
+        const upstreamContentLength = driveRes.headers['content-length'];
+        headers.set('Content-Length', upstreamContentLength || chunkSize.toString());
+    } else {
+        headers.set('Content-Length', driveRes.headers['content-length'] || fileSize.toString());
+    }
 
     // 5. Convert Node.js Readable to Web ReadableStream
     const reactReadable = new ReadableStream({
       start(controller) {
         driveRes.data.on('data', (chunk: Buffer) => {
-             // Use Uint8Array over Buffer for standard web stream
             controller.enqueue(new Uint8Array(chunk));
         });
         driveRes.data.on('end', () => controller.close());
-        driveRes.data.on('error', (err: Error) => controller.error(err));
+        driveRes.data.on('error', (err: any) => {
+            if (err?.message !== 'Premature close') {
+                console.error('[Drive Stream] Data transfer error:', err.message);
+            }
+            controller.error(err);
+        });
       },
       cancel() {
         if (driveRes.data && typeof driveRes.data.destroy === 'function') {
@@ -88,7 +133,7 @@ export async function GET(
     });
 
     return new NextResponse(reactReadable, {
-      status: 206,
+      status,
       headers,
     });
   } catch (error: any) {
