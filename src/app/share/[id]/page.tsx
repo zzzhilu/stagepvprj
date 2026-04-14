@@ -49,6 +49,7 @@ function SharePageContent() {
     const setCues = useStore(state => state.setCues);
     const setR2Videos = useStore(state => state.setR2Videos);
     const setGDriveVideos = useStore(state => state.setGDriveVideos);
+    const setAllGDriveFolders = useStore(state => state.setAllGDriveFolders);
     const addContentTexture = useStore(state => state.addContentTexture);
     const setVideoPlaying = useStore(state => state.setVideoPlaying);
     const applyCue = useStore(state => state.applyCue);
@@ -97,6 +98,7 @@ function SharePageContent() {
             if (data.cues) setCues(data.cues);
             if (data.r2Videos) setR2Videos(data.r2Videos);
             if (data.gdriveVideos) setGDriveVideos(data.gdriveVideos);
+            if (data.gdriveFolders) setAllGDriveFolders(data.gdriveFolders);
 
             // Restore lighting settings from project (if saved)
             if (data.ambientIntensity !== undefined) setAmbientIntensity(data.ambientIntensity);
