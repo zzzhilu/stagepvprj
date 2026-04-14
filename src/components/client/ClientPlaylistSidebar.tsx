@@ -80,10 +80,12 @@ export function ClientPlaylistSidebar({ projectId }: { projectId: string }) {
             }`} 
             style={{ width: '16rem' }}
         >
-            {/* 收合/展開按鈕 - 面板左側垂直置中，收合後靠窗邊 */}
+            {/* 收合/展開按鈕 - 面板左側垂直置中，收合後靠窗邊，收合時變暗 */}
             <button 
                 onClick={() => setIsOpen(!isOpen)}
-                className="absolute -left-6 top-1/2 -translate-y-1/2 z-10 bg-gray-800/80 backdrop-blur text-green-400 p-1 rounded-l-md shadow-[0_0_10px_rgba(0,0,0,0.4)] border border-r-0 border-green-500/40 hover:bg-gray-700 hover:border-green-400 transition-colors"
+                className={`absolute -left-6 top-1/2 -translate-y-1/2 z-10 bg-gray-800/80 backdrop-blur text-green-400 p-1 rounded-l-md shadow-[0_0_10px_rgba(0,0,0,0.4)] border border-r-0 border-green-500/40 hover:bg-gray-700 hover:border-green-400 transition-all duration-300 ${
+                    !isOpen ? 'opacity-50 hover:opacity-100' : 'opacity-100'
+                }`}
                 title={isOpen ? '收起播放列表' : '展開播放列表'}
             >
                 <svg 
