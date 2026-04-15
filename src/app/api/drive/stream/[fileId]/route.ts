@@ -94,10 +94,8 @@ export async function GET(
     headers.set('Accept-Ranges', 'bytes');
     headers.set('Content-Type', mimeType);
 
-    // Disable caching directly for partial streams
-    headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    headers.set('Pragma', 'no-cache');
-    headers.set('Expires', '0');
+    // Enable caching to reduce Vercel bandwidth — same video content is immutable
+    headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800');
 
     let status = 200;
     if (rangeHeader || driveRes.status === 206) {

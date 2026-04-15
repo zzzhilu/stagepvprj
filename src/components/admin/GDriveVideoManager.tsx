@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
+import { resolveGDriveUrl } from '@/lib/gdrive-direct';
 
 export function GDriveVideoManager({ projectId, onSave }: { projectId: string; onSave?: () => void }) {
     const [folderIdInput, setFolderIdInput] = useState('');
@@ -170,31 +171,45 @@ export function GDriveVideoManager({ projectId, onSave }: { projectId: string; o
         return () => clearInterval(intervalId);
     }, [currentFolderId, folderIdInput, projectId]);
 
-    const handlePlay = (video: any) => {
-        let texture = contentTextures.find(t => t.id === video.id);
+    const handlePlay = async (video: any) => {
+        const ext = video.filename.split('.').pop()?.toLowerCase() || '';
+        let resolvedType: 'image' | 'video' | 'gif' = 'video';
+        if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
+            resolvedType = 'image';
+        } else if (ext === 'gif') {
+            resolvedType = 'gif';
+        }
 
-        if (!texture) {
-            const ext = video.filename.split('.').pop()?.toLowerCase() || '';
-            let resolvedType: 'image' | 'video' | 'gif' = 'video';
-            if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
-                resolvedType = 'image';
-            } else if (ext === 'gif') {
-                resolvedType = 'gif';
-            }
+        // Resolve GDrive URL directly (bypasses Vercel bandwidth)
+        let filePath: string;
+        try {
+            filePath = await resolveGDriveUrl(video.driveFileId);
+        } catch {
+            filePath = `/api/drive/stream/${video.driveFileId}`;
+        }
 
-            texture = {
-                id: video.id,
-                name: video.filename,
-                file_path: `/api/drive/stream/${video.driveFileId}`,
-                type: resolvedType,
-            };
+        const texture = {
+            id: video.id,
+            name: video.filename,
+            file_path: filePath,
+            type: resolvedType,
+        };
+
+        // Always update the texture with the latest direct URL
+        let existing = contentTextures.find(t => t.id === video.id);
+        if (existing) {
+            // Update existing texture's file_path
+            const updated = contentTextures.map(t =>
+                t.id === video.id ? { ...t, file_path: filePath } : t
+            );
+            useStore.getState().setContentTextures(updated);
+        } else {
             addContentTexture(texture);
         }
 
         setActiveContent(video.id);
 
         // For video types, ensure video starts playing
-        const ext = video.filename.split('.').pop()?.toLowerCase() || '';
         if (!['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)) {
             setVideoPlaying(true);
         }

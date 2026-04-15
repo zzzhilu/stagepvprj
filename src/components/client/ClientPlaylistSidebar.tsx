@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
+import { resolveGDriveUrl } from '@/lib/gdrive-direct';
 
 export function ClientPlaylistSidebar({ projectId }: { projectId: string }) {
     const [isOpen, setIsOpen] = useState(true);
@@ -29,24 +30,31 @@ export function ClientPlaylistSidebar({ projectId }: { projectId: string }) {
     };
     const isImageFile = (filename: string) => /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(filename);
 
-    const handleVideoSelect = (video: any) => {
+    const handleVideoSelect = async (video: any) => {
         const isImage = isImageFile(video.filename);
 
         // Add to loading state
         setLoadingIds(prev => new Set(prev).add(video.id));
-        setTimeout(() => {
-            setLoadingIds(prev => {
-                const next = new Set(prev);
-                next.delete(video.id);
-                return next;
-            });
-        }, 1500);
+
+        // Resolve GDrive URL directly (bypasses Vercel bandwidth)
+        let filePath: string;
+        try {
+            filePath = await resolveGDriveUrl(video.driveFileId);
+        } catch {
+            filePath = `/api/drive/stream/${video.driveFileId}`;
+        }
+
+        setLoadingIds(prev => {
+            const next = new Set(prev);
+            next.delete(video.id);
+            return next;
+        });
 
         // 轉換為 contentTextures 能夠接受的格式
         const videoTexture = {
             id: video.id,
             name: video.filename,
-            file_path: `/api/drive/stream/${video.driveFileId}`,
+            file_path: filePath,
             type: (isImage ? 'image' : 'r2_video') as 'image' | 'r2_video',
         };
 

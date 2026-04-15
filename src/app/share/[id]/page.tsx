@@ -12,6 +12,7 @@ import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
 import { ClientPlaylistSidebar } from '@/components/client/ClientPlaylistSidebar';
+import { resolveGDriveUrl } from '@/lib/gdrive-direct';
 
 const Scene = dynamic(() => import('@/components/canvas/Scene'), {
     ssr: false,
@@ -142,13 +143,21 @@ function SharePageContent() {
                 const isImageFile = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(video.filename) ||
                     /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(urlToCheck);
 
+                // Resolve GDrive URL directly (bypasses Vercel bandwidth)
+                let filePath: string;
+                if (isR2) {
+                    filePath = video.r2_url;
+                } else {
+                    filePath = await resolveGDriveUrl(video.driveFileId);
+                }
+
                 const originalTexture = data.contentTextures?.find((c: any) => c.id === video.id);
                 // Create ContentTexture for the content
                 const videoTexture = {
                     ...originalTexture,
                     id: video.id,
                     name: video.filename,
-                    file_path: isR2 ? video.r2_url : `/api/drive/stream/${video.driveFileId}`,
+                    file_path: filePath,
                     type: (isImageFile ? 'image' : 'r2_video') as 'image' | 'r2_video',
                     timelineCues: video.timelineCues || originalTexture?.timelineCues,
                 };
@@ -178,12 +187,20 @@ function SharePageContent() {
                     const isFirstImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(firstVideo.filename) ||
                         /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(urlToCheck);
 
+                    // Resolve GDrive URL directly (bypasses Vercel bandwidth)
+                    let firstFilePath: string;
+                    if (isR2) {
+                        firstFilePath = firstVideo.r2_url;
+                    } else {
+                        firstFilePath = await resolveGDriveUrl(firstVideo.driveFileId);
+                    }
+
                     const originalTexture = data.contentTextures?.find((c: any) => c.id === firstVideo.id);
                     const videoTexture = {
                         ...originalTexture,
                         id: firstVideo.id,
                         name: firstVideo.filename,
-                        file_path: isR2 ? firstVideo.r2_url : `/api/drive/stream/${firstVideo.driveFileId}`,
+                        file_path: firstFilePath,
                         type: (isFirstImage ? 'image' : 'r2_video') as 'image' | 'r2_video',
                         timelineCues: firstVideo.timelineCues || originalTexture?.timelineCues,
                     };
