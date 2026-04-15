@@ -62,7 +62,11 @@ export async function GET(request: Request) {
     const resultData = { folder, videos };
     cache.set(folderId, { data: resultData, timestamp: Date.now() });
 
-    return NextResponse.json(resultData);
+    return NextResponse.json(resultData, {
+      headers: {
+        'Cache-Control': 'public, max-age=60, s-maxage=120, stale-while-revalidate=300',
+      },
+    });
   } catch (error: any) {
     console.error('Drive Sync Error:', error);
     return NextResponse.json({ error: `Failed to sync drive folder: ${error.message || error}` }, { status: error.status || 500 });

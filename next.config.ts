@@ -27,6 +27,16 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // Aggressive caching for static preset GLB models (they never change)
+      {
+        source: '/models/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
     ];
   },
 };
