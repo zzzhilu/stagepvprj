@@ -1,0 +1,8 @@
+name = "gdrive-stream"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+account_id = "5e872c2532e4f26f1c93a64ae8daeb23"
+
+# Secrets (set via `npx wrangler secret put`):
+# SA_CLIENT_EMAIL - Google Service Account email
+# SA_PRIVATE_KEY  - Google Service Account private key (PEM format)
