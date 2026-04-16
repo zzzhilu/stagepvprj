@@ -158,18 +158,7 @@ export function GDriveVideoManager({ projectId, onSave }: { projectId: string; o
         setTimeout(() => setCopiedId(null), 2000);
     };
 
-    // Auto-polling effect for background sync
-    useEffect(() => {
-        if (!currentFolderId) return;
 
-        // Poll every 2 minutes (120,000 ms)
-        const intervalId = setInterval(() => {
-            console.log('Auto-polling GDrive folder...', currentFolderId);
-            handleSync(true); // Pass true to use auto mode
-        }, 120000);
-
-        return () => clearInterval(intervalId);
-    }, [currentFolderId, folderIdInput, projectId]);
 
     const handlePlay = async (video: any) => {
         const ext = video.filename.split('.').pop()?.toLowerCase() || '';
@@ -268,7 +257,7 @@ export function GDriveVideoManager({ projectId, onSave }: { projectId: string; o
                     <div>
                         <span className="text-xs text-gray-400">目前綁定資料夾: </span>
                         <span className="text-xs text-violet-300 font-mono">{currentFolderId}</span>
-                        <span className="ml-2 text-[10px] text-green-400">每2分鐘自動重新整理</span>
+                        <span className="ml-2 text-[10px] text-gray-400">手動同步模式</span>
                     </div>
                     <button
                         onClick={() => handleSync(false)}

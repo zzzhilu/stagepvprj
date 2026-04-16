@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
 import { resolveGDriveUrl } from '@/lib/gdrive-direct';
+import { ProjectService } from '@/lib/project-service';
 
 export function ClientPlaylistSidebar({ projectId }: { projectId: string }) {
     const [isOpen, setIsOpen] = useState(true);
@@ -156,6 +157,11 @@ export function ClientPlaylistSidebar({ projectId }: { projectId: string }) {
                 const updatedVideos = [...otherVideos, ...newVideos];
                 
                 currentState.setGDriveVideos(updatedVideos);
+
+                // Write updated video list back to Firestore so admin backend stays in sync
+                ProjectService.updateProject(projectId, { gdriveVideos: updatedVideos }).catch(err =>
+                    console.warn('Client sync write-back failed (non-critical):', err)
+                );
 
                 // Auto-play the first video if this is initial load
                 if (!hasAutoPlayed && newVideos.length > 0) {

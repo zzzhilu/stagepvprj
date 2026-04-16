@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDriveAuth, getDriveClient } from '@/lib/drive';
+import { Readable } from 'stream';
 
 export async function OPTIONS(request: NextRequest) {
   const headers = new Headers();
@@ -7,30 +8,6 @@ export async function OPTIONS(request: NextRequest) {
   headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
   headers.set('Access-Control-Allow-Headers', 'Origin, Range, Accept-Ranges, Content-Type');
   return new NextResponse(null, { status: 204, headers });
-}
-
-/**
- * In-memory cache for access tokens (they last 1 hour, we cache for 50 min)
- */
-let cachedToken: { token: string; expiry: number } | null = null;
-
-async function getAccessToken(): Promise<string> {
-  if (cachedToken && Date.now() < cachedToken.expiry) {
-    return cachedToken.token;
-  }
-
-  const auth = getDriveAuth();
-  const client = await auth.getClient();
-  const tokenResponse = await client.getAccessToken();
-  const token = typeof tokenResponse === 'string' ? tokenResponse : tokenResponse.token;
-  
-  if (!token) {
-    throw new Error('Failed to obtain access token');
-  }
-
-  // Cache for 50 minutes (tokens last 60 min)
-  cachedToken = { token, expiry: Date.now() + 50 * 60 * 1000 };
-  return token;
 }
 
 /**
@@ -48,10 +25,11 @@ export async function GET(
     const params = await context.params;
     const fileId = params.fileId;
 
+    const drive = getDriveClient();
+
     // --- 1. Get file metadata (cached) ---
     let meta = metaCache.get(fileId);
     if (!meta || Date.now() - meta.ts > META_TTL) {
-      const drive = getDriveClient();
       try {
         const metadataRes = await drive.files.get({
           fileId,
@@ -70,33 +48,79 @@ export async function GET(
       }
     }
 
-    // --- 2. Build 302 redirect URL to Google Drive ---
-    const accessToken = await getAccessToken();
+    const { mimeType, size: fileSize } = meta;
 
-    // Google Drive direct download URL with auth
-    const redirectUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&acknowledgeAbuse=true&access_token=${accessToken}`;
+    // --- 2. Handle Range requests for video seeking ---
+    const rangeHeader = request.headers.get('range');
 
-    // --- 3. Return 302 redirect ---
-    // The browser's <video> element will automatically follow the redirect
-    // and send Range headers directly to Google's servers.
-    // This means Vercel only serves ~500 bytes (the redirect response),
-    // NOT the entire video file.
-    const headers = new Headers();
-    headers.set('Location', redirectUrl);
-    headers.set('Access-Control-Allow-Origin', '*');
-    headers.set('Access-Control-Expose-Headers', 'Location');
-    headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
-    
-    // Cache the redirect itself for 50 minutes (matches token TTL).
-    // Browsers will reuse this redirect URL without hitting Vercel again.
-    headers.set('Cache-Control', 'public, max-age=3000, s-maxage=3000');
+    if (rangeHeader && fileSize > 0) {
+      const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+      if (match) {
+        const start = parseInt(match[1], 10);
+        const end = match[2] ? parseInt(match[2], 10) : Math.min(start + 5 * 1024 * 1024 - 1, fileSize - 1);
+        const chunkSize = end - start + 1;
 
-    return new NextResponse(null, {
-      status: 302,
-      headers,
+        const rangeRes = await drive.files.get(
+          { fileId, alt: 'media' },
+          {
+            responseType: 'stream',
+            headers: { Range: `bytes=${start}-${end}` },
+          }
+        );
+
+        const nodeStream = rangeRes.data as unknown as Readable;
+        const webStream = new ReadableStream({
+          start(controller) {
+            nodeStream.on('data', (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
+            nodeStream.on('end', () => controller.close());
+            nodeStream.on('error', (err: Error) => controller.error(err));
+          },
+        });
+
+        return new NextResponse(webStream, {
+          status: 206,
+          headers: {
+            'Content-Type': mimeType,
+            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+            'Content-Length': chunkSize.toString(),
+            'Accept-Ranges': 'bytes',
+            'Access-Control-Allow-Origin': '*',
+            'Cross-Origin-Resource-Policy': 'cross-origin',
+            'Cache-Control': 'public, max-age=3600, s-maxage=86400',
+          },
+        });
+      }
+    }
+
+    // --- 3. Full file request (no Range) ---
+    const fullRes = await drive.files.get(
+      { fileId, alt: 'media' },
+      { responseType: 'stream' }
+    );
+
+    const nodeStream = fullRes.data as unknown as Readable;
+    const webStream = new ReadableStream({
+      start(controller) {
+        nodeStream.on('data', (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
+        nodeStream.on('end', () => controller.close());
+        nodeStream.on('error', (err: Error) => controller.error(err));
+      },
     });
+
+    const headers: Record<string, string> = {
+      'Content-Type': mimeType,
+      'Accept-Ranges': 'bytes',
+      'Access-Control-Allow-Origin': '*',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+      'Cache-Control': 'public, max-age=3600, s-maxage=86400',
+    };
+    if (fileSize > 0) {
+      headers['Content-Length'] = fileSize.toString();
+    }
+
+    return new NextResponse(webStream, { status: 200, headers });
   } catch (error: any) {
-    console.error('Drive Redirect Error:', error);
-    return NextResponse.json({ error: 'Failed to redirect to video' }, { status: error.status || 500 });
+    console.error('Drive Stream Error:', error);
+    return NextResponse.json({ error: 'Failed to stream file' }, { status: error.status || 500 });
   }
 }
