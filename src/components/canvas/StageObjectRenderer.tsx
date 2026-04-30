@@ -67,6 +67,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     const activeContentId = useStore((state) => state.activeContentId);
     const stageObjects = useStore((state) => state.stageObjects);
     const floorPlanTextureUrl = useStore((state) => state.floorPlanTextureUrl);
+    const cameraStreamActive = useStore((state) => state.cameraStreamActive);
     const [videoTexture, setVideoTexture] = useState<THREE.VideoTexture | null>(null);
 
     // Animation refs for smooth lerping
@@ -102,9 +103,12 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     }, [contentTextures, activeContentId]);
 
     // Create and manage video texture using global video element
+    // Supports both content videos AND camera stream
     useEffect(() => {
-        // Support both 'video' and 'r2_video' types
-        if (!activeTexture || (activeTexture.type !== 'video' && activeTexture.type !== 'r2_video')) {
+        const isContentVideo = activeTexture && (activeTexture.type === 'video' || activeTexture.type === 'r2_video');
+
+        // Need either a content video OR an active camera stream
+        if (!isContentVideo && !cameraStreamActive) {
             if (videoTexture) {
                 videoTexture.dispose();
                 setVideoTexture(null);
@@ -118,7 +122,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
 
         // Wait for global video element to be available
         const checkVideo = setInterval(() => {
-            if (globalVideoElement) {
+            if (globalVideoElement && globalVideoElement.readyState >= 1) {
                 clearInterval(checkVideo);
                 const texture = new THREE.VideoTexture(globalVideoElement);
                 texture.colorSpace = THREE.SRGBColorSpace;
@@ -128,30 +132,28 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                 texture.magFilter = THREE.LinearFilter;
                 texture.flipY = false;
 
-                // Flip horizontally (mirror U coordinate) - REMOVED per user request
-                // texture.repeat.x = -1;
-                // texture.offset.x = 1;
-
                 setVideoTexture(texture);
                 currentTexture = texture;
 
-                // Force update on seek or manual time change when paused
-                onSeeked = () => {
-                    if (currentTexture && globalVideoElement?.paused) {
-                        currentTexture.needsUpdate = true;
-                    }
-                };
-                
-                onTimeUpdate = () => {
-                    if (currentTexture && globalVideoElement?.paused) {
-                        currentTexture.needsUpdate = true;
-                    }
-                };
+                // Force update on seek or manual time change when paused (content videos only)
+                if (!cameraStreamActive) {
+                    onSeeked = () => {
+                        if (currentTexture && globalVideoElement?.paused) {
+                            currentTexture.needsUpdate = true;
+                        }
+                    };
+                    
+                    onTimeUpdate = () => {
+                        if (currentTexture && globalVideoElement?.paused) {
+                            currentTexture.needsUpdate = true;
+                        }
+                    };
 
-                globalVideoElement.addEventListener('seeked', onSeeked);
-                globalVideoElement.addEventListener('timeupdate', onTimeUpdate);
+                    globalVideoElement.addEventListener('seeked', onSeeked);
+                    globalVideoElement.addEventListener('timeupdate', onTimeUpdate);
+                }
 
-                console.log('Video texture created from global video element');
+                console.log('[StageObject] Video texture created —', cameraStreamActive ? 'CAMERA' : 'CONTENT');
             }
         }, 100);
 
@@ -169,7 +171,8 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                 videoTexture.dispose();
             }
         };
-    }, [activeTexture?.type, activeTexture?.file_path]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTexture?.type, activeTexture?.file_path, cameraStreamActive]);
 
     // Create static image texture (for non-GIF images)
     const imageTexture = useMemo(() => {
@@ -349,33 +352,42 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         }
     });
 
-    // Select active texture map - support 'video', 'r2_video', and 'gif' types
-    const rawTextureMap = (activeTexture?.type === 'video' || activeTexture?.type === 'r2_video')
-        ? videoTexture
-        : activeTexture?.type === 'gif'
-            ? (gifReady ? gifTextureRef.current : null)
-            : imageTexture;
+    // Select active texture map - support 'video', 'r2_video', 'gif', and camera stream
+    const rawTextureMap = cameraStreamActive
+        ? videoTexture  // Camera stream takes priority
+        : (activeTexture?.type === 'video' || activeTexture?.type === 'r2_video')
+            ? videoTexture
+            : activeTexture?.type === 'gif'
+                ? (gifReady ? gifTextureRef.current : null)
+                : imageTexture;
 
     // Clone texture map to apply per-object property offsets/repeats and filter by targetNodeId
     const textureMap = useMemo(() => {
         if (!rawTextureMap) return null;
-        if (activeTexture?.targetNodeId && activeTexture.targetNodeId !== object.id) {
+        // Skip targetNodeId filter when camera is active (camera goes to all LEDs)
+        if (!cameraStreamActive && activeTexture?.targetNodeId && activeTexture.targetNodeId !== object.id) {
             return null;
         }
 
         const cloned = rawTextureMap.clone();
         
-        const w = activeTexture?.width ?? 1;
-        const h = activeTexture?.height ?? 1;
-        const x = activeTexture?.x ?? 0;
-        const y = activeTexture?.y ?? 0;
+        if (cameraStreamActive) {
+            // Camera mode: horizontal mirror flip
+            cloned.repeat.set(-1, 1);
+            cloned.offset.set(1, 0);
+        } else {
+            const w = activeTexture?.width ?? 1;
+            const h = activeTexture?.height ?? 1;
+            const x = activeTexture?.x ?? 0;
+            const y = activeTexture?.y ?? 0;
 
-        cloned.repeat.set(w, h);
-        cloned.offset.set(x, y);
+            cloned.repeat.set(w, h);
+            cloned.offset.set(x, y);
+        }
         cloned.needsUpdate = true;
 
         return cloned;
-    }, [rawTextureMap, activeTexture, object.id]);
+    }, [rawTextureMap, activeTexture, object.id, cameraStreamActive]);
 
     // Floor plan texture
     const floorPlanTexture = useMemo(() => {

@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { useMemo, useEffect, useRef, forwardRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 
+
 // ═══════════════════════════════════════════════════════════════
 // Projection Screen Renderer (投影紗)
 // - PlaneGeometry with pivot at bottom edge (for roll-up/down via scaleY)
@@ -201,7 +202,7 @@ export const ProjectionScreenRenderer = forwardRef<THREE.Group, {
         }
     }, [forwardedRef]);
 
-    // Material — projection screen shader or fallback
+    // ═══ Base Material — projection screen shader or fallback ═══
     const material = useMemo(() => {
         switch (renderMode) {
             case 'wireframe':
