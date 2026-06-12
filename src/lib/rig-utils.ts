@@ -100,6 +100,8 @@ export function rigDelta(
         if (targetType === 'object' && (rig.instanceIndex ?? 0) !== (instanceIndex ?? 0)) continue;
 
         const raw = rigValues[rig.id] ?? rig.defaultValue;
+        // NaN 防護:任一數值非有限數即跳過此機關,避免 NaN 污染矩陣導致模型永久隱形
+        if (!Number.isFinite(raw) || !Number.isFinite(rig.min) || !Number.isFinite(rig.max)) continue;
         // 保險夾限:即使外部塞入超界值也不超出行程
         const v = Math.min(Math.max(raw, Math.min(rig.min, rig.max)), Math.max(rig.min, rig.max));
         const a = AXIS_INDEX[rig.axis];

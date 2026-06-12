@@ -547,32 +547,30 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         }
     }, [material, envMap, perfectRenderEnabled, object.material_id, object.type, renderMode]);
 
-    // Show error placeholder if loading failed
-    if (!gltfData) return null;
+    const nodes = gltfData?.nodes ?? {};
 
-    const { nodes } = gltfData;
+    // Find all meshes in the loaded GLTF(memoize:供 geometry clone 依賴,避免每次 render 重算)
+    const meshNodes = useMemo(() => {
+        let list = Object.values(nodes).filter((node): node is THREE.Mesh =>
+            (node as THREE.Object3D).type === 'Mesh'
+        );
+        if (object.meshNames && object.meshNames.length > 0) {
+            list = list.filter(mesh => object.meshNames!.includes(mesh.name));
+        }
+        return list;
+    }, [nodes, object.meshNames]);
 
-    // Find all meshes in the loaded GLTF
-    let meshNodes = Object.values(nodes).filter((node): node is THREE.Mesh =>
-        (node as THREE.Object3D).type === 'Mesh'
+    // ⚠️ 關鍵修復:geometry 只在來源變更時 clone 一次,並在替換/卸載時 dispose。
+    // 原本在 render JSX 內 clone 且從不釋放,機關滑桿拖動(每秒數十次 re-render)
+    // 會讓 GPU buffer 無限堆積 → VRAM 耗盡 → 模型消失 / WebGL context lost。
+    const clonedGeometries = useMemo(
+        () => meshNodes.map(n => n.geometry.clone()),
+        [meshNodes]
     );
-
-    // If meshNames is specified, filter to only those meshes
-    if (object.meshNames && object.meshNames.length > 0) {
-        meshNodes = meshNodes.filter(mesh =>
-            object.meshNames!.includes(mesh.name)
-        );
-    }
-
-    // Show warning placeholder if no meshes found
-    if (meshNodes.length === 0) {
-        return (
-            <mesh position={[0, 0, 0]}>
-                <boxGeometry args={[0.5, 0.5, 0.5]} />
-                <meshStandardMaterial color="orange" wireframe />
-            </mesh>
-        );
-    }
+    useEffect(() => {
+        const geos = clonedGeometries;
+        return () => { geos.forEach(g => g.dispose()); };
+    }, [clonedGeometries]);
 
     // Compute target transform
     const worldTransform = useMemo(() =>
@@ -651,10 +649,22 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
 
     const isEmissiveType = object.material_id === 'emissive' || object.material_id === 'emissiveMesh';
 
+    // 條件回傳一律放在所有 hooks 之後(hooks 順序在每次 render 必須一致)
+    if (!gltfData) return null;
+    if (meshNodes.length === 0) {
+        return (
+            <mesh position={[0, 0, 0]}>
+                <boxGeometry args={[0.5, 0.5, 0.5]} />
+                <meshStandardMaterial color="orange" wireframe />
+            </mesh>
+        );
+    }
+
     return (
         <group ref={groupRef} scale={worldTransform.scale} onClick={onClick}>
-            {meshNodes.map((node) => {
-                const geometry = node.geometry.clone();
+            {meshNodes.map((node, i) => {
+                const geometry = clonedGeometries[i];
+                if (!geometry) return null;
 
                 return (
                     <group key={node.uuid}>

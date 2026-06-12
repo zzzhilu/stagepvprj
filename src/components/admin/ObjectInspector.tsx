@@ -1,5 +1,6 @@
 'use client';
 
+import { getObjectDisplayName } from '@/lib/object-utils';
 import { useStore, StageObject } from '@/store/useStore';
 import { useState, useEffect } from 'react';
 
@@ -18,11 +19,10 @@ const typeLabels: Record<string, string> = {
 
 // Helper to get object display name
 function getObjectName(obj: StageObject) {
-    // 1. Moving objects use their mesh name (= obj.id) directly
-    if (!obj.id.startsWith('obj_')) {
-        return obj.id;
-    }
-    // 2. Static objects: use type-based label
+    // 1. 統一命名工具:obj.name(3D 軟體原始命名/使用者改名)→ mesh 名 → 檔名
+    const displayName = getObjectDisplayName(obj);
+    if (displayName) return displayName;
+    // 2. Fallback: use type-based label
     return typeLabels[obj.type] || obj.type || `Object ${obj.id.slice(0, 6)}`;
 }
 
@@ -76,6 +76,7 @@ export function ObjectInspector() {
     const stageObjects = useStore((state) => state.stageObjects);
     const selectedObjectId = useStore((state) => state.selectedObjectId);
     const setSelectedObject = useStore((state) => state.setSelectedObject);
+    const updateObject = useStore((state) => state.updateObject);
     const transformMode = useStore((state) => state.transformMode);
     const setTransformMode = useStore((state) => state.setTransformMode);
     const updateObjectTransform = useStore((state) => state.updateObjectTransform);
@@ -127,6 +128,18 @@ export function ObjectInspector() {
                             <h4 className="text-xs font-bold text-violet-400">
                                 {getObjectName(selectedObject)}
                             </h4>
+                        </div>
+
+                        {/* 改名 */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] text-gray-500">名稱(顯示用,可修改)</label>
+                            <input
+                                type="text"
+                                value={selectedObject.name ?? ''}
+                                placeholder={getObjectName(selectedObject)}
+                                onChange={(e) => updateObject(selectedObject.id, { name: e.target.value })}
+                                className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none"
+                            />
                         </div>
 
                         {/* Transform Mode Toggle */}

@@ -36,6 +36,7 @@ export interface StageObject {
     instances: Instance[];
     type: ModelType; // Model category type
     meshNames?: string[]; // Optional: specific mesh names to filter from the GLB
+    name?: string; // 顯示名稱:上傳時取自 3D 軟體的 mesh/檔案命名,可由使用者修改
     parentId?: string | null; // 掛載的 Null 節點或父物件 ID;一旦有 parent,instances 的 pos/rot 即為相對 parent 的本地座標
     curvature?: number; // [NEW] Arc curvature for projection screens (-1 to 1)
 }
@@ -330,6 +331,7 @@ interface State {
 
     addView: (view: CameraView) => void;
     removeObject: (id: string) => void;
+    updateObject: (id: string, patch: Partial<Omit<StageObject, 'id'>>) => void;
 
     // 機關系統 actions
     addNull: (node: NullNode) => void;
@@ -718,6 +720,12 @@ export const useStore = create<State>()(
             })),
 
             addView: (view) => set((state) => ({ views: [...state.views, view] })),
+
+            updateObject: (id, patch) => set((state) => ({
+                stageObjects: state.stageObjects.map(obj =>
+                    obj.id === id ? { ...obj, ...patch, id: obj.id } : obj
+                )
+            })),
 
             removeObject: (id) => set((state) => ({
                 stageObjects: state.stageObjects.filter(obj => obj.id !== id),

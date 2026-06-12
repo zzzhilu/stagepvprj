@@ -1,38 +1,13 @@
 'use client';
 
-import { useStore, NullNode, RigControl, RigType, RigAxis, ModelType } from '@/store/useStore';
+import { useStore, NullNode, RigControl, RigType, RigAxis } from '@/store/useStore';
 import { useState, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { isSelfOrDescendant, objectWorldPosition, worldPosToLocal } from '@/lib/rig-utils';
 import { RigIcon, NullIcon, LinkIcon, RotateIcon, TranslateIcon, PickIcon } from '@/components/ui/icons';
-
-const TYPE_LABELS: Record<ModelType, string> = {
-    'venues': '場館',
-    'stage': '舞台',
-    'static_LED': '靜態LED',
-    'moving_LED': '移動LED',
-    'moving_prop': '移動道具',
-    'basic_camera': '攝影機',
-    'floor_plan': '平面圖',
-    'prop': '道具',
-    'band': '樂團成員'
-};
+import { getObjectLabel } from '@/lib/object-utils';
 
 const AXIS_OPTIONS: RigAxis[] = ['x', 'y', 'z'];
-
-function fileNameFromUrl(url: string): string {
-    try {
-        const decoded = decodeURIComponent(url);
-        const basename = decoded.split('/').pop()?.split('?')[0] || '?';
-        return basename.replace('models/', '');
-    } catch {
-        return '?';
-    }
-}
-
-function objectLabel(obj: { type: ModelType; model_path: string }): string {
-    return `${TYPE_LABELS[obj.type]} · ${fileNameFromUrl(obj.model_path).substring(0, 24)}`;
-}
 
 /**
  * 數字輸入:本地暫存文字,blur / Enter 時才提交,
@@ -241,7 +216,7 @@ function NullSection() {
                             >
                                 <option value="">選擇物件…</option>
                                 {stageObjects.map(o => (
-                                    <option key={o.id} value={o.id}>{objectLabel(o)}</option>
+                                    <option key={o.id} value={o.id}>{getObjectLabel(o)}</option>
                                 ))}
                             </select>
                             <button
@@ -278,8 +253,8 @@ function ParentingSection() {
             </p>
             {stageObjects.map(obj => (
                 <div key={obj.id} className="flex items-center gap-2 bg-gray-800 rounded p-2">
-                    <span className="text-xs text-gray-300 truncate flex-1" title={objectLabel(obj)}>
-                        {objectLabel(obj)}
+                    <span className="text-xs text-gray-300 truncate flex-1" title={getObjectLabel(obj)}>
+                        {getObjectLabel(obj)}
                     </span>
                     <select
                         value={obj.parentId ?? ''}
@@ -361,7 +336,7 @@ function RigsSection() {
         const o = stageObjects.find(o => o.id === rig.targetId);
         if (!o) return '⚠️ 目標已刪除';
         const idx = o.instances.length > 1 ? ` #${(rig.instanceIndex ?? 0) + 1}` : '';
-        return `${objectLabel(o)}${idx}`;
+        return `${getObjectLabel(o)}${idx}`;
     };
 
     const handleSubmit = () => {
@@ -439,7 +414,7 @@ function RigsSection() {
                                 {stageObjects.flatMap(o =>
                                     o.instances.map((_, i) => (
                                         <option key={`${o.id}:${i}`} value={`object:${o.id}:${i}`}>
-                                            {objectLabel(o)}{o.instances.length > 1 ? ` #${i + 1}` : ''}
+                                            {getObjectLabel(o)}{o.instances.length > 1 ? ` #${i + 1}` : ''}
                                         </option>
                                     ))
                                 )}

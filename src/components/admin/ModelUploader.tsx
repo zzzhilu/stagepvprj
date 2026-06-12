@@ -1,4 +1,5 @@
 'use client';
+import { getObjectDisplayName } from '@/lib/object-utils';
 
 import { useStore, ModelType } from '@/store/useStore';
 import { useState, useRef } from 'react';
@@ -247,6 +248,7 @@ export function ModelUploader() {
                             model_path: cloudUrl,
                             material_id: getDefaultMaterial(parsed.type),
                             type: parsed.type,
+                            name: mesh.name, // 保留 3D 軟體中的原始命名作為顯示名稱
                             meshNames: [mesh.name], // Filter to ONLY show this specific mesh
                             instances: [
                                 {
@@ -265,6 +267,10 @@ export function ModelUploader() {
                         model_path: cloudUrl,
                         material_id: getDefaultMaterial(parsed.type),
                         type: parsed.type,
+                        // 聚合物件:單一 mesh 用 mesh 名,多 mesh 用原始上傳檔名(不含時間戳)
+                        name: parsed.meshes.length === 1
+                            ? parsed.meshes[0].name
+                            : selectedFile.name.replace(/\.glb$/i, ''),
                         meshNames: parsed.meshes.map(m => m.name),
                         instances: [
                             {
@@ -538,7 +544,7 @@ export function ModelUploader() {
                                         return (
                                             <div key={obj.id} className="p-2 bg-gray-900/30 rounded hover:bg-gray-900/50 transition-colors group">
                                                 <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
-                                                    <span className="truncate flex-1" title={obj.id}>{getFileNameFromUrl(obj.model_path)} ({obj.meshNames?.length || 0})</span>
+                                                    <span className="truncate flex-1" title={obj.id}>{getObjectDisplayName(obj) || getFileNameFromUrl(obj.model_path)} ({obj.meshNames?.length || 0})</span>
                                                     <button
                                                         onMouseDown={() => handleLongPressStart(obj.id)}
                                                         onMouseUp={handleLongPressEnd}
