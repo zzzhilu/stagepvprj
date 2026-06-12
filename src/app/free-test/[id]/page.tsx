@@ -208,8 +208,12 @@ function ProjectEditorContent() {
                 if (data.reflectionBlur !== undefined) setReflectionBlur(data.reflectionBlur);
                 if (data.reflectionMetalness !== undefined) setReflectionMetalness(data.reflectionMetalness);
                 // Restore Rigs/Nulls
-                if (data.nulls) useStore.setState({ nulls: data.nulls });
-                if (data.rigs) useStore.setState({ rigs: data.rigs });
+                useStore.setState({
+                    nulls: data.nulls || [],
+                    rigs: data.rigs || [],
+                    rigValues: {},
+                    selectedNullId: null,
+                });
             }
         } catch (error) {
             console.error('Failed to load project:', error);
