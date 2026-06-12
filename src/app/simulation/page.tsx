@@ -10,6 +10,7 @@ import { ViewSwitcher } from '@/components/client/ViewSwitcher';
 import { BottomLeftPanel } from '@/components/client/BottomLeftPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ClientUploader } from '@/components/client/ClientUploader';
+import { RigPanel } from '@/components/client/RigPanel';
 
 const Scene = dynamic(() => import('@/components/canvas/Scene'), {
     ssr: false,
@@ -41,6 +42,10 @@ function SimulationContent() {
                         contentTextures: project.contentTextures || [],
                         activeViewId: project.activeViewId || null,
                         activeContentId: project.activeContentId || null,
+                        // 機關系統(舊專案無此欄位 → fallback 空陣列)
+                        nulls: project.nulls || [],
+                        rigs: project.rigs || [],
+                        rigValues: {}, // 客戶端從各機關的 defaultValue 開始
                         // Force update render mode or other settings if desired, 
                         // but usually we keep user's local preference or default.
                     });
@@ -82,6 +87,9 @@ function SimulationContent() {
 
             {/* Client Uploader - Always visible on this route */}
             <ClientUploader />
+
+            {/* 機關控制面板 */}
+            <RigPanel />
 
             {/* 3D Scene */}
             <ErrorBoundary>

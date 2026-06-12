@@ -273,7 +273,7 @@ export function ObjectInspector() {
                         <LinkToParentDropdown
                             selectedObjectId={selectedObject.id}
                             stageObjects={stageObjects}
-                            currentParentId={selectedObject.parentId}
+                            currentParentId={selectedObject.parentId ?? undefined}
                         />
                     </div>
                 </>

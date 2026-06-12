@@ -13,6 +13,7 @@ import { ClientToolbar } from '@/components/client/ClientToolbar';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
+import { RigPanel } from '@/components/client/RigPanel';
 
 const ADMIN_PASSWORD = '0903';
 const AUTH_KEY = 'stagepv_admin_auth';
@@ -149,6 +150,10 @@ function ProjectEditorContent() {
     const reflectionBlur = useStore(state => state.reflectionBlur);
     const reflectionMetalness = useStore(state => state.reflectionMetalness);
 
+    // Rigs/Nulls state for auto-save
+    const nulls = useStore(state => state.nulls);
+    const rigs = useStore(state => state.rigs);
+
     useEffect(() => {
         // Share mode bypasses auth
         if (isShareMode) {
@@ -202,6 +207,9 @@ function ProjectEditorContent() {
                 if (data.reflectionMirror !== undefined) setReflectionMirror(data.reflectionMirror);
                 if (data.reflectionBlur !== undefined) setReflectionBlur(data.reflectionBlur);
                 if (data.reflectionMetalness !== undefined) setReflectionMetalness(data.reflectionMetalness);
+                // Restore Rigs/Nulls
+                if (data.nulls) useStore.setState({ nulls: data.nulls });
+                if (data.rigs) useStore.setState({ rigs: data.rigs });
             }
         } catch (error) {
             console.error('Failed to load project:', error);
@@ -244,6 +252,9 @@ function ProjectEditorContent() {
                     reflectionMirror,
                     reflectionBlur,
                     reflectionMetalness,
+                    // Rig settings
+                    nulls,
+                    rigs,
                 });
             } catch (error) {
                 console.error('Auto-save failed:', error);
@@ -251,7 +262,7 @@ function ProjectEditorContent() {
         }, 2000); // Debounce 2 seconds
 
         return () => clearTimeout(timeoutId);
-    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, isAuthenticated, isShareMode, isLoading, projectId]);
+    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, nulls, rigs, isAuthenticated, isShareMode, isLoading, projectId]);
 
     // Show loading while checking auth
     if (isChecking) {
@@ -302,6 +313,9 @@ function ProjectEditorContent() {
 
             {/* Client Uploader - Share mode only */}
             {isShareMode && <div data-ui-element><ClientUploader /></div>}
+
+            {/* 機關控制面板 */}
+            <RigPanel />
 
             {/* 3D Scene */}
             <ErrorBoundary>

@@ -6,6 +6,7 @@ import { useMemo, useEffect, useState, useRef, forwardRef } from 'react';
 import { globalVideoElement } from './VideoManager';
 import { useFrame } from '@react-three/fiber';
 import { parseGIF, decompressFrames } from 'gifuct-js';
+import { rigDelta, addVec3 } from '@/lib/rig-utils';
 
 // Calculate lerp speed based on distance (0.5s - 1.5s)
 function calculateLerpSpeed(distance: number): number {
@@ -68,6 +69,8 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     const stageObjects = useStore((state) => state.stageObjects);
     const floorPlanTextureUrl = useStore((state) => state.floorPlanTextureUrl);
     const cameraStreamActive = useStore((state) => state.cameraStreamActive);
+    const rigs = useStore((state) => state.rigs);
+    const rigValues = useStore((state) => state.rigValues);
     const [videoTexture, setVideoTexture] = useState<THREE.VideoTexture | null>(null);
 
     // Animation refs for smooth lerping
@@ -581,8 +584,21 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     useFrame((_, delta) => {
         if (!groupRef.current) return;
 
-        const targetPos = new THREE.Vector3(...worldTransform.pos);
-        const targetRot = new THREE.Euler(...worldTransform.rot);
+        const basePos = new THREE.Vector3(...worldTransform.pos);
+        const baseRot = new THREE.Euler(...worldTransform.rot);
+
+        // 物件級機關:基底 transform + 偏移量
+        const rigOffset = rigDelta(rigs, rigValues, 'object', object.id, 0);
+        const targetPos = new THREE.Vector3(
+            basePos.x + rigOffset.pos[0],
+            basePos.y + rigOffset.pos[1],
+            basePos.z + rigOffset.pos[2]
+        );
+        const targetRot = new THREE.Euler(
+            baseRot.x + rigOffset.rot[0],
+            baseRot.y + rigOffset.rot[1],
+            baseRot.z + rigOffset.rot[2]
+        );
 
         // Initialize on first frame
         if (!isInitialized.current) {

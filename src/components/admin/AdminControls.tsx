@@ -13,6 +13,7 @@ import { StageLightingPanel } from './StageLightingPanel';
 import { R2VideoManager } from '@/components/client/R2VideoManager';
 import { GDriveVideoManager } from './GDriveVideoManager';
 import ContentInspector from './ContentInspector';
+import { RigEditor } from './RigEditor';
 import { useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 
@@ -151,7 +152,6 @@ export default function AdminControls({ projectName, mode = 'free-test', project
     const setTransformMode = useStore((state) => state.setTransformMode);
     const [expandedSections, setExpandedSections] = useState<string[]>(isVideoProgress ? ['videos'] : ['models']);
     const [shareToast, setShareToast] = useState(false);
-
     const setLoading = useStore((state) => state.setLoading);
 
     const handleShare = async () => {
@@ -314,6 +314,26 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                 )}
 
                 {/* Content Input Section - R2VideoManager for video-progress, TextureUploader for free-test */}
+                {/* Rig Editor Section */}
+                {!isVideoProgress && (
+                    <div>
+                        <button
+                            onClick={() => toggleSection('rigs')}
+                            className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
+                        >
+                            <span className="font-semibold flex items-center gap-1.5">🎛️ 機關設定</span>
+                            <svg
+                                className={`w-5 h-5 transition-transform ${expandedSections.includes('rigs') ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {expandedSections.includes('rigs') && <RigEditor />}
+                    </div>
+                )}
                 <div>
                     <button
                         onClick={() => toggleSection('videos')}

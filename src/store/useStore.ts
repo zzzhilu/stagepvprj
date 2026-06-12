@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import * as THREE from 'three';
 import type { MaterialId } from '@/lib/materials';
+import { nullLocalMatrix, nullWorldMatrix, reparentTransform } from '@/lib/rig-utils';
 
 // Types based on SAD 5.1 & 5.2
 export type ModelType = 'venues' | 'stage' | 'static_LED' | 'moving_LED' | 'moving_prop' | 'basic_camera' | 'floor_plan' | 'prop' | 'band';
@@ -34,8 +36,37 @@ export interface StageObject {
     instances: Instance[];
     type: ModelType; // Model category type
     meshNames?: string[]; // Optional: specific mesh names to filter from the GLB
-    parentId?: string; // [NEW] ID of parent object for linked movement
+    parentId?: string | null; // 掛載的 Null 節點或父物件 ID;一旦有 parent,instances 的 pos/rot 即為相對 parent 的本地座標
     curvature?: number; // [NEW] Arc curvature for projection screens (-1 to 1)
+}
+
+// ===== 機關系統 (Rig System) =====
+
+/** Null 空物件:場景層級節點,位置即旋轉軸心,可巢狀 */
+export interface NullNode {
+    id: string;                    // `null_${Date.now()}`
+    name: string;                  // 使用者命名,如「主升降軸」
+    parentId: string | null;       // 掛在另一個 Null 底下;null = 場景根
+    pos: [number, number, number]; // 相對 parent 的位置 = 旋轉軸心
+    rot: [number, number, number]; // 基底旋轉(弧度)
+}
+
+export type RigType = 'rotation' | 'translation';
+export type RigAxis = 'x' | 'y' | 'z';
+
+/** 機關:一個受限的可動自由度,目標可為 Null 或物件 instance */
+export interface RigControl {
+    id: string;                    // `rig_${Date.now()}`
+    name: string;                  // 「升降台高度」
+    targetType: 'null' | 'object';
+    targetId: string;              // NullNode.id 或 StageObject.id
+    instanceIndex?: number;        // targetType === 'object' 時指定 instance(預設 0)
+    type: RigType;
+    axis: RigAxis;
+    min: number;                   // translation: scene units;rotation: 度
+    max: number;
+    step?: number;                 // 滑桿步進
+    defaultValue: number;          // 須在 [min, max] 內
 }
 
 
@@ -195,6 +226,11 @@ interface State {
     bloomThreshold: number;
     fov: number; // [NEW] Global FOV state
 
+    // 機關系統 (Rig System)
+    nulls: NullNode[];                    // Null 空物件(跨端同步)
+    rigs: RigControl[];                   // 機關定義(跨端同步)
+    rigValues: Record<string, number>;    // rigId → 當前值(runtime,不同步、不持久化)
+
     // Loading State
     isLoading: boolean;
     loadingMessage: string;
@@ -293,6 +329,18 @@ interface State {
 
     addView: (view: CameraView) => void;
     removeObject: (id: string) => void;
+
+    // 機關系統 actions
+    addNull: (node: NullNode) => void;
+    updateNull: (id: string, patch: Partial<Omit<NullNode, 'id'>>) => void;
+    removeNull: (id: string) => void;
+    setObjectParent: (objectId: string, parentId: string | null) => void;
+    addRig: (rig: RigControl) => void;
+    updateRig: (id: string, patch: Partial<Omit<RigControl, 'id'>>) => void;
+    removeRig: (id: string) => void;
+    setRigValue: (rigId: string, value: number) => void;
+    resetRigValues: () => void;
+
     addContentTexture: (texture: ContentTexture) => void;
     removeContentTexture: (id: string) => void;
     updateContentTexture: (id: string, updates: Partial<ContentTexture>) => void;
@@ -444,6 +492,11 @@ export const useStore = create<State>()(
                 { name: '背光 Rim', position: [-5, 6, -8] as [number, number, number], intensity: 1.0, angle: 0.4, distance: 20, color: '#ddeeff', enabled: false, castShadow: false },
             ],
             stageLights: [],
+
+            // 機關系統
+            nulls: [],
+            rigs: [],
+            rigValues: {},
 
             // Loading State
             isLoading: false,
@@ -661,8 +714,90 @@ export const useStore = create<State>()(
             addView: (view) => set((state) => ({ views: [...state.views, view] })),
 
             removeObject: (id) => set((state) => ({
-                stageObjects: state.stageObjects.filter(obj => obj.id !== id)
+                stageObjects: state.stageObjects.filter(obj => obj.id !== id),
+                // 級聯清除指向此物件的機關
+                rigs: state.rigs.filter(r => !(r.targetType === 'object' && r.targetId === id))
             })),
+
+            // ===== 機關系統 actions =====
+            addNull: (node) => set((state) => ({ nulls: [...state.nulls, node] })),
+
+            updateNull: (id, patch) => set((state) => ({
+                nulls: state.nulls.map(n => n.id === id ? { ...n, ...patch, id: n.id } : n)
+            })),
+
+            // 刪除 Null:子節點與子物件重新掛回其 parent,世界位置保持不變;
+            // 指向此 Null 的機關一併清除。
+            removeNull: (id) => set((state) => {
+                const node = state.nulls.find(n => n.id === id);
+                if (!node) return {};
+
+                const nodeLocal = nullLocalMatrix(node);
+                const identity = new THREE.Matrix4();
+
+                const nulls = state.nulls
+                    .filter(n => n.id !== id)
+                    .map(n => {
+                        if (n.parentId !== id) return n;
+                        // 在 node.parentId 的空間裡:新本地變換 = nodeLocal ∘ 原本地變換
+                        const { pos, rot } = reparentTransform(n.pos, n.rot, nodeLocal, identity);
+                        return { ...n, parentId: node.parentId, pos, rot };
+                    });
+
+                const stageObjects = state.stageObjects.map(o => {
+                    if (o.parentId !== id) return o;
+                    const instances = o.instances.map(inst => {
+                        const { pos, rot } = reparentTransform(inst.pos, inst.rot, nodeLocal, identity);
+                        return { ...inst, pos, rot };
+                    });
+                    return { ...o, parentId: node.parentId, instances };
+                });
+
+                const rigs = state.rigs.filter(r => !(r.targetType === 'null' && r.targetId === id));
+
+                return { nulls, stageObjects, rigs };
+            }),
+
+            // 換 parent 但保持世界位置不變(Object3D.attach 語意)。
+            // 座標轉換以「基底」transform 為準,不含機關偏移。
+            setObjectParent: (objectId, parentId) => set((state) => {
+                const obj = state.stageObjects.find(o => o.id === objectId);
+                if (!obj) return {};
+                if ((obj.parentId ?? null) === parentId) return {};
+
+                const fromWorld = nullWorldMatrix(obj.parentId ?? null, state.nulls);
+                const toWorld = nullWorldMatrix(parentId, state.nulls);
+
+                const instances = obj.instances.map(inst => {
+                    const { pos, rot } = reparentTransform(inst.pos, inst.rot, fromWorld, toWorld);
+                    return { ...inst, pos, rot };
+                });
+
+                return {
+                    stageObjects: state.stageObjects.map(o =>
+                        o.id === objectId ? { ...o, parentId, instances } : o
+                    )
+                };
+            }),
+
+            addRig: (rig) => set((state) => ({ rigs: [...state.rigs, rig] })),
+
+            updateRig: (id, patch) => set((state) => ({
+                rigs: state.rigs.map(r => r.id === id ? { ...r, ...patch, id: r.id } : r)
+            })),
+
+            removeRig: (id) => set((state) => {
+                const rigValues = { ...state.rigValues };
+                delete rigValues[id];
+                return { rigs: state.rigs.filter(r => r.id !== id), rigValues };
+            }),
+
+            setRigValue: (rigId, value) => set((state) => ({
+                rigValues: { ...state.rigValues, [rigId]: value }
+            })),
+
+            resetRigValues: () => set({ rigValues: {} }),
+
             addContentTexture: (texture) => set((state) => ({
                 contentTextures: [...state.contentTextures, texture],
                 // Auto-select first uploaded content
@@ -871,6 +1006,9 @@ export const useStore = create<State>()(
                 floorPlanTextureUrl: state.floorPlanTextureUrl, // [NEW]
                 stageLights: state.stageLights, // Stage lighting system
                 materialSlots: state.materialSlots, // Custom material slots
+                // 機關系統:定義持久化,rigValues(當前值)刻意不持久化
+                nulls: state.nulls,
+                rigs: state.rigs,
             }),
             // Migration: convert old spotLights to stageLights on hydration
             onRehydrateStorage: () => (state) => {

@@ -1,7 +1,7 @@
 
 import { db } from './firebase';
 import { collection, addDoc, doc, getDoc, setDoc, updateDoc, deleteDoc, query, orderBy, getDocs, serverTimestamp } from 'firebase/firestore';
-import type { StageObject, CameraView, ContentTexture, R2Video, SpotLightConfig } from '@/store/useStore';
+import type { StageObject, CameraView, ContentTexture, R2Video, SpotLightConfig, NullNode, RigControl } from '@/store/useStore';
 
 export interface ProjectState {
     name: string;
@@ -31,6 +31,8 @@ export interface ProjectState {
     reflectionMirror?: number;
     reflectionBlur?: number;
     reflectionMetalness?: number;
+    nulls?: NullNode[];        // 機關系統:Null 空物件(舊專案無此欄位)
+    rigs?: RigControl[];       // 機關系統:機關定義(舊專案無此欄位)
     createdAt?: any;
     updatedAt?: any;
 }

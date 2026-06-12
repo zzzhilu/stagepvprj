@@ -1,5 +1,6 @@
 import { OrbitControls, PerspectiveCamera, TransformControls } from '@react-three/drei';
 import { useStore, StageObject } from '@/store/useStore';
+import type { NullNode } from '@/store/useStore';
 import { StageObjectRenderer } from './StageObjectRenderer';
 import { BoxPrimitiveRenderer } from './BoxPrimitiveRenderer';
 import { ProjectionScreenRenderer } from './ProjectionScreenRenderer';
@@ -18,9 +19,94 @@ import * as THREE from 'three';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { PerfectRenderEnvironment } from './PerfectRenderEnvironment';
 import { ToneMappingMode } from 'postprocessing';
+import { rigDelta, addVec3 } from '@/lib/rig-utils';
+
+/**
+ * Null 節點 → <group> 遞迴渲染。
+ * group transform = 基底 pos/rot + 該 Null 所有機關偏移。
+ * Admin 模式顯示 axesHelper 標出軸心位置與軸向。
+ */
+function NullGroup({
+    node,
+    objectRefs,
+    realtimeEnvMap,
+    gizmoEnabled,
+    setSelectedObject,
+}: {
+    node: NullNode;
+    objectRefs: React.MutableRefObject<Map<string, { current: THREE.Group | null }>>;
+    realtimeEnvMap: THREE.CubeTexture | null;
+    gizmoEnabled: boolean;
+    setSelectedObject: (id: string | null) => void;
+}) {
+    const nulls = useStore((state) => state.nulls);
+    const stageObjects = useStore((state) => state.stageObjects);
+    const rigs = useStore((state) => state.rigs);
+    const rigValues = useStore((state) => state.rigValues);
+    const mode = useStore((state) => state.mode);
+
+    const delta = rigDelta(rigs, rigValues, 'null', node.id);
+    const pos = addVec3(node.pos, delta.pos);
+    const rot = addVec3(node.rot, delta.rot);
+
+    const childNulls = nulls.filter(n => n.parentId === node.id);
+    const childObjects = stageObjects.filter(o => o.parentId === node.id);
+
+    return (
+        <group position={pos} rotation={rot}>
+            {/* Admin 模式:顯示軸心輔助線(客戶端看不到) */}
+            {mode === 'admin' && <axesHelper args={[1.5]} />}
+
+            {childNulls.map(n => (
+                <NullGroup
+                    key={n.id}
+                    node={n}
+                    objectRefs={objectRefs}
+                    realtimeEnvMap={realtimeEnvMap}
+                    gizmoEnabled={gizmoEnabled}
+                    setSelectedObject={setSelectedObject}
+                />
+            ))}
+
+            {childObjects.map(obj => {
+                const objRef = objectRefs.current.get(obj.id);
+                const Renderer = obj.model_path === '__box__'
+                    ? BoxPrimitiveRenderer
+                    : obj.model_path === '__projection_screen__'
+                        ? ProjectionScreenRenderer
+                        : StageObjectRenderer;
+
+                return (
+                    <ErrorBoundary
+                        key={obj.id}
+                        fallback={
+                            <mesh position={obj.instances[0]?.pos || [0, 0, 0]}>
+                                <boxGeometry args={[1, 1, 1]} />
+                                <meshStandardMaterial color="red" wireframe />
+                            </mesh>
+                        }
+                    >
+                        <Renderer
+                            ref={objRef}
+                            object={obj}
+                            envMap={realtimeEnvMap}
+                            onClick={(e: ThreeEvent<MouseEvent>) => {
+                                if (mode === 'admin' && gizmoEnabled) {
+                                    e.stopPropagation();
+                                    setSelectedObject(obj.id);
+                                }
+                            }}
+                        />
+                    </ErrorBoundary>
+                );
+            })}
+        </group>
+    );
+}
 
 export function SceneGraph() {
     const stageObjects = useStore((state) => state.stageObjects);
+    const nulls = useStore((state) => state.nulls);
     const ambientIntensity = useStore((state) => state.ambientIntensity);
     const directionalIntensity = useStore((state) => state.directionalIntensity);
     const mainLightAzimuth = useStore((state) => state.mainLightAzimuth);
@@ -264,39 +350,56 @@ export function SceneGraph() {
             {/* Stage Light System - dynamic lights only in Perfect Render */}
             <StageLightRenderer ref={stageLightRendererRef} />
 
-            {/* Stage Objects from Store */}
-            {stageObjects.map((obj) => {
-                const objRef = objectRefsRef.current.get(obj.id);
-                const Renderer = obj.model_path === '__box__'
-                    ? BoxPrimitiveRenderer
-                    : obj.model_path === '__projection_screen__'
-                        ? ProjectionScreenRenderer
-                        : StageObjectRenderer;
+            {/* ===== 場景層級渲染 ===== */}
+            {/* 根層 Null(無 parent 或 parent 已不存在 → fallback 到根層) */}
+            {nulls
+                .filter(n => !n.parentId || !nulls.some(p => p.id === n.parentId))
+                .map(n => (
+                    <NullGroup
+                        key={n.id}
+                        node={n}
+                        objectRefs={objectRefsRef}
+                        realtimeEnvMap={realtimeEnvMap}
+                        gizmoEnabled={gizmoEnabled}
+                        setSelectedObject={setSelectedObject}
+                    />
+                ))}
 
-                return (
-                    <ErrorBoundary
-                        key={obj.id}
-                        fallback={
-                            <mesh position={obj.instances[0]?.pos || [0, 0, 0]}>
-                                <boxGeometry args={[1, 1, 1]} />
-                                <meshStandardMaterial color="red" wireframe />
-                            </mesh>
-                        }
-                    >
-                        <Renderer
-                            ref={objRef}
-                            object={obj}
-                            envMap={realtimeEnvMap}
-                            onClick={(e: ThreeEvent<MouseEvent>) => {
-                                if (mode === 'admin' && gizmoEnabled) {
-                                    e.stopPropagation();
-                                    setSelectedObject(obj.id);
-                                }
-                            }}
-                        />
-                    </ErrorBoundary>
-                );
-            })}
+            {/* 未掛載到任何 Null 的物件(含 parent 已被刪除的孤兒) */}
+            {stageObjects
+                .filter(obj => !obj.parentId || !nulls.some(n => n.id === obj.parentId))
+                .map((obj) => {
+                    const objRef = objectRefsRef.current.get(obj.id);
+                    const Renderer = obj.model_path === '__box__'
+                        ? BoxPrimitiveRenderer
+                        : obj.model_path === '__projection_screen__'
+                            ? ProjectionScreenRenderer
+                            : StageObjectRenderer;
+
+                    return (
+                        <ErrorBoundary
+                            key={obj.id}
+                            fallback={
+                                <mesh position={obj.instances[0]?.pos || [0, 0, 0]}>
+                                    <boxGeometry args={[1, 1, 1]} />
+                                    <meshStandardMaterial color="red" wireframe />
+                                </mesh>
+                            }
+                        >
+                            <Renderer
+                                ref={objRef}
+                                object={obj}
+                                envMap={realtimeEnvMap}
+                                onClick={(e: ThreeEvent<MouseEvent>) => {
+                                    if (mode === 'admin' && gizmoEnabled) {
+                                        e.stopPropagation();
+                                        setSelectedObject(obj.id);
+                                    }
+                                }}
+                            />
+                        </ErrorBoundary>
+                    );
+                })}
 
             {/* TransformControls for Admin Mode (when Gizmo is enabled) */}
             {mode === 'admin' && gizmoEnabled && selectedObjectId && (() => {
