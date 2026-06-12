@@ -4,6 +4,7 @@ import { useStore, NullNode, RigControl, RigType, RigAxis, ModelType } from '@/s
 import { useState, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { isSelfOrDescendant, objectWorldPosition, worldPosToLocal } from '@/lib/rig-utils';
+import { RigIcon, NullIcon, LinkIcon, RotateIcon, TranslateIcon, PickIcon } from '@/components/ui/icons';
 
 const TYPE_LABELS: Record<ModelType, string> = {
     'venues': '場館',
@@ -82,6 +83,20 @@ function NullSection() {
     const addNull = useStore((s) => s.addNull);
     const updateNull = useStore((s) => s.updateNull);
     const removeNull = useStore((s) => s.removeNull);
+    const selectedNullId = useStore((s) => s.selectedNullId);
+    const setSelectedNull = useStore((s) => s.setSelectedNull);
+    const setGizmoEnabled = useStore((s) => s.setGizmoEnabled);
+    const gizmoEnabled = useStore((s) => s.gizmoEnabled);
+
+    // 在場景中選取此 Null:自動開啟 gizmo 並選取(出現 TransformControls 可拖曳)
+    const handlePick = (node: NullNode) => {
+        if (selectedNullId === node.id) {
+            setSelectedNull(null);
+            return;
+        }
+        if (!gizmoEnabled) setGizmoEnabled(true);
+        setSelectedNull(node.id);
+    };
 
     const [alignTarget, setAlignTarget] = useState<Record<string, string>>({}); // nullId → objectId
 
@@ -130,19 +145,34 @@ function NullSection() {
                     Null 是旋轉軸心。建立後把物件掛載到它底下,旋轉機關就以它的位置為軸。
                 </p>
             )}
+            {nulls.length > 0 && (
+                <p className="text-[10px] text-gray-500">
+                    場景中的八面體虛影即為 Null。點「選取」(或開啟 Gizmo 後直接點虛影)可拖曳調整軸心位置。
+                </p>
+            )}
 
             {nulls.map((node) => (
-                <div key={node.id} className="bg-gray-800 rounded p-2 space-y-2">
+                <div key={node.id} className={`bg-gray-800 rounded p-2 space-y-2 transition-all ${selectedNullId === node.id ? 'ring-1 ring-violet-500' : ''}`}>
                     <div className="flex items-center gap-2">
                         <input
                             type="text"
                             value={node.name}
                             onChange={(e) => updateNull(node.id, { name: e.target.value })}
-                            className="flex-1 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-violet-500 focus:outline-none"
+                            className="flex-1 min-w-0 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-violet-500 focus:outline-none"
                         />
                         <button
+                            onClick={() => handlePick(node)}
+                            className={`text-xs px-2 py-1 rounded flex items-center gap-1 flex-shrink-0 transition-colors ${selectedNullId === node.id
+                                ? 'bg-violet-600 text-white'
+                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                            title={selectedNullId === node.id ? '取消選取' : '在場景中選取並拖曳調整位置'}
+                        >
+                            <PickIcon className="w-3 h-3" />
+                            {selectedNullId === node.id ? '選取中' : '選取'}
+                        </button>
+                        <button
                             onClick={() => handleDelete(node)}
-                            className="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-900/40 rounded"
+                            className="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-900/40 rounded flex-shrink-0"
                         >
                             刪除
                         </button>
@@ -326,7 +356,7 @@ function RigsSection() {
     const targetName = (rig: RigControl): string => {
         if (rig.targetType === 'null') {
             const n = nulls.find(n => n.id === rig.targetId);
-            return n ? `⊕ ${n.name}` : '⚠️ 目標已刪除';
+            return n ? `◇ ${n.name}` : '⚠️ 目標已刪除';
         }
         const o = stageObjects.find(o => o.id === rig.targetId);
         if (!o) return '⚠️ 目標已刪除';
@@ -400,7 +430,7 @@ function RigsSection() {
                         {nulls.length > 0 && (
                             <optgroup label="Null 節點(建議:旋轉機關)">
                                 {nulls.map(n => (
-                                    <option key={n.id} value={`null:${n.id}`}>⊕ {n.name}</option>
+                                    <option key={n.id} value={`null:${n.id}`}>◇ {n.name}</option>
                                 ))}
                             </optgroup>
                         )}
@@ -425,7 +455,10 @@ function RigsSection() {
                                 onClick={() => handleTypeChange(t)}
                                 className={`flex-1 py-1 rounded text-xs ${type === t ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
                             >
-                                {t === 'rotation' ? '🔄 旋轉' : '↕️ 位移'}
+                                <span className="flex items-center justify-center gap-1">
+                                    {t === 'rotation' ? <RotateIcon className="w-3 h-3" /> : <TranslateIcon className="w-3 h-3" />}
+                                    {t === 'rotation' ? '旋轉' : '位移'}
+                                </span>
                             </button>
                         ))}
                         {AXIS_OPTIONS.map(a => (
@@ -559,15 +592,16 @@ export function RigEditor() {
 
             <div className="flex gap-1">
                 {([
-                    ['nulls', '⊕ Null'],
-                    ['parenting', '🔗 掛載'],
-                    ['rigs', '🎛️ 機關'],
-                ] as const).map(([key, label]) => (
+                    ['nulls', 'Null', NullIcon],
+                    ['parenting', '掛載', LinkIcon],
+                    ['rigs', '機關', RigIcon],
+                ] as const).map(([key, label, Icon]) => (
                     <button
                         key={key}
                         onClick={() => setTab(key)}
-                        className={`flex-1 py-1.5 rounded text-xs font-medium ${tab === key ? 'bg-violet-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+                        className={`flex-1 py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1.5 ${tab === key ? 'bg-violet-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
                     >
+                        <Icon className="w-3.5 h-3.5" />
                         {label}
                     </button>
                 ))}

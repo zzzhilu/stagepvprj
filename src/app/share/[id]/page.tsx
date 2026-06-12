@@ -6,6 +6,7 @@ import { Suspense, useState, useEffect } from 'react';
 import ClientControls from '@/components/client/ClientControls';
 import { VideoControls } from '@/components/client/VideoControls';
 import { BottomLeftPanel } from '@/components/client/BottomLeftPanel';
+import { RigPanel } from '@/components/client/RigPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ClientToolbar } from '@/components/client/ClientToolbar';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
@@ -113,6 +114,13 @@ function SharePageContent() {
             if (data.contactShadow !== undefined) setContactShadow(data.contactShadow);
             if (data.toneMapping !== undefined) setToneMapping(data.toneMapping);
             if (data.spotLights !== undefined) useStore.setState({ spotLights: data.spotLights });
+
+            // 機關系統:還原定義,當前值從各機關的 defaultValue 開始
+            useStore.setState({
+                nulls: data.nulls || [],
+                rigs: data.rigs || [],
+                rigValues: {},
+            });
             if (data.reflectionMirror !== undefined) setReflectionMirror(data.reflectionMirror);
             if (data.reflectionBlur !== undefined) setReflectionBlur(data.reflectionBlur);
             if (data.reflectionMetalness !== undefined) setReflectionMetalness(data.reflectionMetalness);
@@ -298,6 +306,9 @@ function SharePageContent() {
 
             {/* Bottom Left Panel - Views & Cues */}
             <BottomLeftPanel defaultCollapsed={true} />
+
+            {/* 機關控制面板 */}
+            <RigPanel />
 
             {/* 3D Scene */}
             <ErrorBoundary>

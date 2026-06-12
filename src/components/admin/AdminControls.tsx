@@ -14,6 +14,7 @@ import { R2VideoManager } from '@/components/client/R2VideoManager';
 import { GDriveVideoManager } from './GDriveVideoManager';
 import ContentInspector from './ContentInspector';
 import { RigEditor } from './RigEditor';
+import { RigIcon } from '@/components/ui/icons';
 import { useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 
@@ -321,7 +322,7 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                             onClick={() => toggleSection('rigs')}
                             className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
                         >
-                            <span className="font-semibold flex items-center gap-1.5">🎛️ 機關設定</span>
+                            <span className="font-semibold flex items-center gap-1.5"><RigIcon className="w-4 h-4" /> 機關設定</span>
                             <svg
                                 className={`w-5 h-5 transition-transform ${expandedSections.includes('rigs') ? 'rotate-180' : ''}`}
                                 fill="none"

@@ -2,11 +2,13 @@
 
 import { useStore } from '@/store/useStore';
 import { useState } from 'react';
+import { RigIcon } from '@/components/ui/icons';
 
 /**
- * 客戶端機關控制面板。
+ * 機關控制面板(左側,Cues/視角面板上方)。
  * 依後台定義的機關自動生成滑桿,使用者只能在 min/max 範圍內調整。
- * admin 模式下隱藏(後台用 RigEditor 內的預覽滑桿)。
+ * Admin 模式下同樣可見,方便一邊增減機關一邊測試;
+ * 並額外顯示排序箭頭,可調整滑桿順序(順序隨專案同步到客戶端)。
  */
 export function RigPanel() {
     const mode = useStore((s) => s.mode);
@@ -16,6 +18,9 @@ export function RigPanel() {
     const rigValues = useStore((s) => s.rigValues);
     const setRigValue = useStore((s) => s.setRigValue);
     const resetRigValues = useStore((s) => s.resetRigValues);
+    const moveRig = useStore((s) => s.moveRig);
+    const views = useStore((s) => s.views);
+    const cues = useStore((s) => s.cues);
 
     const [collapsed, setCollapsed] = useState(false);
 
@@ -26,80 +31,120 @@ export function RigPanel() {
             : stageObjects.some(o => o.id === rig.targetId)
     );
 
-    // admin 模式下右側被 Admin Panel 佔據,且後台有自己的預覽滑桿
-    if (mode === 'admin' || validRigs.length === 0) return null;
+    if (validRigs.length === 0) return null;
+
+    const isAdmin = mode === 'admin';
+
+    // 位置:左側,疊在 BottomLeftPanel(Cues + 視角)上方;
+    // 該面板不存在時直接貼齊左下
+    const hasBottomPanel = views.length > 0 || cues.length > 0;
+    const anchorClass = hasBottomPanel ? 'bottom-52' : 'bottom-4';
 
     return (
-        <div className="absolute bottom-4 right-4 z-40 pointer-events-auto max-w-[calc(100vw-2rem)]">
-            <div className="bg-black/50 backdrop-blur-sm rounded-lg border border-white/10 w-72 max-w-full">
-                {/* 標題列 */}
-                <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
-                    <button
-                        onClick={() => setCollapsed(!collapsed)}
-                        className="flex items-center gap-2 text-white text-xs font-semibold"
-                    >
-                        <span>🎛️ 舞台機關</span>
-                        <svg
-                            className={`w-3 h-3 text-gray-400 transition-transform ${collapsed ? '' : 'rotate-180'}`}
-                            fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                        >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {!collapsed && (
-                        <button
-                            onClick={resetRigValues}
-                            className="text-[10px] text-gray-400 hover:text-white bg-white/10 hover:bg-white/20 px-2 py-1 rounded transition-colors"
-                        >
-                            全部重置
-                        </button>
-                    )}
-                </div>
-
-                {/* 機關滑桿列表 */}
+        <div className={`absolute left-4 ${anchorClass} z-40 pointer-events-auto`} data-ui-element>
+            <div className="flex items-end gap-1.5">
+                {/* 主面板 */}
                 {!collapsed && (
-                    <div className="p-3 space-y-3 max-h-[50vh] overflow-y-auto">
-                        {validRigs.map(rig => {
-                            const value = rigValues[rig.id] ?? rig.defaultValue;
-                            const unit = rig.type === 'rotation' ? '°' : 'm';
-                            const isDefault = value === rig.defaultValue;
-                            return (
-                                <div key={rig.id}>
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-xs text-gray-200">{rig.name}</span>
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-xs text-violet-300 font-mono">
-                                                {value.toFixed(rig.type === 'translation' ? 2 : 0)}{unit}
-                                            </span>
-                                            {!isDefault && (
-                                                <button
-                                                    onClick={() => setRigValue(rig.id, rig.defaultValue)}
-                                                    className="text-[10px] text-gray-500 hover:text-gray-300"
-                                                    title="重置此機關"
-                                                >
-                                                    ↺
-                                                </button>
-                                            )}
+                    <div className="bg-black/40 backdrop-blur-md rounded-xl border border-white/10 w-64 animate-fade-in">
+                        {/* 標題列 */}
+                        <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
+                            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-gray-500 font-medium">
+                                <RigIcon className="w-3 h-3" />
+                                機關
+                            </div>
+                            <button
+                                onClick={resetRigValues}
+                                className="text-[10px] text-gray-400 hover:text-white bg-white/5 hover:bg-white/15 px-2 py-0.5 rounded transition-colors"
+                            >
+                                全部重置
+                            </button>
+                        </div>
+
+                        {/* 機關滑桿列表 */}
+                        <div className="p-3 space-y-3 max-h-[45vh] overflow-y-auto">
+                            {validRigs.map((rig, index) => {
+                                const value = rigValues[rig.id] ?? rig.defaultValue;
+                                const unit = rig.type === 'rotation' ? '°' : 'm';
+                                const isDefault = value === rig.defaultValue;
+                                return (
+                                    <div key={rig.id} className="group/rig">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <div className="flex items-center gap-1 min-w-0">
+                                                {/* Admin:排序箭頭 */}
+                                                {isAdmin && (
+                                                    <div className="flex flex-col -my-1 opacity-30 group-hover/rig:opacity-100 transition-opacity">
+                                                        <button
+                                                            onClick={() => moveRig(rig.id, -1)}
+                                                            disabled={index === 0}
+                                                            className="text-gray-400 hover:text-white disabled:opacity-20 leading-none"
+                                                            title="上移"
+                                                        >
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                                                            </svg>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => moveRig(rig.id, 1)}
+                                                            disabled={index === validRigs.length - 1}
+                                                            className="text-gray-400 hover:text-white disabled:opacity-20 leading-none"
+                                                            title="下移"
+                                                        >
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                <span className="text-xs text-gray-200 truncate">{rig.name}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                <span className="text-xs text-gray-300 font-mono">
+                                                    {value.toFixed(rig.type === 'translation' ? 2 : 0)}{unit}
+                                                </span>
+                                                {!isDefault && (
+                                                    <button
+                                                        onClick={() => setRigValue(rig.id, rig.defaultValue)}
+                                                        className="text-[10px] text-gray-500 hover:text-gray-300"
+                                                        title="重置此機關"
+                                                    >
+                                                        ↺
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min={rig.min}
+                                            max={rig.max}
+                                            step={rig.step ?? (rig.type === 'translation' ? 0.01 : 1)}
+                                            value={value}
+                                            onChange={(e) => setRigValue(rig.id, parseFloat(e.target.value))}
+                                            className="w-full accent-gray-300 cursor-pointer h-1"
+                                        />
+                                        <div className="flex justify-between text-[9px] text-gray-600 font-mono">
+                                            <span>{rig.min}{unit}</span>
+                                            <span>{rig.max}{unit}</span>
                                         </div>
                                     </div>
-                                    <input
-                                        type="range"
-                                        min={rig.min}
-                                        max={rig.max}
-                                        step={rig.step ?? (rig.type === 'translation' ? 0.01 : 1)}
-                                        value={value}
-                                        onChange={(e) => setRigValue(rig.id, parseFloat(e.target.value))}
-                                        className="w-full accent-violet-500 cursor-pointer"
-                                    />
-                                    <div className="flex justify-between text-[9px] text-gray-600 font-mono">
-                                        <span>{rig.min}{unit}</span>
-                                        <span>{rig.max}{unit}</span>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
+
+                {/* 開闔按鈕(機關圖標) */}
+                <button
+                    onClick={() => setCollapsed(!collapsed)}
+                    className={`
+                        w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0
+                        bg-black/40 backdrop-blur-md border border-white/10
+                        hover:bg-white/10 transition-all duration-200
+                        ${!collapsed ? 'text-white' : 'text-gray-400'}
+                    `}
+                    title={collapsed ? '展開機關面板' : '收合機關面板'}
+                >
+                    <RigIcon className="w-4 h-4" />
+                </button>
             </div>
         </div>
     );

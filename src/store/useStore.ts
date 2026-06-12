@@ -244,6 +244,7 @@ interface State {
     // Editor State [NEW]
     selectedObjectId: string | null;
     selectedLightId: string | null;  // Selected stage light for TransformControls
+    selectedNullId: string | null;   // Selected rig Null node for TransformControls
     transformMode: 'translate' | 'rotate' | 'scale';
     gizmoEnabled: boolean; // [NEW] Toggle for transform controls
 
@@ -340,6 +341,8 @@ interface State {
     removeRig: (id: string) => void;
     setRigValue: (rigId: string, value: number) => void;
     resetRigValues: () => void;
+    moveRig: (id: string, direction: -1 | 1) => void;
+    setSelectedNull: (id: string | null) => void;
 
     addContentTexture: (texture: ContentTexture) => void;
     removeContentTexture: (id: string) => void;
@@ -451,6 +454,7 @@ export const useStore = create<State>()(
 
             selectedObjectId: null,
             selectedLightId: null,
+            selectedNullId: null,
             transformMode: 'translate',
             gizmoEnabled: false, // [NEW] Default off
 
@@ -634,13 +638,15 @@ export const useStore = create<State>()(
                 };
             }),
 
-            setSelectedObject: (id) => set({ selectedObjectId: id, selectedLightId: null }),
-            setSelectedLight: (id) => set({ selectedLightId: id, selectedObjectId: null }),
+            setSelectedObject: (id) => set({ selectedObjectId: id, selectedLightId: null, selectedNullId: null }),
+            setSelectedLight: (id) => set({ selectedLightId: id, selectedObjectId: null, selectedNullId: null }),
+            setSelectedNull: (id) => set({ selectedNullId: id, selectedObjectId: null, selectedLightId: null }),
             setTransformMode: (mode) => set({ transformMode: mode }),
             setGizmoEnabled: (enabled) => set({
                 gizmoEnabled: enabled,
                 selectedObjectId: enabled ? null : null,
                 selectedLightId: enabled ? null : null,
+                selectedNullId: enabled ? null : null,
             }),
 
             // Floor Plan Texture Action
@@ -755,7 +761,10 @@ export const useStore = create<State>()(
 
                 const rigs = state.rigs.filter(r => !(r.targetType === 'null' && r.targetId === id));
 
-                return { nulls, stageObjects, rigs };
+                return {
+                    nulls, stageObjects, rigs,
+                    selectedNullId: state.selectedNullId === id ? null : state.selectedNullId,
+                };
             }),
 
             // 換 parent 但保持世界位置不變(Object3D.attach 語意)。
@@ -797,6 +806,17 @@ export const useStore = create<State>()(
             })),
 
             resetRigValues: () => set({ rigValues: {} }),
+
+            // 調整機關在列表/客戶端面板中的顯示順序(陣列順序即顯示順序,會隨專案同步)
+            moveRig: (id, direction) => set((state) => {
+                const idx = state.rigs.findIndex(r => r.id === id);
+                if (idx < 0) return {};
+                const j = idx + direction;
+                if (j < 0 || j >= state.rigs.length) return {};
+                const rigs = [...state.rigs];
+                [rigs[idx], rigs[j]] = [rigs[j], rigs[idx]];
+                return { rigs };
+            }),
 
             addContentTexture: (texture) => set((state) => ({
                 contentTextures: [...state.contentTextures, texture],

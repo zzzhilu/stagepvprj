@@ -22,19 +22,79 @@ import { ToneMappingMode } from 'postprocessing';
 import { rigDelta, addVec3 } from '@/lib/rig-utils';
 
 /**
- * Null 節點 → <group> 遞迴渲染。
- * group transform = 基底 pos/rot + 該 Null 所有機關偏移。
- * Admin 模式顯示 axesHelper 標出軸心位置與軸向。
+ * Null 虛影標記:八面體線框 + 軸向輔助線。
+ * Admin 模式恆顯示;gizmo 開啟時可點選(選取後出現 TransformControls)。
+ */
+function NullMarker({
+    node,
+    isSelected,
+    gizmoEnabled,
+    setSelectedNull,
+}: {
+    node: NullNode;
+    isSelected: boolean;
+    gizmoEnabled: boolean;
+    setSelectedNull: (id: string | null) => void;
+}) {
+    return (
+        <group>
+            <axesHelper args={[isSelected ? 1.5 : 0.8]} />
+            {/* 可點擊的虛影本體 */}
+            <mesh
+                onClick={(e) => {
+                    if (!gizmoEnabled) return;
+                    e.stopPropagation();
+                    setSelectedNull(isSelected ? null : node.id);
+                }}
+                onPointerOver={(e) => {
+                    if (!gizmoEnabled) return;
+                    e.stopPropagation();
+                    document.body.style.cursor = 'pointer';
+                }}
+                onPointerOut={() => {
+                    document.body.style.cursor = 'auto';
+                }}
+            >
+                <octahedronGeometry args={[0.35, 0]} />
+                <meshBasicMaterial
+                    color={isSelected ? '#8b5cf6' : '#9ca3af'}
+                    wireframe
+                    transparent
+                    opacity={isSelected ? 1 : 0.55}
+                    depthTest={false}
+                />
+            </mesh>
+            {/* 放大點擊判定範圍的隱形球 */}
+            <mesh
+                visible={false}
+                onClick={(e) => {
+                    if (!gizmoEnabled) return;
+                    e.stopPropagation();
+                    setSelectedNull(isSelected ? null : node.id);
+                }}
+            >
+                <sphereGeometry args={[0.5, 8, 8]} />
+            </mesh>
+        </group>
+    );
+}
+
+/**
+ * Null 節點 → 巢狀 <group> 遞迴渲染。
+ * 外層 group = 基底 pos/rot(TransformControls 操作對象,寫回 store);
+ * 內層 group = 機關偏移(rig delta),沿 Null 自身的本地軸作用。
  */
 function NullGroup({
     node,
     objectRefs,
+    nullRefs,
     realtimeEnvMap,
     gizmoEnabled,
     setSelectedObject,
 }: {
     node: NullNode;
     objectRefs: React.MutableRefObject<Map<string, { current: THREE.Group | null }>>;
+    nullRefs: React.MutableRefObject<Map<string, { current: THREE.Group | null }>>;
     realtimeEnvMap: THREE.CubeTexture | null;
     gizmoEnabled: boolean;
     setSelectedObject: (id: string | null) => void;
@@ -44,24 +104,41 @@ function NullGroup({
     const rigs = useStore((state) => state.rigs);
     const rigValues = useStore((state) => state.rigValues);
     const mode = useStore((state) => state.mode);
+    const selectedNullId = useStore((state) => state.selectedNullId);
+    const setSelectedNull = useStore((state) => state.setSelectedNull);
 
     const delta = rigDelta(rigs, rigValues, 'null', node.id);
-    const pos = addVec3(node.pos, delta.pos);
-    const rot = addVec3(node.rot, delta.rot);
 
     const childNulls = nulls.filter(n => n.parentId === node.id);
     const childObjects = stageObjects.filter(o => o.parentId === node.id);
 
+    const nullRef = nullRefs.current.get(node.id);
+
     return (
-        <group position={pos} rotation={rot}>
-            {/* Admin 模式:顯示軸心輔助線(客戶端看不到) */}
-            {mode === 'admin' && <axesHelper args={[1.5]} />}
+        <group
+            ref={(el) => { if (nullRef) nullRef.current = el; }}
+            position={node.pos}
+            rotation={node.rot}
+        >
+            {/* Admin 模式:顯示可點選的軸心虛影(客戶端看不到) */}
+            {mode === 'admin' && (
+                <NullMarker
+                    node={node}
+                    isSelected={selectedNullId === node.id}
+                    gizmoEnabled={gizmoEnabled}
+                    setSelectedNull={setSelectedNull}
+                />
+            )}
+
+            {/* 機關偏移層:位移/旋轉沿 Null 自身本地軸作用 */}
+            <group position={delta.pos} rotation={delta.rot}>
 
             {childNulls.map(n => (
                 <NullGroup
                     key={n.id}
                     node={n}
                     objectRefs={objectRefs}
+                    nullRefs={nullRefs}
                     realtimeEnvMap={realtimeEnvMap}
                     gizmoEnabled={gizmoEnabled}
                     setSelectedObject={setSelectedObject}
@@ -100,6 +177,7 @@ function NullGroup({
                     </ErrorBoundary>
                 );
             })}
+            </group>
         </group>
     );
 }
@@ -121,6 +199,8 @@ export function SceneGraph() {
     const setSelectedObject = useStore((state) => state.setSelectedObject);
     const selectedLightId = useStore((state) => state.selectedLightId);
     const updateStageLight = useStore((state) => state.updateStageLight);
+    const selectedNullId = useStore((state) => state.selectedNullId);
+    const updateNull = useStore((state) => state.updateNull);
     const transformMode = useStore((state) => state.transformMode);
     const updateObjectTransform = useStore((state) => state.updateObjectTransform);
 
@@ -135,6 +215,8 @@ export function SceneGraph() {
     const lightTransformRef = useRef<any>(null);
     const stageLightRendererRef = useRef<StageLightRendererHandle>(null);
     const objectRefsRef = useRef<Map<string, { current: THREE.Group | null }>>(new Map());
+    const nullRefsRef = useRef<Map<string, { current: THREE.Group | null }>>(new Map());
+    const nullTransformRef = useRef<any>(null);
     const activeViewId = useStore((state) => state.activeViewId);
     const views = useStore((state) => state.views);
     const setActiveView = useStore((state) => state.setActiveView);
@@ -172,6 +254,21 @@ export function SceneGraph() {
         });
         keysToDelete.forEach(key => objectRefsRef.current.delete(key));
     }, [stageObjects]);
+
+    // Create/update refs for all rig Null nodes (same pattern as objects)
+    useEffect(() => {
+        nulls.forEach(node => {
+            if (!nullRefsRef.current.has(node.id)) {
+                nullRefsRef.current.set(node.id, { current: null });
+            }
+        });
+        const currentIds = new Set(nulls.map(n => n.id));
+        const keysToDelete: string[] = [];
+        nullRefsRef.current.forEach((_, key) => {
+            if (!currentIds.has(key)) keysToDelete.push(key);
+        });
+        keysToDelete.forEach(key => nullRefsRef.current.delete(key));
+    }, [nulls]);
 
     // CubeCamera for realtime LED reflections on stage surfaces
     useEffect(() => {
@@ -359,6 +456,7 @@ export function SceneGraph() {
                         key={n.id}
                         node={n}
                         objectRefs={objectRefsRef}
+                        nullRefs={nullRefsRef}
                         realtimeEnvMap={realtimeEnvMap}
                         gizmoEnabled={gizmoEnabled}
                         setSelectedObject={setSelectedObject}
@@ -400,6 +498,39 @@ export function SceneGraph() {
                         </ErrorBoundary>
                     );
                 })}
+
+            {/* TransformControls for rig Null nodes (when Gizmo is enabled + null selected) */}
+            {mode === 'admin' && gizmoEnabled && selectedNullId && (() => {
+                const nullRef = nullRefsRef.current.get(selectedNullId);
+                if (!nullRef || !nullRef.current) return null;
+
+                return (
+                    <TransformControls
+                        ref={nullTransformRef}
+                        object={nullRef.current}
+                        mode={transformMode === 'scale' ? 'translate' : transformMode}
+                        translationSnap={null}
+                        rotationSnap={Math.PI / 180} // 1 degree
+                        onObjectChange={() => {
+                            const g = nullRef.current;
+                            if (g) {
+                                // group 是巢狀子節點,position/rotation 即為相對 parent 的本地座標,
+                                // 直接寫回 NullNode 的基底 transform(機關偏移在內層 group,不受污染)
+                                updateNull(selectedNullId, {
+                                    pos: [g.position.x, g.position.y, g.position.z],
+                                    rot: [g.rotation.x, g.rotation.y, g.rotation.z],
+                                });
+                            }
+                        }}
+                        onMouseDown={() => {
+                            if (controlsRef.current) controlsRef.current.enabled = false;
+                        }}
+                        onMouseUp={() => {
+                            if (controlsRef.current) controlsRef.current.enabled = true;
+                        }}
+                    />
+                );
+            })()}
 
             {/* TransformControls for Admin Mode (when Gizmo is enabled) */}
             {mode === 'admin' && gizmoEnabled && selectedObjectId && (() => {
