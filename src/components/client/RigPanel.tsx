@@ -21,6 +21,7 @@ export function RigPanel() {
     const moveRig = useStore((s) => s.moveRig);
     const views = useStore((s) => s.views);
     const cues = useStore((s) => s.cues);
+    const toolbarExpanded = useStore((s) => s.toolbarExpanded);
 
     const [collapsed, setCollapsed] = useState(false);
 
@@ -36,12 +37,17 @@ export function RigPanel() {
     const isAdmin = mode === 'admin';
 
     // 位置:左側,疊在 BottomLeftPanel(Cues + 視角)上方;
-    // 該面板不存在時直接貼齊左下
+    // 該面板不存在時直接貼齊左下。
+    // 左偏移避開貼齊螢幕左緣的小工具列:預設內縮,工具列展開時再往右退
     const hasBottomPanel = views.length > 0 || cues.length > 0;
     const anchorClass = hasBottomPanel ? 'bottom-52' : 'bottom-4';
+    const leftClass = toolbarExpanded ? 'left-24' : 'left-14';
 
     return (
-        <div className={`absolute left-4 ${anchorClass} z-40 pointer-events-auto`} data-ui-element>
+        <div
+            className={`absolute ${leftClass} ${anchorClass} z-40 pointer-events-auto transition-[left] duration-300`}
+            data-ui-element
+        >
             <div className="flex items-end gap-1.5">
                 {/* 主面板 */}
                 {!collapsed && (

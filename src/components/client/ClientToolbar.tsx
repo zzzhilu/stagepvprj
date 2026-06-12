@@ -10,7 +10,8 @@ interface ClientToolbarProps {
 }
 
 export function ClientToolbar({ projectId }: ClientToolbarProps) {
-    const [expanded, setExpanded] = useState(false);
+    const expanded = useStore((state) => state.toolbarExpanded);
+    const setExpanded = useStore((state) => state.setToolbarExpanded);
     const drawingMode = useStore(s => s.drawingMode);
     const setDrawingMode = useStore(s => s.setDrawingMode);
     const showScreenshotToast = useStore(s => s.showScreenshotToast);

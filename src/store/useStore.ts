@@ -25,6 +25,7 @@ export interface StageCue {
     name: string;
     transforms: ObjectTransform[];
     lightStates?: StageLightState[];       // Snapshot of all light states per cue
+    rigValues?: Record<string, number>;    // 機關值快照(rigId → 值);舊 cue 無此欄位 = 不動機關
     thumbnail_url?: string;
     order: number;
 }
@@ -37,6 +38,7 @@ export interface StageObject {
     type: ModelType; // Model category type
     meshNames?: string[]; // Optional: specific mesh names to filter from the GLB
     name?: string; // 顯示名稱:上傳時取自 3D 軟體的 mesh/檔案命名,可由使用者修改
+    rigMirror?: boolean; // 鏡像跟隨:掛載於 Null 時,機關偏移以 ×-1 作用(對稱機關,如左右對開門)
     parentId?: string | null; // 掛載的 Null 節點或父物件 ID;一旦有 parent,instances 的 pos/rot 即為相對 parent 的本地座標
     curvature?: number; // [NEW] Arc curvature for projection screens (-1 to 1)
 }
@@ -343,8 +345,13 @@ interface State {
     removeRig: (id: string) => void;
     setRigValue: (rigId: string, value: number) => void;
     resetRigValues: () => void;
+    animateRigValues: (target: Record<string, number>, duration?: number) => void;
     moveRig: (id: string, direction: -1 | 1) => void;
     setSelectedNull: (id: string | null) => void;
+
+    // UI 共享狀態:左側小工具列展開(供 RigPanel 等浮動面板避讓)
+    toolbarExpanded: boolean;
+    setToolbarExpanded: (expanded: boolean) => void;
 
     addContentTexture: (texture: ContentTexture) => void;
     removeContentTexture: (id: string) => void;
@@ -427,6 +434,22 @@ interface State {
     updateTimelineCue: (videoId: string, cueId: string, updates: Partial<VideoTimelineCue>) => void;
 }
 
+// ===== 機關值動畫(cue 切換時平滑過渡)=====
+let rigAnimFrame: number | null = null;
+function cancelRigAnimation() {
+    if (rigAnimFrame !== null && typeof window !== 'undefined') {
+        cancelAnimationFrame(rigAnimFrame);
+        rigAnimFrame = null;
+    }
+}
+
+/** 快照所有機關的有效值(未調整過的補上 defaultValue,確保 cue 完整且可重現) */
+function snapshotRigValues(rigs: RigControl[], rigValues: Record<string, number>): Record<string, number> {
+    const snapshot: Record<string, number> = {};
+    rigs.forEach(r => { snapshot[r.id] = rigValues[r.id] ?? r.defaultValue; });
+    return snapshot;
+}
+
 export const useStore = create<State>()(
     persist(
         (set, get) => ({
@@ -457,6 +480,7 @@ export const useStore = create<State>()(
             selectedObjectId: null,
             selectedLightId: null,
             selectedNullId: null,
+            toolbarExpanded: false,
             transformMode: 'translate',
             gizmoEnabled: false, // [NEW] Default off
 
@@ -555,6 +579,7 @@ export const useStore = create<State>()(
                     name,
                     transforms,
                     lightStates,
+                    rigValues: snapshotRigValues(state.rigs, state.rigValues),
                     order: state.cues.length
                 };
 
@@ -585,7 +610,9 @@ export const useStore = create<State>()(
                 }));
 
                 return {
-                    cues: state.cues.map(c => c.id === id ? { ...c, transforms, lightStates } : c)
+                    cues: state.cues.map(c => c.id === id
+                        ? { ...c, transforms, lightStates, rigValues: snapshotRigValues(state.rigs, state.rigValues) }
+                        : c)
                 };
             }),
 
@@ -594,9 +621,11 @@ export const useStore = create<State>()(
                 activeCueId: state.activeCueId === id ? null : state.activeCueId
             })),
 
-            applyCue: (id) => set((state) => {
-                const cue = state.cues.find(c => c.id === id);
-                if (!cue) return {};
+            applyCue: (id) => {
+                const cue = get().cues.find(c => c.id === id);
+                if (!cue) return;
+
+                set((state) => {
 
                 // Update all stage objects based on cue data
                 const newObjects = state.stageObjects.map(obj => {
@@ -638,7 +667,13 @@ export const useStore = create<State>()(
                     stageLights: newLights,
                     activeCueId: id
                 };
-            }),
+                });
+
+                // 機關值:平滑動畫過渡到 cue 的快照(滑桿與場景同步動)
+                if (cue.rigValues && Object.keys(cue.rigValues).length > 0) {
+                    get().animateRigValues(cue.rigValues, 800);
+                }
+            },
 
             setSelectedObject: (id) => set({ selectedObjectId: id, selectedLightId: null, selectedNullId: null }),
             setSelectedLight: (id) => set({ selectedLightId: id, selectedObjectId: null, selectedNullId: null }),
@@ -809,11 +844,50 @@ export const useStore = create<State>()(
                 return { rigs: state.rigs.filter(r => r.id !== id), rigValues };
             }),
 
-            setRigValue: (rigId, value) => set((state) => ({
-                rigValues: { ...state.rigValues, [rigId]: value }
-            })),
+            setRigValue: (rigId, value) => {
+                cancelRigAnimation(); // 手動拖動優先,中斷 cue 動畫
+                set((state) => ({
+                    rigValues: { ...state.rigValues, [rigId]: value }
+                }));
+            },
 
-            resetRigValues: () => set({ rigValues: {} }),
+            resetRigValues: () => {
+                cancelRigAnimation();
+                set({ rigValues: {} });
+            },
+
+            // 機關值補間動畫:easeInOutQuad,驅動 store 更新 → 滑桿 UI 與 3D 場景同步反應
+            animateRigValues: (target, duration = 800) => {
+                cancelRigAnimation();
+                if (typeof window === 'undefined' || duration <= 0) {
+                    set((state) => ({ rigValues: { ...state.rigValues, ...target } }));
+                    return;
+                }
+
+                const stateNow = get();
+                const from: Record<string, number> = {};
+                for (const id of Object.keys(target)) {
+                    const rig = stateNow.rigs.find(r => r.id === id);
+                    if (!rig || !Number.isFinite(target[id])) continue; // 已刪除的機關或壞值跳過
+                    from[id] = stateNow.rigValues[id] ?? rig.defaultValue;
+                }
+                const keys = Object.keys(from);
+                if (keys.length === 0) return;
+
+                const start = performance.now();
+                const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+                const step = (now: number) => {
+                    const t = Math.min(1, (now - start) / duration);
+                    const e = ease(t);
+                    const next: Record<string, number> = {};
+                    keys.forEach(k => { next[k] = from[k] + (target[k] - from[k]) * e; });
+                    set((state) => ({ rigValues: { ...state.rigValues, ...next } }));
+                    rigAnimFrame = t < 1 ? requestAnimationFrame(step) : null;
+                };
+                rigAnimFrame = requestAnimationFrame(step);
+            },
+
+            setToolbarExpanded: (expanded) => set({ toolbarExpanded: expanded }),
 
             // 調整機關在列表/客戶端面板中的顯示順序(陣列順序即顯示順序,會隨專案同步)
             moveRig: (id, direction) => set((state) => {

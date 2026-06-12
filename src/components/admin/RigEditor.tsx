@@ -241,6 +241,7 @@ function ParentingSection() {
     const nulls = useStore((s) => s.nulls);
     const stageObjects = useStore((s) => s.stageObjects);
     const setObjectParent = useStore((s) => s.setObjectParent);
+    const updateObject = useStore((s) => s.updateObject);
 
     if (stageObjects.length === 0) {
         return <p className="text-gray-500 text-xs text-center py-2">尚未上傳任何模型</p>;
@@ -250,12 +251,25 @@ function ParentingSection() {
         <div className="space-y-1.5">
             <p className="text-[10px] text-gray-500 mb-1">
                 掛載時物件會保持原位(座標自動轉換),之後跟著 Null 一起動。
+                <span className="text-gray-600">「×-1」= 鏡像跟隨:機關偏移反向作用,適合對稱機關(左右對開門掛同一個 Null,各往反方向開)。</span>
             </p>
             {stageObjects.map(obj => (
                 <div key={obj.id} className="flex items-center gap-2 bg-gray-800 rounded p-2">
                     <span className="text-xs text-gray-300 truncate flex-1" title={getObjectLabel(obj)}>
                         {getObjectLabel(obj)}
                     </span>
+                    {/* ×-1 鏡像跟隨(掛載於 Null 時可用) */}
+                    {obj.parentId && nulls.some(n => n.id === obj.parentId) && (
+                        <button
+                            onClick={() => updateObject(obj.id, { rigMirror: !obj.rigMirror })}
+                            className={`text-[10px] px-1.5 py-1 rounded font-mono flex-shrink-0 transition-colors ${obj.rigMirror
+                                ? 'bg-amber-600/80 text-white'
+                                : 'bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-gray-200'}`}
+                            title={obj.rigMirror ? '鏡像跟隨中:機關偏移 ×-1 作用' : '切換為鏡像跟隨(機關偏移 ×-1)'}
+                        >
+                            ×-1
+                        </button>
+                    )}
                     <select
                         value={obj.parentId ?? ''}
                         onChange={(e) => setObjectParent(obj.id, e.target.value || null)}

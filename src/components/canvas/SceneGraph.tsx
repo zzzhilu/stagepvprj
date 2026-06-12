@@ -110,7 +110,15 @@ function NullGroup({
     const delta = rigDelta(rigs, rigValues, 'null', node.id);
 
     const childNulls = nulls.filter(n => n.parentId === node.id);
-    const childObjects = stageObjects.filter(o => o.parentId === node.id);
+    const allChildObjects = stageObjects.filter(o => o.parentId === node.id);
+    const childObjects = allChildObjects.filter(o => !o.rigMirror);
+    const mirroredObjects = allChildObjects.filter(o => o.rigMirror);
+
+    // 鏡像跟隨:機關偏移 ×-1(位移反向、旋轉反向),供對稱機關使用
+    const negDelta = {
+        pos: [-delta.pos[0], -delta.pos[1], -delta.pos[2]] as [number, number, number],
+        rot: [-delta.rot[0], -delta.rot[1], -delta.rot[2]] as [number, number, number],
+    };
 
     const nullRef = nullRefs.current.get(node.id);
 
@@ -178,6 +186,42 @@ function NullGroup({
                 );
             })}
             </group>
+            {/* 鏡像跟隨層:同一個機關,偏移以 ×-1 作用 */}
+            {mirroredObjects.length > 0 && (
+                <group position={negDelta.pos} rotation={negDelta.rot}>
+                    {mirroredObjects.map(obj => {
+                        const objRef = objectRefs.current.get(obj.id);
+                        const Renderer = obj.model_path === '__box__'
+                            ? BoxPrimitiveRenderer
+                            : obj.model_path === '__projection_screen__'
+                                ? ProjectionScreenRenderer
+                                : StageObjectRenderer;
+                        return (
+                            <ErrorBoundary
+                                key={obj.id}
+                                fallback={
+                                    <mesh position={obj.instances[0]?.pos || [0, 0, 0]}>
+                                        <boxGeometry args={[1, 1, 1]} />
+                                        <meshStandardMaterial color="red" wireframe />
+                                    </mesh>
+                                }
+                            >
+                                <Renderer
+                                    ref={objRef}
+                                    object={obj}
+                                    envMap={realtimeEnvMap}
+                                    onClick={(e: ThreeEvent<MouseEvent>) => {
+                                        if (mode === 'admin' && gizmoEnabled) {
+                                            e.stopPropagation();
+                                            setSelectedObject(obj.id);
+                                        }
+                                    }}
+                                />
+                            </ErrorBoundary>
+                        );
+                    })}
+                </group>
+            )}
         </group>
     );
 }
