@@ -7,6 +7,7 @@ import ClientControls from '@/components/client/ClientControls';
 import { VideoControls } from '@/components/client/VideoControls';
 import { BottomLeftPanel } from '@/components/client/BottomLeftPanel';
 import { RigPanel } from '@/components/client/RigPanel';
+import { AssetLoadingOverlay } from '@/components/ui/AssetLoadingOverlay';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ClientToolbar } from '@/components/client/ClientToolbar';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
@@ -251,17 +252,9 @@ function SharePageContent() {
         }
     };
 
-    // Show loading state
-    if (isLoading) {
-        return (
-            <div className="w-full h-full flex items-center justify-center bg-gray-900">
-                <div className="text-center">
-                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
-                    <p className="text-gray-400">載入中...</p>
-                </div>
-            </div>
-        );
-    }
+    // 載入中不再整頁替換成 spinner —— 立即掛載 3D 場景讓資產開始下載,
+    // 由 AssetLoadingOverlay 蓋在上方顯示「真實」進度(資料 → 資產 → 首幀),
+    // 三關全過才淡出,避免 loading 結束時場景仍是空的。
 
     // Show error state
     if (error) {
@@ -281,6 +274,9 @@ function SharePageContent() {
 
     return (
         <main className="relative w-full h-full">
+            {/* 真實載入進度(蓋在場景上,完成後淡出) */}
+            <AssetLoadingOverlay dataReady={!isLoading} projectName={projectName} />
+
             {/* Watermark - Bottom Right */}
             {(projectName || displayVideoFilename) && (
                 <div data-ui-element className="absolute bottom-6 right-6 z-50 pointer-events-none">

@@ -16,6 +16,13 @@ export function BottomLeftPanel({ defaultCollapsed = false }: BottomLeftPanelPro
 
     // Initial state based on prop
     const [collapsed, setCollapsed] = useState(defaultCollapsed);
+    const setBottomPanelExpanded = useStore((state) => state.setBottomPanelExpanded);
+
+    // 鏡射展開狀態到 store,供 RigPanel 收合按鈕對齊定位
+    useEffect(() => {
+        setBottomPanelExpanded(!collapsed);
+        return () => setBottomPanelExpanded(false);
+    }, [collapsed, setBottomPanelExpanded]);
 
     // Only auto-select first view on initial mount (not when user clears it by rotating)
     const hasAutoSelected = useRef(false);

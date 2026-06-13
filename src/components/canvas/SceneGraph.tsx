@@ -1,4 +1,4 @@
-import { OrbitControls, PerspectiveCamera, TransformControls } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, TransformControls , useProgress } from '@react-three/drei';
 import { useStore, StageObject } from '@/store/useStore';
 import type { NullNode } from '@/store/useStore';
 import { StageObjectRenderer } from './StageObjectRenderer';
@@ -20,6 +20,27 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { PerfectRenderEnvironment } from './PerfectRenderEnvironment';
 import { ToneMappingMode } from 'postprocessing';
 import { rigDelta, addVec3 } from '@/lib/rig-utils';
+
+/**
+ * 首幀信號:資產載入完成後,實際渲染出第一幀時通知 store。
+ * 載入進行中會把旗標歸零,確保旗標語意 = 「資產完成後的首幀」。
+ * AssetLoadingOverlay 以此作為隱藏 loading 畫面的最終關卡。
+ */
+function FirstFrameGate() {
+    const { active } = useProgress();
+    const setFirstFrameRendered = useStore((state) => state.setFirstFrameRendered);
+
+    useFrame(() => {
+        const flag = useStore.getState().firstFrameRendered;
+        if (active) {
+            if (flag) setFirstFrameRendered(false); // 新一輪載入開始,歸零
+        } else if (!flag) {
+            setFirstFrameRendered(true); // 載入結束後的首幀
+        }
+    });
+
+    return null;
+}
 
 /**
  * Null 虛影標記:八面體線框 + 軸向輔助線。
@@ -454,6 +475,7 @@ export function SceneGraph() {
 
             {/* Video Manager and its Timeline Cue Controller */}
             <VideoManager />
+            <FirstFrameGate />
             <VideoTimelineController />
 
             {/* Paper Figures (Billboard Sprites) */}

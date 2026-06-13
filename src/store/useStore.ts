@@ -353,6 +353,14 @@ interface State {
     toolbarExpanded: boolean;
     setToolbarExpanded: (expanded: boolean) => void;
 
+    // UI 共享狀態:左下 Cues/視角面板展開(供 RigPanel 收合按鈕對齊)
+    bottomPanelExpanded: boolean;
+    setBottomPanelExpanded: (expanded: boolean) => void;
+
+    // 載入狀態:資產完成後是否已實際渲染出首幀(真實 loading 畫面的最終關卡)
+    firstFrameRendered: boolean;
+    setFirstFrameRendered: (rendered: boolean) => void;
+
     addContentTexture: (texture: ContentTexture) => void;
     removeContentTexture: (id: string) => void;
     updateContentTexture: (id: string, updates: Partial<ContentTexture>) => void;
@@ -481,6 +489,8 @@ export const useStore = create<State>()(
             selectedLightId: null,
             selectedNullId: null,
             toolbarExpanded: false,
+            bottomPanelExpanded: false,
+            firstFrameRendered: false,
             transformMode: 'translate',
             gizmoEnabled: false, // [NEW] Default off
 
@@ -888,6 +898,8 @@ export const useStore = create<State>()(
             },
 
             setToolbarExpanded: (expanded) => set({ toolbarExpanded: expanded }),
+            setBottomPanelExpanded: (expanded) => set({ bottomPanelExpanded: expanded }),
+            setFirstFrameRendered: (rendered) => set({ firstFrameRendered: rendered }),
 
             // 調整機關在列表/客戶端面板中的顯示順序(陣列順序即顯示順序,會隨專案同步)
             moveRig: (id, direction) => set((state) => {
