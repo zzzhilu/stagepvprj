@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import * as THREE from 'three';
-import type { MaterialId } from '@/lib/materials';
+import type { MaterialId, MaterialOverrides } from '@/lib/materials';
 import { nullLocalMatrix, nullWorldMatrix, reparentTransform } from '@/lib/rig-utils';
 
 // Types based on SAD 5.1 & 5.2
@@ -39,6 +39,7 @@ export interface StageObject {
     meshNames?: string[]; // Optional: specific mesh names to filter from the GLB
     name?: string; // 顯示名稱:上傳時取自 3D 軟體的 mesh/檔案命名,可由使用者修改
     rigMirror?: boolean; // 鏡像跟隨:掛載於 Null 時,機關偏移以 ×-1 作用(對稱機關,如左右對開門)
+    materialOverrides?: MaterialOverrides; // 材質參數微調(基底 material_id 之上的覆寫)
     parentId?: string | null; // 掛載的 Null 節點或父物件 ID;一旦有 parent,instances 的 pos/rot 即為相對 parent 的本地座標
     curvature?: number; // [NEW] Arc curvature for projection screens (-1 to 1)
 }

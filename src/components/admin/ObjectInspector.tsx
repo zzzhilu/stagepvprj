@@ -1,6 +1,7 @@
 'use client';
 
 import { getObjectDisplayName } from '@/lib/object-utils';
+import { MaterialPanel } from './MaterialPanel';
 import { useStore, StageObject } from '@/store/useStore';
 import { useState, useEffect } from 'react';
 
@@ -141,6 +142,9 @@ export function ObjectInspector() {
                                 className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none"
                             />
                         </div>
+
+                        {/* 材質球面板 */}
+                        <MaterialPanel object={selectedObject} />
 
                         {/* Transform Mode Toggle */}
                         <div className="flex gap-1 bg-gray-800 p-1 rounded">

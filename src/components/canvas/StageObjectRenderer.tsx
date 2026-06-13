@@ -1,7 +1,7 @@
 import { useGLTF } from '@react-three/drei';
 import { StageObject, useStore } from '@/store/useStore';
 import * as THREE from 'three';
-import { createMaterial, createPerfectMaterial, MATERIAL_LIBRARY, createMeshLEDAlphaMap } from '@/lib/materials';
+import { createMaterial, createPerfectMaterial, MATERIAL_LIBRARY, createMeshLEDAlphaMap, applyMaterialOverrides } from '@/lib/materials';
 import { useMemo, useEffect, useState, useRef, forwardRef } from 'react';
 import { globalVideoElement } from './VideoManager';
 import { useFrame } from '@react-three/fiber';
@@ -546,6 +546,23 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
             mat.needsUpdate = true;
         }
     }, [material, envMap, perfectRenderEnabled, object.material_id, object.type, renderMode]);
+
+    // 材質參數微調:就地 mutate(不重建材質、不重編譯 shader),滑桿拖動即時反映。
+    // 特殊功能材質(LED 螢幕/投影幕/平面圖)維持各自路徑,不套用覆寫。
+    const overridesJson = JSON.stringify(object.materialOverrides ?? null);
+    useEffect(() => {
+        if (!material || Array.isArray(material)) return;
+        if (
+            object.material_id === 'emissive' ||
+            object.material_id === 'emissiveMesh' ||
+            object.material_id === 'projectionScreen' ||
+            object.type === 'floor_plan'
+        ) return;
+        const def = MATERIAL_LIBRARY[object.material_id];
+        if (!def) return;
+        applyMaterialOverrides(material as THREE.MeshStandardMaterial, def, object.materialOverrides);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [material, overridesJson, object.material_id, object.type]);
 
     const nodes = gltfData?.nodes ?? {};
 

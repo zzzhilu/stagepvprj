@@ -38,6 +38,30 @@ export interface MaterialDefinition {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// MaterialOverrides - 每物件的材質參數微調(基底預設之上的覆寫)
+// 存於 StageObject.materialOverrides,跟著專案同步
+// ═══════════════════════════════════════════════════════════════
+export type BumpPattern = 'none' | 'noise' | 'brushed' | 'grid';
+
+export interface MaterialOverrides {
+    color?: string;            // 基底色(同時染色程序化紋理)
+    roughness?: number;        // 0–1
+    metalness?: number;        // 0–1
+    envMapIntensity?: number;  // 反射強度 0–3
+    bumpPattern?: BumpPattern; // 程序化凹凸圖樣
+    bumpScale?: number;        // 凹凸強度 0–2
+    patternScale?: number;     // 紋理密度(repeat)1–8
+    emissive?: string;         // 自發光色
+    emissiveIntensity?: number;// 自發光強度 0–5
+    opacity?: number;          // 0–1(<1 自動開啟 transparent)
+}
+
+/** 是否有任何有效覆寫 */
+export function hasMaterialOverrides(o?: MaterialOverrides | null): boolean {
+    return !!o && Object.keys(o).length > 0;
+}
+
+// ═══════════════════════════════════════════════════════════════
 // 程序化紋理生成器
 // 使用 Canvas 或 DataTexture 創建逼真的紋理貼圖
 // ═══════════════════════════════════════════════════════════════
@@ -523,6 +547,100 @@ export const MATERIAL_LIBRARY: Record<MaterialId, MaterialDefinition> = {
 // ═══════════════════════════════════════════════════════════════
 // createMaterial - 預設模式（MeshStandardMaterial，效能優先）
 // ═══════════════════════════════════════════════════════════════
+/** 生成格紋凹凸圖 - 面板接縫/磁磚感 */
+function generateGridBumpTexture(size = 256): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#808080';
+    ctx.fillRect(0, 0, size, size);
+    const cell = size / 4;
+    ctx.strokeStyle = '#202020';
+    ctx.lineWidth = Math.max(2, size / 128);
+    for (let i = 0; i <= 4; i++) {
+        ctx.beginPath(); ctx.moveTo(i * cell, 0); ctx.lineTo(i * cell, size); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, i * cell); ctx.lineTo(size, i * cell); ctx.stroke();
+    }
+    // 邊緣亮線增加立體感
+    ctx.strokeStyle = '#d0d0d0';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+        ctx.beginPath(); ctx.moveTo(i * cell + 2, 0); ctx.lineTo(i * cell + 2, size); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, i * cell + 2); ctx.lineTo(size, i * cell + 2); ctx.stroke();
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+}
+
+// 凹凸貼圖模組層級快取:key = pattern + scale。
+// ⚠️ 絕不在元件 render 中生成貼圖 —— 滑桿拖動頻率下會造成 VRAM 洩漏
+// (patternScale 以離散步進限制 key 數量,快取上限可控,不需淘汰)
+const bumpTextureCache = new Map<string, THREE.Texture>();
+
+export function getBumpTexture(pattern: BumpPattern, patternScale = 2): THREE.Texture | null {
+    if (pattern === 'none') return null;
+    const scale = Math.max(1, Math.min(8, Math.round(patternScale)));
+    const key = `${pattern}_${scale}`;
+    let tex = bumpTextureCache.get(key);
+    if (!tex) {
+        tex = pattern === 'noise'
+            ? generateNoiseTexture(256, 0.9, 0.5)
+            : pattern === 'brushed'
+                ? generateBrushedMetalTexture(512)
+                : generateGridBumpTexture(256);
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(scale, scale);
+        bumpTextureCache.set(key, tex);
+    }
+    return tex;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// applyMaterialOverrides - 把覆寫「就地」套用到既有材質
+// 採 mutate 而非重建材質:避免拖動滑桿時反覆觸發 shader 重編譯
+// 未覆寫的欄位回落到基底預設值(def),確保「清除微調」能完整還原
+// ═══════════════════════════════════════════════════════════════
+export function applyMaterialOverrides(
+    mat: THREE.MeshStandardMaterial,
+    def: MaterialDefinition,
+    overrides?: MaterialOverrides | null
+) {
+    const o = overrides || {};
+
+    mat.color.set(o.color ?? def.color);
+    mat.roughness = o.roughness ?? def.roughness;
+    mat.metalness = o.metalness ?? def.metalness;
+    mat.emissive.set(o.emissive ?? def.emissive ?? '#000000');
+    mat.emissiveIntensity = o.emissiveIntensity ?? def.emissiveIntensity ?? 0;
+
+    const opacity = o.opacity ?? def.opacity ?? 1.0;
+    const transparent = opacity < 1 || (def.transparent ?? false);
+    if (mat.transparent !== transparent) {
+        mat.transparent = transparent;
+        mat.needsUpdate = true;
+    }
+    mat.opacity = opacity;
+
+    // 反射強度:僅在明確覆寫時設定,避免與 envMap 管理邏輯互踩
+    if (o.envMapIntensity !== undefined) {
+        mat.envMapIntensity = o.envMapIntensity;
+    }
+
+    // 程序化凹凸
+    const newBump = o.bumpPattern && o.bumpPattern !== 'none'
+        ? getBumpTexture(o.bumpPattern, o.patternScale ?? 2)
+        : null;
+    if (mat.bumpMap !== newBump) {
+        mat.bumpMap = newBump;
+        mat.needsUpdate = true; // 貼圖插槽增減需要重編譯(僅在切換圖樣時發生一次)
+    }
+    mat.bumpScale = o.bumpScale ?? 0.5;
+}
+
 export function createMaterial(materialId: MaterialId): THREE.MeshStandardMaterial {
     const def = MATERIAL_LIBRARY[materialId];
 
