@@ -45,13 +45,16 @@ export function AssetLoadingOverlay({
         return () => clearTimeout(t);
     }, []);
 
-    // 資料抓取階段沒有任何 state 變動,需要 tick 驅動重繪讓爬升百分比動起來
-    const [, forceTick] = useState(0);
+    // 等待階段(資料抓取/初始化場景)沒有 loader 進度事件,
+    // 用 tick 驅動重繪:讓爬升百分比與省略號動畫持續跳動,表示頁面正在運作
+    const [tick, setTick] = useState(0);
+    const waiting = !dataReady || (!active && !(dataReady && firstFrameRendered));
     useEffect(() => {
-        if (dataReady) return;
-        const t = setInterval(() => forceTick(n => n + 1), 200);
+        if (!waiting) return;
+        const t = setInterval(() => setTick(n => n + 1), 350);
         return () => clearInterval(t);
-    }, [dataReady]);
+    }, [waiting]);
+    const dots = '.'.repeat((tick % 3) + 1);
 
     const ready =
         dataReady &&
@@ -91,12 +94,12 @@ export function AssetLoadingOverlay({
         : '';
 
     const statusText = !dataReady
-        ? '載入專案資料…'
+        ? `載入專案資料${dots}`
         : active
             ? `載入 3D 資產 ${loaded}/${total}`
             : ready
                 ? '完成'
-                : '初始化場景…';
+                : `初始化場景${dots}`;
 
     return (
         <div
@@ -122,8 +125,16 @@ export function AssetLoadingOverlay({
                 />
             </div>
 
-            {/* 狀態與目前項目 */}
-            <p className="text-white/50 text-xs tracking-wider">{statusText}</p>
+            {/* 狀態與目前項目(spinner 表示頁面運作中) */}
+            <div className="flex items-center gap-2">
+                {!ready && (
+                    <svg className="animate-spin w-3 h-3 text-white/40" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                        <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V1.5A10.5 10.5 0 001.5 12H4z" />
+                    </svg>
+                )}
+                <p className="text-white/50 text-xs tracking-wider">{statusText}</p>
+            </div>
             {itemLabel && active && (
                 <p className="text-white/25 text-[10px] mt-1.5 max-w-[80vw] truncate font-mono">
                     {itemLabel}

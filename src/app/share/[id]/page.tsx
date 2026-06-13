@@ -84,6 +84,7 @@ function SharePageContent() {
 
         try {
             setIsLoading(true);
+            setError(null); // 清除舊錯誤(重試/重跑成功時不殘留)
             const data = await ProjectService.loadProject(projectId);
 
             if (!data) {
@@ -152,31 +153,40 @@ function SharePageContent() {
                 const isImageFile = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(video.filename) ||
                     /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(urlToCheck);
 
-                // Resolve GDrive URL directly (bypasses Vercel bandwidth)
-                let filePath: string;
-                if (isR2) {
-                    filePath = video.r2_url;
-                } else {
-                    filePath = await resolveGDriveUrl(video.driveFileId);
+                // 影片 URL 解析是「非致命」步驟:專案本體此時已成功載入,
+                // 解析失敗(手機網路逾時等)只降級略過影片,不報整體錯誤
+                try {
+                    // Resolve GDrive URL directly (bypasses Vercel bandwidth)
+                    let filePath: string;
+                    if (isR2) {
+                        filePath = video.r2_url;
+                    } else {
+                        filePath = await resolveGDriveUrl(video.driveFileId);
+                    }
+
+                    const originalTexture = data.contentTextures?.find((c: any) => c.id === video.id);
+                    // Create ContentTexture for the content
+                    const videoTexture = {
+                        ...originalTexture,
+                        id: video.id,
+                        name: video.filename,
+                        file_path: filePath,
+                        type: (isImageFile ? 'image' : 'r2_video') as 'image' | 'r2_video',
+                        timelineCues: video.timelineCues || originalTexture?.timelineCues,
+                    };
+
+                    // Clear existing content and add only this
+                    setContentTextures([videoTexture]);
+                    setActiveContent(video.id);
+
+                    // Auto-play only for videos
+                    if (!isImageFile) setVideoPlaying(true);
+                } catch (videoErr) {
+                    console.warn('影片 URL 解析失敗(非致命,專案照常顯示):', videoErr);
+                    // 降級:還原專案原本的內容清單,讓 LED 至少有東西顯示
+                    if (data.contentTextures) setContentTextures(data.contentTextures);
+                    if (data.activeContentId) setActiveContent(data.activeContentId);
                 }
-
-                const originalTexture = data.contentTextures?.find((c: any) => c.id === video.id);
-                // Create ContentTexture for the content
-                const videoTexture = {
-                    ...originalTexture,
-                    id: video.id,
-                    name: video.filename,
-                    file_path: filePath,
-                    type: (isImageFile ? 'image' : 'r2_video') as 'image' | 'r2_video',
-                    timelineCues: video.timelineCues || originalTexture?.timelineCues,
-                };
-
-                // Clear existing content and add only this
-                setContentTextures([videoTexture]);
-                setActiveContent(video.id);
-
-                // Auto-play only for videos
-                if (!isImageFile) setVideoPlaying(true);
             } else if ((data.r2Videos && data.r2Videos.length > 0) || (data.gdriveVideos && data.gdriveVideos.length > 0)) {
                 let firstVideo: any = null;
                 let isR2 = false;
@@ -189,6 +199,7 @@ function SharePageContent() {
                 }
 
                 if (firstVideo) {
+                    try {
                     setVideoFilename(formatDisplayName(firstVideo.filename));
 
                     const urlToCheck = isR2 ? firstVideo.r2_url : firstVideo.filename;
@@ -217,6 +228,11 @@ function SharePageContent() {
                     setContentTextures([videoTexture]);
                     setActiveContent(firstVideo.id);
                     if (!isFirstImage) setVideoPlaying(true);
+                    } catch (videoErr) {
+                        console.warn('影片 URL 解析失敗(非致命,專案照常顯示):', videoErr);
+                        if (data.contentTextures) setContentTextures(data.contentTextures);
+                        if (data.activeContentId) setActiveContent(data.activeContentId);
+                    }
                 }
             } else {
                 // Load existing content textures if no videos found
@@ -245,6 +261,7 @@ function SharePageContent() {
             }
 
         } catch (err) {
+            // 只有專案本體(Firestore)載入失敗才會到這裡;影片解析失敗已在內層降級處理
             console.error('Failed to load project:', err);
             setError('載入專案失敗');
         } finally {
