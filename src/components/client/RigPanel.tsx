@@ -1,6 +1,7 @@
 'use client';
 
 import { useStore } from '@/store/useStore';
+import { getRigStep, quantizeRigValue } from '@/lib/rig-utils';
 import { useState } from 'react';
 import { RigIcon } from '@/components/ui/icons';
 
@@ -77,7 +78,7 @@ export function RigPanel() {
                         {/* 機關滑桿列表 */}
                         <div className="p-3 space-y-3 max-h-[45vh] overflow-y-auto">
                             {validRigs.map((rig, index) => {
-                                const value = rigValues[rig.id] ?? rig.defaultValue;
+                                const value = quantizeRigValue(rig.type, rigValues[rig.id] ?? rig.defaultValue);
                                 const unit = rig.type === 'rotation' ? '°' : 'm';
                                 const isDefault = value === rig.defaultValue;
                                 return (
@@ -113,7 +114,7 @@ export function RigPanel() {
                                             </div>
                                             <div className="flex items-center gap-1.5 flex-shrink-0">
                                                 <span className="text-xs text-gray-300 font-mono">
-                                                    {value.toFixed(rig.type === 'translation' ? 2 : 0)}{unit}
+                                                    {value.toFixed(rig.type === 'translation' ? 1 : 0)}{unit}
                                                 </span>
                                                 {!isDefault && (
                                                     <button
@@ -130,7 +131,7 @@ export function RigPanel() {
                                             type="range"
                                             min={rig.min}
                                             max={rig.max}
-                                            step={rig.step ?? (rig.type === 'translation' ? 0.01 : 1)}
+                                            step={getRigStep(rig.type)}
                                             value={value}
                                             onChange={(e) => setRigValue(rig.id, parseFloat(e.target.value))}
                                             className="w-full accent-gray-300 cursor-pointer h-1"

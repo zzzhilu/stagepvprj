@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { isSelfOrDescendant, objectWorldPosition, worldPosToLocal } from '@/lib/rig-utils';
 import { RigIcon, NullIcon, LinkIcon, RotateIcon, TranslateIcon, PickIcon } from '@/components/ui/icons';
 import { getObjectLabel } from '@/lib/object-utils';
+import { getRigStep } from '@/lib/rig-utils';
 
 const AXIS_OPTIONS: RigAxis[] = ['x', 'y', 'z'];
 
@@ -370,7 +371,7 @@ function RigsSection() {
             axis,
             min,
             max,
-            step: type === 'translation' ? 0.01 : 1,
+            step: getRigStep(type),
             defaultValue,
         };
         addRig(rig);
@@ -528,7 +529,7 @@ function RigsSection() {
                                 type="range"
                                 min={rig.min}
                                 max={rig.max}
-                                step={rig.step ?? (rig.type === 'translation' ? 0.01 : 1)}
+                                step={getRigStep(rig.type)}
                                 value={value}
                                 onChange={(e) => setRigValue(rig.id, parseFloat(e.target.value))}
                                 className="flex-1 accent-violet-500"
