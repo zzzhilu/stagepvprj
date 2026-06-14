@@ -114,7 +114,7 @@ export function RigPanel() {
                                             </div>
                                             <div className="flex items-center gap-1.5 flex-shrink-0">
                                                 <span className="text-xs text-gray-300 font-mono">
-                                                    {value.toFixed(rig.type === 'translation' ? 1 : 0)}{unit}
+                                                    {value.toFixed(rig.type === 'translation' ? 2 : 0)}{unit}
                                                 </span>
                                                 {!isDefault && (
                                                     <button

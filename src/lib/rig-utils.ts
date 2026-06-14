@@ -3,14 +3,14 @@ import type { NullNode, RigControl, Instance } from '@/store/useStore';
 
 /**
  * 機關滑桿步進(單一事實來源)。
- * 位移:0.5(以半整數值移動,如 0 → 0.5 → 1.0);旋轉:1 度。
- * 不依賴每個機關存的 step 欄位,避免舊機關殘留 0.01 — 由型別即時決定。
+ * 位移:0.05(如 0 → 0.05 → 0.10);旋轉:1 度。
+ * 不依賴每個機關存的 step 欄位,避免舊機關殘留舊值 — 由型別即時決定。
  */
 export function getRigStep(type: 'rotation' | 'translation'): number {
-    return type === 'translation' ? 0.5 : 1;
+    return type === 'translation' ? 0.05 : 1;
 }
 
-/** 把值對齊到該型別的步進(位移 0.5 / 旋轉 1),修正舊機關殘留的非整數值 */
+/** 把值對齊到該型別的步進(位移 0.05 / 旋轉 1),修正舊機關殘留的非整數值 */
 export function quantizeRigValue(type: 'rotation' | 'translation', value: number): number {
     const step = getRigStep(type);
     return Math.round(value / step) * step;
