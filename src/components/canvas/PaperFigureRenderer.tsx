@@ -3,7 +3,7 @@
 import { useRef, useState, useMemo, useCallback } from 'react';
 import { useStore, PaperFigure } from '@/store/useStore';
 import { Billboard, Html } from '@react-three/drei';
-import { ThreeEvent, useThree, useFrame } from '@react-three/fiber';
+import { ThreeEvent, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 // ─── Human silhouette shape ───────────────────────────────────
@@ -99,7 +99,7 @@ function PaperFigureMesh({
     const [showMenu, setShowMenu] = useState(false);
     const [dragging, setDragging] = useState(false);
     const groupRef = useRef<THREE.Group>(null);
-    const { raycaster, camera, scene } = useThree();
+    const { raycaster } = useThree();
 
     // Floor plane for raycasting during drag
     const floorPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
@@ -120,7 +120,8 @@ function PaperFigureMesh({
         const intersection = new THREE.Vector3();
         raycaster.ray.intersectPlane(floorPlane, intersection);
         if (intersection) {
-            updatePaperFigurePosition(figure.id, [intersection.x, 0, intersection.z]);
+            // 與放置時一致的落地高度(避免拖曳後小人高度跳變)
+            updatePaperFigurePosition(figure.id, [intersection.x, 0.05, intersection.z]);
         }
     }, [dragging, raycaster, floorPlane, figure.id, updatePaperFigurePosition]);
 
@@ -227,6 +228,8 @@ function PaperFigureMesh({
     );
 }
 
+const FIGURE_COLORS = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#a29bfe', '#fd79a8', '#00cec9'];
+
 // ─── Main Renderer ────────────────────────────────────────────
 export function PaperFigureRenderer() {
     const paperFigures = useStore(s => s.paperFigures);
@@ -234,40 +237,60 @@ export function PaperFigureRenderer() {
     const addPaperFigure = useStore(s => s.addPaperFigure);
     const { scene, raycaster, pointer, camera } = useThree();
 
-    const FIGURE_COLORS = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#a29bfe', '#fd79a8', '#00cec9'];
+    // 紙片小人尺寸:原 1.045 縮小 15% → 0.888(人形 shape 高約 1.77,縮放後更貼近真人比例)
+    const FIGURE_SCALE = 0.888;
+    // 落地點 Y 微調(場景單位):往上約 0.05,修正浮空/陷地
+    const PLACE_Y_OFFSET = 0.05;
+
+    // 去抖鎖:onPointerMissed 在單次點擊中可能被觸發多次(觸控/多按鈕),
+    // 用時間鎖確保「一次點擊只生成一個」
+    const lastPlaceRef = useRef(0);
 
     // Use onPointerMissed on a group — when clicking anywhere NOT on a figure mesh,
     // raycast against the entire scene to find the real intersection point on models/floor
     const handleSceneClick = useCallback((e: MouseEvent) => {
         if (!paperFigureMode) return;
+        // 只接受滑鼠左鍵(右鍵/中鍵不放置)
+        if (e.button !== 0) return;
+        // 去抖:120ms 內的重複觸發視為同一次點擊
+        const now = Date.now();
+        if (now - lastPlaceRef.current < 120) return;
 
         // Update raycaster from pointer
         raycaster.setFromCamera(pointer, camera);
 
         // Raycast against all scene children (models, floor, etc.)
-        // Filter out paper figure meshes by userData
         const intersects = raycaster.intersectObjects(scene.children, true)
             .filter(hit => {
-                // Skip paper figure meshes
+                // 跳過不可見物件、helper(axesHelper/gizmo 等)、無面幾何
+                const o = hit.object as THREE.Mesh;
+                if (!o.visible) return false;
+                if (o.type.includes('Helper') || o.type === 'Line' || o.type === 'LineSegments') return false;
+                if (!o.geometry) return false;
+                // 跳過紙片小人自身(避免疊放時打到別的小人)
                 let obj: THREE.Object3D | null = hit.object;
                 while (obj) {
                     if (obj.userData?.isPaperFigure) return false;
+                    if (obj.visible === false) return false;
                     obj = obj.parent;
                 }
                 return true;
             });
 
-        if (intersects.length > 0) {
-            const point = intersects[0].point;
-            const colorIdx = Math.floor(Math.random() * FIGURE_COLORS.length);
+        if (intersects.length === 0) return;
 
-            addPaperFigure({
-                id: `fig_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                position: [point.x, point.y, point.z],
-                scale: 1.045,
-                color: FIGURE_COLORS[colorIdx],
-            });
-        }
+        // intersectObjects 已依距離排序,取最近的命中點 = 使用者實際看到的表面
+        const point = intersects[0].point;
+        lastPlaceRef.current = now;
+        const colorIdx = Math.floor(Math.random() * FIGURE_COLORS.length);
+
+        addPaperFigure({
+            id: `fig_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            // 落地點微調:命中點略微上抬,避免腳陷入地面/浮空(見 PLACE_Y_OFFSET)
+            position: [point.x, point.y + PLACE_Y_OFFSET, point.z],
+            scale: FIGURE_SCALE,
+            color: FIGURE_COLORS[colorIdx],
+        });
     }, [paperFigureMode, addPaperFigure, scene, raycaster, pointer, camera]);
 
     return (
