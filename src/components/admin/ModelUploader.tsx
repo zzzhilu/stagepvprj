@@ -244,7 +244,10 @@ export function ModelUploader() {
                 if (parsed.type === 'moving_LED' || parsed.type === 'moving_prop' || parsed.type === 'prop' || parsed.type === 'band') {
                     parsed.meshes.forEach(mesh => {
                         const newObject = {
-                            id: mesh.name, // Use the actual mesh name (e.g., "moving led 1") as ID
+                            // id 需全域唯一:跨檔案可能有同名 mesh(如多個 GLB 都含 "truss"),
+                            // 直接用 mesh.name 當 id 會碰撞 → React key 重複導致渲染錯亂。
+                            // 故加唯一後綴;mesh 名稱保留在 name / meshNames 供顯示與機關辨識。
+                            id: `${mesh.name}__${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
                             model_path: cloudUrl,
                             material_id: getDefaultMaterial(parsed.type),
                             type: parsed.type,

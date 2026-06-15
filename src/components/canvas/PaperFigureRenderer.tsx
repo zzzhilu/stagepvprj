@@ -83,7 +83,9 @@ function createHumanShape(): THREE.Shape {
 // Cache geometry
 const humanShape = createHumanShape();
 const humanGeometry = new THREE.ShapeGeometry(humanShape);
-humanGeometry.translate(0, 0.07, 0); // lift slightly so feet touch y=0
+// shape 腳底約在 y=0.07;往下平移 0.07 使腳底落在本地 y=0(真正貼地)。
+// 之前誤加 +0.07 反而讓腳底浮到 ~0.14,故改為負向修正。
+humanGeometry.translate(0, -0.07, 0);
 
 // ─── Single Figure ────────────────────────────────────────────
 function PaperFigureMesh({
@@ -120,8 +122,8 @@ function PaperFigureMesh({
         const intersection = new THREE.Vector3();
         raycaster.ray.intersectPlane(floorPlane, intersection);
         if (intersection) {
-            // 與放置時一致的落地高度(避免拖曳後小人高度跳變)
-            updatePaperFigurePosition(figure.id, [intersection.x, 0.05, intersection.z]);
+            // 與放置一致的落地高度(腳底已貼地,直接落在命中點)
+            updatePaperFigurePosition(figure.id, [intersection.x, 0, intersection.z]);
         }
     }, [dragging, raycaster, floorPlane, figure.id, updatePaperFigurePosition]);
 
@@ -239,8 +241,9 @@ export function PaperFigureRenderer() {
 
     // 紙片小人尺寸:原 1.045 縮小 15% → 0.888(人形 shape 高約 1.77,縮放後更貼近真人比例)
     const FIGURE_SCALE = 0.888;
-    // 落地點 Y 微調(場景單位):往上約 0.05,修正浮空/陷地
-    const PLACE_Y_OFFSET = 0.05;
+    // 落地點 Y 微調(場景單位):腳底已在本地 y=0,直接貼地;
+    // 如需整體微調離地高度改此值(正=抬高,負=下沉)
+    const PLACE_Y_OFFSET = 0;
 
     // 去抖鎖:onPointerMissed 在單次點擊中可能被觸發多次(觸控/多按鈕),
     // 用時間鎖確保「一次點擊只生成一個」
