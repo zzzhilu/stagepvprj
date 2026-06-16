@@ -29,13 +29,20 @@ import { rigDelta, addVec3 } from '@/lib/rig-utils';
 function FirstFrameGate() {
     const { active } = useProgress();
     const setFirstFrameRendered = useStore((state) => state.setFirstFrameRendered);
+    const framesAfterIdleRef = useRef(0);
 
     useFrame(() => {
         const flag = useStore.getState().firstFrameRendered;
         if (active) {
-            if (flag) setFirstFrameRendered(false); // 新一輪載入開始,歸零
-        } else if (!flag) {
-            setFirstFrameRendered(true); // 載入結束後的首幀
+            // 載入活動中:歸零(進入新一輪載入)
+            framesAfterIdleRef.current = 0;
+            if (flag) setFirstFrameRendered(false);
+        } else {
+            // 無載入活動:連續渲染數幀後判定首幀已穩定呈現
+            framesAfterIdleRef.current += 1;
+            if (framesAfterIdleRef.current >= 2 && !flag) {
+                setFirstFrameRendered(true);
+            }
         }
     });
 

@@ -45,6 +45,32 @@ export function AssetLoadingOverlay({
         return () => clearTimeout(t);
     }, []);
 
+    // 卡關保險絲:某些資產(GDrive 影片貼圖、慢速 GLB)可能永遠停在 pending,
+    // 讓 useProgress 的 active 一直為 true、progress 卡在 ~99% → 整個 loading 鎖死在 98%。
+    // 兩道保險:① 資料就緒後進度爬到 ≥90% 但停滯 4 秒 → 放行;② 資料就緒後總計 15 秒硬上限 → 放行。
+    const [forceReady, setForceReady] = useState(false);
+    const progressRef = useRef(0);
+    progressRef.current = progress;
+    useEffect(() => {
+        if (!dataReady) return;
+        // ① 停滯偵測:每秒檢查,進度高位且 3 次無變化即放行
+        let stalls = 0;
+        let lastP = -1;
+        const stallTimer = setInterval(() => {
+            const p = progressRef.current;
+            if (p >= 90 && Math.abs(p - lastP) < 0.5) {
+                stalls += 1;
+                if (stalls >= 3) { setForceReady(true); clearInterval(stallTimer); }
+            } else {
+                stalls = 0;
+            }
+            lastP = p;
+        }, 1300);
+        // ② 硬上限
+        const hardTimer = setTimeout(() => setForceReady(true), 15000);
+        return () => { clearInterval(stallTimer); clearTimeout(hardTimer); };
+    }, [dataReady]);
+
     // 等待階段(資料抓取/初始化場景)沒有 loader 進度事件,
     // 用 tick 驅動重繪:讓爬升百分比與省略號動畫持續跳動,表示頁面正在運作
     const [tick, setTick] = useState(0);
@@ -57,11 +83,13 @@ export function AssetLoadingOverlay({
     const dots = '.'.repeat((tick % 3) + 1);
 
     const ready =
-        dataReady &&
-        firstFrameRendered &&
-        !active &&
-        (everActive || graceTimedOut) &&
-        minTimePassed;
+        forceReady || (
+            dataReady &&
+            firstFrameRendered &&
+            !active &&
+            (everActive || graceTimedOut) &&
+            minTimePassed
+        );
 
     // 淡出 → 卸載
     const [fading, setFading] = useState(false);
