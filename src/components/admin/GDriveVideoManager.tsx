@@ -7,6 +7,7 @@ import { resolveGDriveUrl } from '@/lib/gdrive-direct';
 export function GDriveVideoManager({ projectId, onSave }: { projectId: string; onSave?: () => void }) {
     const [folderIdInput, setFolderIdInput] = useState('');
     const [isSyncing, setIsSyncing] = useState(false);
+    const [lastSync, setLastSync] = useState<number | null>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
     const gdriveFolders = useStore(state => state.gdriveFolders);
@@ -139,6 +140,7 @@ export function GDriveVideoManager({ projectId, onSave }: { projectId: string; o
                 alert('同步失敗: ' + error.message);
             }
         } finally {
+            setLastSync(Date.now());
             if (!isAuto) setIsSyncing(false);
         }
     };
@@ -258,6 +260,9 @@ export function GDriveVideoManager({ projectId, onSave }: { projectId: string; o
                         <span className="text-xs text-gray-400">目前綁定資料夾: </span>
                         <span className="text-xs text-violet-300 font-mono">{currentFolderId}</span>
                         <span className="ml-2 text-[10px] text-gray-400">手動同步模式</span>
+                        {lastSync && (
+                            <span className="ml-2 text-[10px] text-gray-500">· 上次更新 {new Date(lastSync).toLocaleTimeString()}</span>
+                        )}
                     </div>
                     <button
                         onClick={() => handleSync(false)}
