@@ -59,6 +59,8 @@ export function ClientPlaylistSidebar({ projectId }: { projectId: string }) {
             name: video.filename,
             file_path: filePath,
             type: (isImage ? 'image' : 'r2_video') as 'image' | 'r2_video',
+            // 帶回時間軸 cue —— 缺這行會讓 VideoTimelineController 讀不到 cue,時間軸功能失效
+            timelineCues: video.timelineCues,
         };
 
         // 像預設的分享頁面邏輯一樣，切換目前的 texture 並讓其成為 active
