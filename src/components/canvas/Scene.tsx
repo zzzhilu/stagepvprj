@@ -47,6 +47,8 @@ export default function Scene() {
     const videoPlaying = useStore((state) => state.videoPlaying);
     const contentTextures = useStore((state) => state.contentTextures);
     const activeContentId = useStore((state) => state.activeContentId);
+    const r2Videos = useStore((state) => state.r2Videos);
+    const gdriveVideos = useStore((state) => state.gdriveVideos);
     const isRecordingMode = useStore((state) => state.isRecordingMode);
     const gizmoEnabled = useStore((state) => state.gizmoEnabled);
     const perfectRenderEnabled = useStore((state) => state.perfectRenderEnabled);
@@ -54,11 +56,20 @@ export default function Scene() {
     const paperFigures = useStore((state) => state.paperFigures);
     const walkMode = useStore((state) => state.walkMode);
 
-    // Check if active content is a video (support both 'video' and 'r2_video')
+    // Check if active content is a video.
+    // ⚠️ 必須與 VideoControls 的 isVideoActive 判斷一致 —— GDrive/R2 影片的 active content
+    // 可能不在 contentTextures(或 type 不符),只查 contentTextures 會漏判,
+    // 導致 frameloop 停在 demand、VideoTimelineController 的 useFrame 不跑 → 時間軸 cue 不觸發。
     const activeContent = activeContentId
         ? contentTextures.find(t => t.id === activeContentId)
         : null;
-    const isVideoActive = activeContent?.type === 'video' || activeContent?.type === 'r2_video';
+    const activeR2Video = activeContentId ? r2Videos?.find(v => v.id === activeContentId) : null;
+    const activeGDriveVideo = activeContentId ? gdriveVideos?.find(v => v.id === activeContentId) : null;
+    const isVideoActive =
+        activeContent?.type === 'video' ||
+        activeContent?.type === 'r2_video' ||
+        !!activeR2Video ||
+        !!activeGDriveVideo;
 
     // Use 'always' frameloop when video is playing, recording, Gizmo, Perfect Render, walk mode, or paper figures exist
     const hasPaperFigures = paperFigures.length > 0;
