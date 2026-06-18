@@ -15,7 +15,6 @@ import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
 import { RigPanel } from '@/components/client/RigPanel';
 
-const ADMIN_PASSWORD = '0903';
 const AUTH_KEY = 'stagepv_admin_auth';
 
 const Scene = dynamic(() => import('@/components/canvas/Scene'), {
@@ -28,13 +27,31 @@ function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
 
-    const handleSubmit = () => {
-        if (password === ADMIN_PASSWORD) {
-            sessionStorage.setItem(AUTH_KEY, 'true');
-            onSuccess();
-        } else {
-            setError('密碼錯誤');
-            setPassword('');
+    const [checking, setChecking] = useState(false);
+
+    const handleSubmit = async () => {
+        if (checking) return;
+        setChecking(true);
+        setError('');
+        try {
+            // 密碼送到 server 端驗證(前端不含密碼);成功取回 token 存 sessionStorage
+            const res = await fetch('/api/admin-auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password }),
+            });
+            const data = await res.json();
+            if (data.ok && data.token) {
+                sessionStorage.setItem(AUTH_KEY, data.token);
+                onSuccess();
+            } else {
+                setError('密碼錯誤');
+                setPassword('');
+            }
+        } catch {
+            setError('驗證失敗,請稍後再試');
+        } finally {
+            setChecking(false);
         }
     };
 
@@ -164,7 +181,8 @@ function ProjectEditorContent() {
         }
 
         // Check sessionStorage for auth
-        const authed = sessionStorage.getItem(AUTH_KEY) === 'true';
+        const token = sessionStorage.getItem(AUTH_KEY);
+        const authed = !!token && token.length === 32; // server 簽發的 token(非明文 'true')
         setIsAuthenticated(authed);
         setIsChecking(false);
 
