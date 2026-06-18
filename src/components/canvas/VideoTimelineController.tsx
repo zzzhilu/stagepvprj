@@ -185,10 +185,34 @@ export function VideoTimelineController() {
             });
         }
 
+        // 機關值插值:cueA → cueB 過渡時,把兩個 cue 的 rigValues 快照按 progress 線性插值。
+        // 寫進 store 的 rigValues 後,3D 場景的機關會動,RigPanel 的 slider 因讀同一份 rigValues 也同步動。
+        let newRigValues: Record<string, number> | null = null;
+        const rigsA = stageCueA.rigValues;
+        const rigsB = targetCueB.rigValues;
+        if (rigsA || rigsB) {
+            const candidate: Record<string, number> = { ...state.rigValues };
+            let rigChanged = false;
+            for (const rig of state.rigs) {
+                const a = rigsA?.[rig.id] ?? rig.defaultValue;
+                const b = rigsB?.[rig.id] ?? rig.defaultValue;
+                const v = THREE.MathUtils.lerp(a, b, progress);
+                if (Math.abs((state.rigValues[rig.id] ?? rig.defaultValue) - v) > 0.0001) {
+                    candidate[rig.id] = v;
+                    rigChanged = true;
+                }
+            }
+            if (rigChanged) {
+                newRigValues = candidate;
+                hasChanges = true;
+            }
+        }
+
         if (hasChanges) {
             useStore.setState({ 
                 stageObjects: newObjects,
-                stageLights: newLights
+                stageLights: newLights,
+                ...(newRigValues ? { rigValues: newRigValues } : {})
             });
         }
     });

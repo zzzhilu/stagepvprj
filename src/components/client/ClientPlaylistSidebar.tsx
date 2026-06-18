@@ -71,8 +71,11 @@ export function ClientPlaylistSidebar({ projectId }: { projectId: string }) {
             setVideoPlaying(true);
         }
 
-        // 如果影片有綁定的 cue，則自動套用 cue
-        if (video.cueId) {
+        // Cue 優先級:時間軸 cues > 後台/檔名指定的單一 cue。
+        // 若此影片有時間軸 cues,交由 VideoTimelineController 全權驅動(含機關),
+        // 不再 applyCue,避免兩套同時寫 rigValues 打架。
+        const hasTimeline = Array.isArray(video.timelineCues) && video.timelineCues.length > 0;
+        if (video.cueId && !hasTimeline) {
             // 小延遲確保前面狀態更新後才吃燈光等 cue
             setTimeout(() => applyCue(video.cueId), 100);
         }
