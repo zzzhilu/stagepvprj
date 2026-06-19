@@ -76,14 +76,16 @@ export interface RigControl {
 
 // 機關分類顏色:淡色、半透明,與面板 UI 一致。值為 RGB,套用時自帶透明度。
 export const RIG_COLORS: { id: string; label: string; rgb: string }[] = [
+    { id: 'white',  label: '白', rgb: '230, 230, 235' },
     { id: 'violet', label: '紫', rgb: '139, 122, 246' },
     { id: 'blue',   label: '藍', rgb: '96, 165, 250' },
     { id: 'green',  label: '綠', rgb: '110, 200, 160' },
     { id: 'amber',  label: '橘', rgb: '230, 180, 110' },
     { id: 'rose',   label: '紅', rgb: '230, 140, 150' },
     { id: 'cyan',   label: '青', rgb: '110, 200, 210' },
+    { id: 'black',  label: '黑', rgb: '60, 60, 70' },
 ];
-export const DEFAULT_RIG_COLOR = 'violet';
+export const DEFAULT_RIG_COLOR = 'white';
 export function rigColorRgb(colorId?: string): string {
     return (RIG_COLORS.find(c => c.id === colorId) || RIG_COLORS[0]).rgb;
 }

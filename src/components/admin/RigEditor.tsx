@@ -490,7 +490,7 @@ function RigsSection() {
                                 key={c.id}
                                 onClick={() => setColor(c.id)}
                                 title={c.label}
-                                className="w-5 h-5 rounded-full flex-shrink-0 transition-transform hover:scale-110"
+                                className="w-5 h-5 rounded-full flex-shrink-0 transition-transform hover:scale-110 border border-white/15"
                                 style={{
                                     background: `rgba(${c.rgb}, 0.55)`,
                                     boxShadow: color === c.id ? `0 0 0 2px rgba(${c.rgb}, 1)` : 'none',
@@ -596,10 +596,10 @@ function RigsSection() {
                                     key={c.id}
                                     onClick={() => updateRig(rig.id, { color: c.id })}
                                     title={c.label}
-                                    className="w-4 h-4 rounded-full flex-shrink-0 transition-transform hover:scale-110"
+                                    className="w-4 h-4 rounded-full flex-shrink-0 transition-transform hover:scale-110 border border-white/15"
                                     style={{
                                         background: `rgba(${c.rgb}, 0.55)`,
-                                        boxShadow: (rig.color || 'violet') === c.id ? `0 0 0 2px rgba(${c.rgb}, 1)` : 'none',
+                                        boxShadow: (rig.color || 'white') === c.id ? `0 0 0 2px rgba(${c.rgb}, 1)` : 'none',
                                     }}
                                 />
                             ))}
