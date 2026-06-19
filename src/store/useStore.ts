@@ -55,7 +55,7 @@ export interface NullNode {
     rot: [number, number, number]; // 基底旋轉(弧度)
 }
 
-export type RigType = 'rotation' | 'translation';
+export type RigType = 'rotation' | 'translation' | 'visibility';
 export type RigAxis = 'x' | 'y' | 'z';
 
 /** 機關:一個受限的可動自由度,目標可為 Null 或物件 instance */
@@ -67,10 +67,25 @@ export interface RigControl {
     instanceIndex?: number;        // targetType === 'object' 時指定 instance(預設 0)
     type: RigType;
     axis: RigAxis;
-    min: number;                   // translation: scene units;rotation: 度
-    max: number;
+    min: number;                   // translation: scene units;rotation: 度;visibility: 0
+    max: number;                   // visibility: 1
     step?: number;                 // 滑桿步進
-    defaultValue: number;          // 須在 [min, max] 內
+    defaultValue: number;          // 須在 [min, max] 內;visibility: 0=隱藏 1=顯示
+    color?: string;                // 分類顏色(預設 6 色之一,半透明融入面板)
+}
+
+// 機關分類顏色:淡色、半透明,與面板 UI 一致。值為 RGB,套用時自帶透明度。
+export const RIG_COLORS: { id: string; label: string; rgb: string }[] = [
+    { id: 'violet', label: '紫', rgb: '139, 122, 246' },
+    { id: 'blue',   label: '藍', rgb: '96, 165, 250' },
+    { id: 'green',  label: '綠', rgb: '110, 200, 160' },
+    { id: 'amber',  label: '橘', rgb: '230, 180, 110' },
+    { id: 'rose',   label: '紅', rgb: '230, 140, 150' },
+    { id: 'cyan',   label: '青', rgb: '110, 200, 210' },
+];
+export const DEFAULT_RIG_COLOR = 'violet';
+export function rigColorRgb(colorId?: string): string {
+    return (RIG_COLORS.find(c => c.id === colorId) || RIG_COLORS[0]).rgb;
 }
 
 
@@ -348,6 +363,7 @@ interface State {
     resetRigValues: () => void;
     animateRigValues: (target: Record<string, number>, duration?: number) => void;
     moveRig: (id: string, direction: -1 | 1) => void;
+    reorderRigs: (fromIndex: number, toIndex: number) => void;
     setSelectedNull: (id: string | null) => void;
 
     // UI 共享狀態:左側小工具列展開(供 RigPanel 等浮動面板避讓)
@@ -910,6 +926,16 @@ export const useStore = create<State>()(
                 if (j < 0 || j >= state.rigs.length) return {};
                 const rigs = [...state.rigs];
                 [rigs[idx], rigs[j]] = [rigs[j], rigs[idx]];
+                return { rigs };
+            }),
+
+            // 拖拉排序:把 fromIndex 的機關移到 toIndex(陣列順序即顯示順序,隨專案同步)
+            reorderRigs: (fromIndex, toIndex) => set((state) => {
+                if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return {};
+                if (fromIndex >= state.rigs.length || toIndex >= state.rigs.length) return {};
+                const rigs = [...state.rigs];
+                const [moved] = rigs.splice(fromIndex, 1);
+                rigs.splice(toIndex, 0, moved);
                 return { rigs };
             }),
 

@@ -6,7 +6,7 @@ import { useMemo, useEffect, useState, useRef, forwardRef } from 'react';
 import { globalVideoElement } from './VideoManager';
 import { useFrame } from '@react-three/fiber';
 import { parseGIF, decompressFrames } from 'gifuct-js';
-import { rigDelta, addVec3 } from '@/lib/rig-utils';
+import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
 
 // Calculate lerp speed based on distance (0.5s - 1.5s)
 function calculateLerpSpeed(distance: number): number {
@@ -678,7 +678,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     }
 
     return (
-        <group ref={groupRef} scale={worldTransform.scale} onClick={onClick}>
+        <group ref={groupRef} scale={worldTransform.scale} onClick={onClick} visible={rigVisibility(rigs, rigValues, 'object', object.id, 0) !== false}>
             {meshNodes.map((node, i) => {
                 const geometry = clonedGeometries[i];
                 if (!geometry) return null;

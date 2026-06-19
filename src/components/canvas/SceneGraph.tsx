@@ -19,7 +19,7 @@ import * as THREE from 'three';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { PerfectRenderEnvironment } from './PerfectRenderEnvironment';
 import { ToneMappingMode } from 'postprocessing';
-import { rigDelta, addVec3 } from '@/lib/rig-utils';
+import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
 
 /**
  * 首幀信號:資產載入完成後,實際渲染出第一幀時通知 store。
@@ -137,6 +137,9 @@ function NullGroup({
 
     const delta = rigDelta(rigs, rigValues, 'null', node.id);
 
+    // 可見性機關:控制整個 Null group(含子物件)的顯示/隱藏
+    const nullVisible = rigVisibility(rigs, rigValues, 'null', node.id);
+
     const childNulls = nulls.filter(n => n.parentId === node.id);
     const allChildObjects = stageObjects.filter(o => o.parentId === node.id);
     const childObjects = allChildObjects.filter(o => !o.rigMirror);
@@ -166,8 +169,8 @@ function NullGroup({
                 />
             )}
 
-            {/* 機關偏移層:位移/旋轉沿 Null 自身本地軸作用 */}
-            <group position={delta.pos} rotation={delta.rot}>
+            {/* 機關偏移層:位移/旋轉沿 Null 自身本地軸作用;可見性控制子物件顯示 */}
+            <group position={delta.pos} rotation={delta.rot} visible={nullVisible !== false}>
 
             {childNulls.map(n => (
                 <NullGroup

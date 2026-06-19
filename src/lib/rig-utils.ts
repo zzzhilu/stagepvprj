@@ -6,12 +6,12 @@ import type { NullNode, RigControl, Instance } from '@/store/useStore';
  * 位移:0.05(如 0 → 0.05 → 0.10);旋轉:1 度。
  * 不依賴每個機關存的 step 欄位,避免舊機關殘留舊值 — 由型別即時決定。
  */
-export function getRigStep(type: 'rotation' | 'translation'): number {
-    return type === 'translation' ? 0.05 : 1;
+export function getRigStep(type: 'rotation' | 'translation' | 'visibility'): number {
+    return type === 'translation' ? 0.05 : 1; // visibility/rotation: 1
 }
 
 /** 把值對齊到該型別的步進(位移 0.05 / 旋轉 1),修正舊機關殘留的非整數值 */
-export function quantizeRigValue(type: 'rotation' | 'translation', value: number): number {
+export function quantizeRigValue(type: 'rotation' | 'translation' | 'visibility', value: number): number {
     const step = getRigStep(type);
     return Math.round(value / step) * step;
 }
@@ -113,6 +113,7 @@ export function rigDelta(
     for (const rig of rigs) {
         if (rig.targetType !== targetType || rig.targetId !== targetId) continue;
         if (targetType === 'object' && (rig.instanceIndex ?? 0) !== (instanceIndex ?? 0)) continue;
+        if (rig.type === 'visibility') continue; // 可見性不參與 transform,由 rigVisibility 處理
 
         const raw = rigValues[rig.id] ?? rig.defaultValue;
         // NaN 防護:任一數值非有限數即跳過此機關,避免 NaN 污染矩陣導致模型永久隱形
@@ -132,6 +133,31 @@ export function rigDelta(
             THREE.MathUtils.degToRad(dRotDeg[2]),
         ],
     };
+}
+
+/**
+ * 計算某節點(Null 或 object instance)的可見性。
+ * 回傳 null = 無 visibility 機關控制此節點(維持預設顯示);
+ * true/false = 由 visibility 機關決定(值 ≥ 0.5 視為顯示)。
+ * 多個 visibility 機關時,任一要求隱藏即隱藏(AND 邏輯,較安全)。
+ */
+export function rigVisibility(
+    rigs: RigControl[],
+    rigValues: Record<string, number>,
+    targetType: 'null' | 'object',
+    targetId: string,
+    instanceIndex?: number
+): boolean | null {
+    let result: boolean | null = null;
+    for (const rig of rigs) {
+        if (rig.type !== 'visibility') continue;
+        if (rig.targetType !== targetType || rig.targetId !== targetId) continue;
+        if (targetType === 'object' && (rig.instanceIndex ?? 0) !== (instanceIndex ?? 0)) continue;
+        const v = rigValues[rig.id] ?? rig.defaultValue;
+        const visible = v >= 0.5;
+        result = result === null ? visible : (result && visible);
+    }
+    return result;
 }
 
 /**

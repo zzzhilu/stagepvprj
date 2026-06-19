@@ -2,6 +2,7 @@
 
 import { useStore } from '@/store/useStore';
 import { getRigStep, quantizeRigValue } from '@/lib/rig-utils';
+import { rigColorRgb } from '@/store/useStore';
 import { useState } from 'react';
 import { RigIcon } from '@/components/ui/icons';
 
@@ -79,8 +80,10 @@ export function RigPanel() {
                         <div className="p-3 space-y-3 max-h-[45vh] overflow-y-auto">
                             {validRigs.map((rig, index) => {
                                 const value = quantizeRigValue(rig.type, rigValues[rig.id] ?? rig.defaultValue);
-                                const unit = rig.type === 'rotation' ? '°' : 'm';
+                                const unit = rig.type === 'rotation' ? '°' : rig.type === 'translation' ? 'm' : '';
                                 const isDefault = value === rig.defaultValue;
+                                const rgb = rigColorRgb(rig.color);
+                                const isVis = rig.type === 'visibility';
                                 return (
                                     <div key={rig.id} className="group/rig">
                                         <div className="flex items-center justify-between mb-1">
@@ -110,12 +113,15 @@ export function RigPanel() {
                                                         </button>
                                                     </div>
                                                 )}
+                                                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: `rgba(${rgb}, 0.7)` }} />
                                                 <span className="text-xs text-gray-200 truncate">{rig.name}</span>
                                             </div>
                                             <div className="flex items-center gap-1.5 flex-shrink-0">
-                                                <span className="text-xs text-gray-300 font-mono">
-                                                    {value.toFixed(rig.type === 'translation' ? 2 : 0)}{unit}
-                                                </span>
+                                                {!isVis && (
+                                                    <span className="text-xs text-gray-300 font-mono">
+                                                        {value.toFixed(rig.type === 'translation' ? 2 : 0)}{unit}
+                                                    </span>
+                                                )}
                                                 {!isDefault && (
                                                     <button
                                                         onClick={() => setRigValue(rig.id, rig.defaultValue)}
@@ -127,19 +133,32 @@ export function RigPanel() {
                                                 )}
                                             </div>
                                         </div>
-                                        <input
-                                            type="range"
-                                            min={rig.min}
-                                            max={rig.max}
-                                            step={getRigStep(rig.type)}
-                                            value={value}
-                                            onChange={(e) => setRigValue(rig.id, parseFloat(e.target.value))}
-                                            className="w-full accent-gray-300 cursor-pointer h-1"
-                                        />
-                                        <div className="flex justify-between text-[9px] text-gray-600 font-mono">
-                                            <span>{rig.min}{unit}</span>
-                                            <span>{rig.max}{unit}</span>
-                                        </div>
+                                        {isVis ? (
+                                            <button
+                                                onClick={() => setRigValue(rig.id, value >= 0.5 ? 0 : 1)}
+                                                className={`w-full py-1 rounded text-[11px] font-medium transition-colors ${value >= 0.5 ? 'text-white' : 'bg-white/5 text-gray-500'}`}
+                                                style={value >= 0.5 ? { background: `rgba(${rgb}, 0.6)` } : undefined}
+                                            >
+                                                {value >= 0.5 ? '顯示中' : '已隱藏'}
+                                            </button>
+                                        ) : (
+                                            <>
+                                                <input
+                                                    type="range"
+                                                    min={rig.min}
+                                                    max={rig.max}
+                                                    step={getRigStep(rig.type)}
+                                                    value={value}
+                                                    onChange={(e) => setRigValue(rig.id, parseFloat(e.target.value))}
+                                                    className="w-full cursor-pointer h-1"
+                                                    style={{ accentColor: `rgba(${rgb}, 0.9)` }}
+                                                />
+                                                <div className="flex justify-between text-[9px] text-gray-600 font-mono">
+                                                    <span>{rig.min}{unit}</span>
+                                                    <span>{rig.max}{unit}</span>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 );
                             })}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useStore, NullNode, RigControl, RigType, RigAxis } from '@/store/useStore';
+import { useStore, NullNode, RigControl, RigType, RigAxis, RIG_COLORS, DEFAULT_RIG_COLOR, rigColorRgb } from '@/store/useStore';
 import { useState, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { isSelfOrDescendant, objectWorldPosition, worldPosToLocal } from '@/lib/rig-utils';
@@ -312,6 +312,7 @@ function RigsSection() {
     const updateRig = useStore((s) => s.updateRig);
     const removeRig = useStore((s) => s.removeRig);
     const setRigValue = useStore((s) => s.setRigValue);
+    const reorderRigs = useStore((s) => s.reorderRigs);
 
     // 新增表單 state
     const [showForm, setShowForm] = useState(false);
@@ -322,7 +323,12 @@ function RigsSection() {
     const [min, setMin] = useState(0);
     const [max, setMax] = useState(90);
     const [defaultValue, setDefaultValue] = useState(0);
+    const [color, setColor] = useState<string>(DEFAULT_RIG_COLOR);
     const [formError, setFormError] = useState('');
+
+    // 拖拉排序 state
+    const [dragIndex, setDragIndex] = useState<number | null>(null);
+    const [overIndex, setOverIndex] = useState<number | null>(null);
 
     // 長按刪除(沿用專案慣例)
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -358,8 +364,12 @@ function RigsSection() {
         const target = decodeTarget(targetKey);
         if (!name.trim()) { setFormError('請輸入機關名稱'); return; }
         if (!target) { setFormError('請選擇目標'); return; }
-        if (!(min < max)) { setFormError('下限必須小於上限'); return; }
-        if (defaultValue < min || defaultValue > max) { setFormError('預設值必須在上下限之間'); return; }
+
+        const isVis = type === 'visibility';
+        if (!isVis) {
+            if (!(min < max)) { setFormError('下限必須小於上限'); return; }
+            if (defaultValue < min || defaultValue > max) { setFormError('預設值必須在上下限之間'); return; }
+        }
 
         const rig: RigControl = {
             id: `rig_${Date.now()}`,
@@ -369,10 +379,12 @@ function RigsSection() {
             instanceIndex: target.instanceIndex ?? 0,
             type,
             axis,
-            min,
-            max,
+            // visibility: 固定 0~1,預設值即「初始是否顯示」
+            min: isVis ? 0 : min,
+            max: isVis ? 1 : max,
             step: getRigStep(type),
-            defaultValue,
+            defaultValue: isVis ? defaultValue : defaultValue,
+            color,
         };
         addRig(rig);
 
@@ -386,10 +398,11 @@ function RigsSection() {
     const handleTypeChange = (t: RigType) => {
         setType(t);
         if (t === 'rotation') { setMin(0); setMax(90); setDefaultValue(0); }
-        else { setMin(0); setMax(3); setDefaultValue(0); }
+        else if (t === 'translation') { setMin(0); setMax(3); setDefaultValue(0); }
+        else { setMin(0); setMax(1); setDefaultValue(1); } // visibility:預設顯示
     };
 
-    const unit = (t: RigType) => t === 'rotation' ? '°' : 'm';
+    const unit = (t: RigType) => t === 'rotation' ? '°' : t === 'translation' ? 'm' : '';
 
     return (
         <div className="space-y-2">
@@ -437,46 +450,82 @@ function RigsSection() {
                         )}
                     </select>
 
-                    {/* 類型 + 軸向 */}
+                    {/* 類型 */}
                     <div className="flex gap-1">
-                        {(['rotation', 'translation'] as RigType[]).map(t => (
+                        {(['rotation', 'translation', 'visibility'] as RigType[]).map(t => (
                             <button
                                 key={t}
                                 onClick={() => handleTypeChange(t)}
                                 className={`flex-1 py-1 rounded text-xs ${type === t ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
                             >
                                 <span className="flex items-center justify-center gap-1">
-                                    {t === 'rotation' ? <RotateIcon className="w-3 h-3" /> : <TranslateIcon className="w-3 h-3" />}
-                                    {t === 'rotation' ? '旋轉' : '位移'}
+                                    {t === 'rotation' ? <><RotateIcon className="w-3 h-3" />旋轉</>
+                                     : t === 'translation' ? <><TranslateIcon className="w-3 h-3" />位移</>
+                                     : <>👁 顯示</>}
                                 </span>
-                            </button>
-                        ))}
-                        {AXIS_OPTIONS.map(a => (
-                            <button
-                                key={a}
-                                onClick={() => setAxis(a)}
-                                className={`w-8 py-1 rounded text-xs uppercase ${axis === a ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
-                            >
-                                {a}
                             </button>
                         ))}
                     </div>
 
-                    {/* min / max / default */}
-                    <div className="flex items-center gap-1">
-                        <div className="flex-1 min-w-0">
-                            <span className="text-[10px] text-gray-500 block">下限 ({unit(type)})</span>
-                            <NumberField value={min} onCommit={setMin} className="w-full" />
+                    {/* 軸向(visibility 不需要)*/}
+                    {type !== 'visibility' && (
+                        <div className="flex gap-1">
+                            {AXIS_OPTIONS.map(a => (
+                                <button
+                                    key={a}
+                                    onClick={() => setAxis(a)}
+                                    className={`flex-1 py-1 rounded text-xs uppercase ${axis === a ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                                >
+                                    {a} 軸
+                                </button>
+                            ))}
                         </div>
-                        <div className="flex-1 min-w-0">
-                            <span className="text-[10px] text-gray-500 block">上限 ({unit(type)})</span>
-                            <NumberField value={max} onCommit={setMax} className="w-full" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <span className="text-[10px] text-gray-500 block">預設值</span>
-                            <NumberField value={defaultValue} onCommit={setDefaultValue} className="w-full" />
-                        </div>
+                    )}
+
+                    {/* 顏色分類 */}
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-gray-500 flex-shrink-0">顏色</span>
+                        {RIG_COLORS.map(c => (
+                            <button
+                                key={c.id}
+                                onClick={() => setColor(c.id)}
+                                title={c.label}
+                                className="w-5 h-5 rounded-full flex-shrink-0 transition-transform hover:scale-110"
+                                style={{
+                                    background: `rgba(${c.rgb}, 0.55)`,
+                                    boxShadow: color === c.id ? `0 0 0 2px rgba(${c.rgb}, 1)` : 'none',
+                                }}
+                            />
+                        ))}
                     </div>
+
+                    {/* 行程設定:visibility 改為單一「初始狀態」開關 */}
+                    {type === 'visibility' ? (
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-gray-500">初始狀態</span>
+                            <button
+                                onClick={() => setDefaultValue(defaultValue >= 0.5 ? 0 : 1)}
+                                className={`flex-1 py-1.5 rounded text-xs font-semibold ${defaultValue >= 0.5 ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+                            >
+                                {defaultValue >= 0.5 ? '👁 顯示' : '🚫 隱藏'}
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-1">
+                            <div className="flex-1 min-w-0">
+                                <span className="text-[10px] text-gray-500 block">下限 ({unit(type)})</span>
+                                <NumberField value={min} onCommit={setMin} className="w-full" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <span className="text-[10px] text-gray-500 block">上限 ({unit(type)})</span>
+                                <NumberField value={max} onCommit={setMax} className="w-full" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <span className="text-[10px] text-gray-500 block">預設值</span>
+                                <NumberField value={defaultValue} onCommit={setDefaultValue} className="w-full" />
+                            </div>
+                        </div>
+                    )}
 
                     {formError && <p className="text-red-400 text-[10px]">{formError}</p>}
 
@@ -494,12 +543,29 @@ function RigsSection() {
                 <p className="text-gray-500 text-xs text-center py-2">尚未建立任何機關</p>
             )}
 
-            {rigs.map(rig => {
+            {rigs.map((rig, index) => {
                 const value = rigValues[rig.id] ?? rig.defaultValue;
                 const isDeleting = deletingId === rig.id;
+                const rgb = rigColorRgb(rig.color);
+                const isVis = rig.type === 'visibility';
+                const isDragOver = overIndex === index && dragIndex !== null && dragIndex !== index;
                 return (
-                    <div key={rig.id} className={`bg-gray-800 rounded p-2 space-y-1.5 ${isDeleting ? 'ring-1 ring-red-500' : ''}`}>
+                    <div
+                        key={rig.id}
+                        draggable
+                        onDragStart={() => setDragIndex(index)}
+                        onDragOver={(e) => { e.preventDefault(); setOverIndex(index); }}
+                        onDragEnd={() => {
+                            if (dragIndex !== null && overIndex !== null && dragIndex !== overIndex) {
+                                reorderRigs(dragIndex, overIndex);
+                            }
+                            setDragIndex(null); setOverIndex(null);
+                        }}
+                        className={`bg-gray-800 rounded p-2 space-y-1.5 border-l-[3px] cursor-grab active:cursor-grabbing ${isDeleting ? 'ring-1 ring-red-500' : ''} ${isDragOver ? 'ring-1 ring-violet-400' : ''}`}
+                        style={{ borderLeftColor: `rgba(${rgb}, 0.6)`, background: `rgba(${rgb}, 0.08)` }}
+                    >
                         <div className="flex items-center gap-2">
+                            <span className="text-gray-600 text-xs flex-shrink-0 select-none" title="拖拉排序">⠿</span>
                             <input
                                 type="text"
                                 value={rig.name}
@@ -520,26 +586,54 @@ function RigsSection() {
                         </div>
 
                         <p className="text-[10px] text-gray-500">
-                            {targetName(rig)} · {rig.type === 'rotation' ? '旋轉' : '位移'} {rig.axis.toUpperCase()} 軸
+                            {targetName(rig)} · {isVis ? '👁 顯示控制' : `${rig.type === 'rotation' ? '旋轉' : '位移'} ${rig.axis.toUpperCase()} 軸`}
                         </p>
 
-                        {/* 即時預覽滑桿 */}
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="range"
-                                min={rig.min}
-                                max={rig.max}
-                                step={getRigStep(rig.type)}
-                                value={value}
-                                onChange={(e) => setRigValue(rig.id, parseFloat(e.target.value))}
-                                className="flex-1 accent-violet-500"
-                            />
-                            <span className="text-xs text-violet-300 w-16 text-right flex-shrink-0 font-mono">
-                                {value.toFixed(rig.type === 'translation' ? 2 : 0)}{unit(rig.type)}
-                            </span>
+                        {/* 顏色選擇(列表內可改) */}
+                        <div className="flex items-center gap-1">
+                            {RIG_COLORS.map(c => (
+                                <button
+                                    key={c.id}
+                                    onClick={() => updateRig(rig.id, { color: c.id })}
+                                    title={c.label}
+                                    className="w-4 h-4 rounded-full flex-shrink-0 transition-transform hover:scale-110"
+                                    style={{
+                                        background: `rgba(${c.rgb}, 0.55)`,
+                                        boxShadow: (rig.color || 'violet') === c.id ? `0 0 0 2px rgba(${c.rgb}, 1)` : 'none',
+                                    }}
+                                />
+                            ))}
                         </div>
 
-                        {/* 行程設定 */}
+                        {/* 即時預覽:visibility 顯示開關,其餘顯示滑桿 */}
+                        {isVis ? (
+                            <button
+                                onClick={() => setRigValue(rig.id, value >= 0.5 ? 0 : 1)}
+                                className={`w-full py-1.5 rounded text-xs font-semibold transition-colors ${value >= 0.5 ? 'text-white' : 'bg-gray-700 text-gray-400'}`}
+                                style={value >= 0.5 ? { background: `rgba(${rgb}, 0.7)` } : undefined}
+                            >
+                                {value >= 0.5 ? '👁 顯示中' : '🚫 已隱藏'}
+                            </button>
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="range"
+                                    min={rig.min}
+                                    max={rig.max}
+                                    step={getRigStep(rig.type)}
+                                    value={value}
+                                    onChange={(e) => setRigValue(rig.id, parseFloat(e.target.value))}
+                                    className="flex-1"
+                                    style={{ accentColor: `rgba(${rgb}, 0.9)` }}
+                                />
+                                <span className="text-xs w-16 text-right flex-shrink-0 font-mono" style={{ color: `rgba(${rgb}, 1)` }}>
+                                    {value.toFixed(rig.type === 'translation' ? 2 : 0)}{unit(rig.type)}
+                                </span>
+                            </div>
+                        )}
+
+                        {/* 行程設定(visibility 不需要)*/}
+                        {!isVis && (
                         <div className="flex items-center gap-1">
                             <NumberField
                                 value={rig.min}
@@ -561,6 +655,7 @@ function RigsSection() {
                                 className="w-full min-w-0"
                             />
                         </div>
+                        )}
                     </div>
                 );
             })}
