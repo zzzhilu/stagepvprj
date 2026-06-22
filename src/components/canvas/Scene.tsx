@@ -3,9 +3,10 @@
 import { Canvas } from '@react-three/fiber';
 import { Preload } from '@react-three/drei';
 import { SceneGraph } from './SceneGraph';
-import { Suspense, useEffect, useRef } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useStore } from '@/store/useStore';
 import { setCanvasRef } from '@/components/client/VideoControls';
+import { isMobileDevice } from '@/lib/device';
 
 function LoadingFallback() {
     return (
@@ -75,16 +76,20 @@ export default function Scene() {
     const hasPaperFigures = paperFigures.length > 0;
     const frameloop = (isVideoActive && videoPlaying) || isRecordingMode || gizmoEnabled || perfectRenderEnabled || paperFigureMode || hasPaperFigures || walkMode ? 'always' : 'demand';
 
+    // 行動裝置畫質降載開關:只在「手機/平板」生效,桌機維持完整畫質。
+    // 裝置類型一個 session 內不變,故只在掛載時判定一次(Scene 為 ssr:false,僅 client 執行)。
+    const [isMobile] = useState<boolean>(() => isMobileDevice());
+
     return (
         <Canvas
             gl={{
-                antialias: true,
+                antialias: !isMobile, // 桌機維持 MSAA；手機關閉(SMAA 後處理已涵蓋抗鋸齒,省 backbuffer 記憶體)
                 powerPreference: 'high-performance',
                 failIfMajorPerformanceCaveat: false,
-                preserveDrawingBuffer: true,
+                preserveDrawingBuffer: true, // 截圖(ClientToolbar)依賴此 buffer,必須恆開,勿條件化
                 alpha: false,
             }}
-            dpr={perfectRenderEnabled ? [2, 2] : [1, 2]}
+            dpr={perfectRenderEnabled ? [2, 2] : (isMobile ? [1, 1.5] : [1, 2])}
             camera={{ position: [0, 5, 10], fov: 50 }}
             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
             shadows="soft"
