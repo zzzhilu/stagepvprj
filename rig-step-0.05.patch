@@ -1,0 +1,86 @@
+diff --git a/src/components/admin/RigEditor.tsx b/src/components/admin/RigEditor.tsx
+index c2f7ce9..21a6196 100644
+--- a/src/components/admin/RigEditor.tsx
++++ b/src/components/admin/RigEditor.tsx
+@@ -6,6 +6,7 @@ import * as THREE from 'three';
+ import { isSelfOrDescendant, objectWorldPosition, worldPosToLocal } from '@/lib/rig-utils';
+ import { RigIcon, NullIcon, LinkIcon, RotateIcon, TranslateIcon, PickIcon } from '@/components/ui/icons';
+ import { getObjectLabel } from '@/lib/object-utils';
++import { getRigStep } from '@/lib/rig-utils';
+ 
+ const AXIS_OPTIONS: RigAxis[] = ['x', 'y', 'z'];
+ 
+@@ -370,7 +371,7 @@ function RigsSection() {
+             axis,
+             min,
+             max,
+-            step: type === 'translation' ? 0.01 : 1,
++            step: getRigStep(type),
+             defaultValue,
+         };
+         addRig(rig);
+@@ -528,7 +529,7 @@ function RigsSection() {
+                                 type="range"
+                                 min={rig.min}
+                                 max={rig.max}
+-                                step={rig.step ?? (rig.type === 'translation' ? 0.01 : 1)}
++                                step={getRigStep(rig.type)}
+                                 value={value}
+                                 onChange={(e) => setRigValue(rig.id, parseFloat(e.target.value))}
+                                 className="flex-1 accent-violet-500"
+diff --git a/src/components/client/RigPanel.tsx b/src/components/client/RigPanel.tsx
+index 24ea336..fce4595 100644
+--- a/src/components/client/RigPanel.tsx
++++ b/src/components/client/RigPanel.tsx
+@@ -1,6 +1,7 @@
+ 'use client';
+ 
+ import { useStore } from '@/store/useStore';
++import { getRigStep, quantizeRigValue } from '@/lib/rig-utils';
+ import { useState } from 'react';
+ import { RigIcon } from '@/components/ui/icons';
+ 
+@@ -77,7 +78,7 @@ export function RigPanel() {
+                         {/* 機關滑桿列表 */}
+                         <div className="p-3 space-y-3 max-h-[45vh] overflow-y-auto">
+                             {validRigs.map((rig, index) => {
+-                                const value = rigValues[rig.id] ?? rig.defaultValue;
++                                const value = quantizeRigValue(rig.type, rigValues[rig.id] ?? rig.defaultValue);
+                                 const unit = rig.type === 'rotation' ? '°' : 'm';
+                                 const isDefault = value === rig.defaultValue;
+                                 return (
+@@ -130,7 +131,7 @@ export function RigPanel() {
+                                             type="range"
+                                             min={rig.min}
+                                             max={rig.max}
+-                                            step={rig.step ?? (rig.type === 'translation' ? 0.01 : 1)}
++                                            step={getRigStep(rig.type)}
+                                             value={value}
+                                             onChange={(e) => setRigValue(rig.id, parseFloat(e.target.value))}
+                                             className="w-full accent-gray-300 cursor-pointer h-1"
+diff --git a/src/lib/rig-utils.ts b/src/lib/rig-utils.ts
+index f539645..046694b 100644
+--- a/src/lib/rig-utils.ts
++++ b/src/lib/rig-utils.ts
+@@ -1,6 +1,21 @@
+ import * as THREE from 'three';
+ import type { NullNode, RigControl, Instance } from '@/store/useStore';
+ 
++/**
++ * 機關滑桿步進(單一事實來源)。
++ * 位移:0.05(如 0 → 0.05 → 0.10);旋轉:1 度。
++ * 不依賴每個機關存的 step 欄位,避免舊機關殘留舊值 — 由型別即時決定。
++ */
++export function getRigStep(type: 'rotation' | 'translation'): number {
++    return type === 'translation' ? 0.05 : 1;
++}
++
++/** 把值對齊到該型別的步進(位移 0.5 / 旋轉 1),修正舊機關殘留的非整數值 */
++export function quantizeRigValue(type: 'rotation' | 'translation', value: number): number {
++    const step = getRigStep(type);
++    return Math.round(value / step) * step;
++}
++
+ export const AXIS_INDEX: Record<'x' | 'y' | 'z', 0 | 1 | 2> = { x: 0, y: 1, z: 2 };
+ 
+ export type Vec3 = [number, number, number];

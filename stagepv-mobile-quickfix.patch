@@ -1,0 +1,73 @@
+diff --git a/src/components/canvas/Scene.tsx b/src/components/canvas/Scene.tsx
+index 882f9a3..4fd96f7 100644
+--- a/src/components/canvas/Scene.tsx
++++ b/src/components/canvas/Scene.tsx
+@@ -3,9 +3,10 @@
+ import { Canvas } from '@react-three/fiber';
+ import { Preload } from '@react-three/drei';
+ import { SceneGraph } from './SceneGraph';
+-import { Suspense, useEffect, useRef } from 'react';
++import { Suspense, useEffect, useRef, useState } from 'react';
+ import { useStore } from '@/store/useStore';
+ import { setCanvasRef } from '@/components/client/VideoControls';
++import { isMobileDevice } from '@/lib/device';
+ 
+ function LoadingFallback() {
+     return (
+@@ -75,16 +76,20 @@ export default function Scene() {
+     const hasPaperFigures = paperFigures.length > 0;
+     const frameloop = (isVideoActive && videoPlaying) || isRecordingMode || gizmoEnabled || perfectRenderEnabled || paperFigureMode || hasPaperFigures || walkMode ? 'always' : 'demand';
+ 
++    // 行動裝置畫質降載開關:只在「手機/平板」生效,桌機維持完整畫質。
++    // 裝置類型一個 session 內不變,故只在掛載時判定一次(Scene 為 ssr:false,僅 client 執行)。
++    const [isMobile] = useState<boolean>(() => isMobileDevice());
++
+     return (
+         <Canvas
+             gl={{
+-                antialias: true,
++                antialias: !isMobile, // 桌機維持 MSAA；手機關閉(SMAA 後處理已涵蓋抗鋸齒,省 backbuffer 記憶體)
+                 powerPreference: 'high-performance',
+                 failIfMajorPerformanceCaveat: false,
+-                preserveDrawingBuffer: true,
++                preserveDrawingBuffer: true, // 截圖(ClientToolbar)依賴此 buffer,必須恆開,勿條件化
+                 alpha: false,
+             }}
+-            dpr={perfectRenderEnabled ? [2, 2] : [1, 2]}
++            dpr={perfectRenderEnabled ? [2, 2] : (isMobile ? [1, 1.5] : [1, 2])}
+             camera={{ position: [0, 5, 10], fov: 50 }}
+             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+             shadows="soft"
+diff --git a/src/lib/device.ts b/src/lib/device.ts
+new file mode 100644
+index 0000000..beec76a
+--- /dev/null
++++ b/src/lib/device.ts
+@@ -0,0 +1,27 @@
++/**
++ * 行動裝置偵測（保守版）。
++ *
++ * 目的：只讓「手機 / 平板」吃到行動端的畫質降載（較低 dpr、關閉 MSAA），
++ * 桌機（包含帶觸控螢幕的桌機）一律維持原本完整畫質。
++ *
++ * 因此刻意「只用 User-Agent 判斷」，不採用 `(pointer: coarse)` 之類的
++ * 觸控偵測——那會把觸控筆電 / 觸控螢幕的桌機誤判成手機而被降載。
++ *
++ * 偵測失敗或無法判斷時一律回傳 false（= 視為桌機，給完整畫質），
++ * 確保偏誤方向是「寧可不降載，也絕不誤降桌機」。
++ *
++ * 注意：只在 client 端呼叫（Scene 以 ssr:false 動態載入），SSR 期間回傳 false。
++ */
++export function isMobileDevice(): boolean {
++    if (typeof navigator === 'undefined' || typeof window === 'undefined') return false;
++
++    const ua = navigator.userAgent || '';
++
++    // 手機 / 平板的典型 UA 關鍵字
++    const uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua);
++
++    // iPadOS 13+ 預設會偽裝成桌面 Safari（UA 顯示 Macintosh），用觸控點數補抓
++    const iPadOS = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
++
++    return uaMobile || iPadOS;
++}

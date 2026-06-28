@@ -1,0 +1,33 @@
+diff --git a/src/components/client/ClientPlaylistSidebar.tsx b/src/components/client/ClientPlaylistSidebar.tsx
+index 4442cd5..fecf80e 100644
+--- a/src/components/client/ClientPlaylistSidebar.tsx
++++ b/src/components/client/ClientPlaylistSidebar.tsx
+@@ -94,9 +94,15 @@ export function ClientPlaylistSidebar({ projectId }: { projectId: string }) {
+             const currentGDriveVideos = currentState.gdriveVideos || [];
+                 const currentCues = currentState.cues || [];
+                 const currentProjectVideos = currentGDriveVideos.filter((v: any) => v.folderId === currentFolderId);
++
++                // 以 driveFileId(穩定的 Google 檔案 ID)為錨點,從「所有」既有影片捞既存資料,
++                // 不限本資料夾 —— 避免 timelineCues/cueId 在 sync 重建時遺失。
++                const findExistingByDriveId = (driveId: string) =>
++                    currentGDriveVideos.find((v: any) => v.driveFileId === driveId);
+                 
+                 const newVideos = data.videos.map((vid: any) => {
+-                    const existing = currentProjectVideos.find((p: any) => p.driveFileId === vid.id);
++                    const existing = currentProjectVideos.find((p: any) => p.driveFileId === vid.id)
++                        || findExistingByDriveId(vid.id);
+                     
+                     let autoCueId = undefined;
+                     if (vid.name) {
+@@ -141,7 +147,10 @@ export function ClientPlaylistSidebar({ projectId }: { projectId: string }) {
+                             cueId: existing.cueId || autoCueId,
+                             filename: vid.name,
+                             thumbnail_url: vid.thumbnail_url,
+-                            size: vid.size
++                            size: vid.size,
++                            folderId: currentFolderId,
++                            // 明確保留時間軸 cue(...existing 已含,此處再次明示防未來改動誤刪)
++                            timelineCues: existing.timelineCues,
+                         };
+                     }
+ 

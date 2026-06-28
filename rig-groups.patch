@@ -1,0 +1,186 @@
+diff --git a/src/components/admin/RigEditor.tsx b/src/components/admin/RigEditor.tsx
+index 5999c1b..3c6ca55 100644
+--- a/src/components/admin/RigEditor.tsx
++++ b/src/components/admin/RigEditor.tsx
+@@ -313,6 +313,7 @@ function RigsSection() {
+     const removeRig = useStore((s) => s.removeRig);
+     const setRigValue = useStore((s) => s.setRigValue);
+     const reorderRigs = useStore((s) => s.reorderRigs);
++    const existingGroups = Array.from(new Set(rigs.map(r => r.group).filter((g): g is string => !!g)));
+ 
+     // 新增表單 state
+     const [showForm, setShowForm] = useState(false);
+@@ -324,6 +325,8 @@ function RigsSection() {
+     const [max, setMax] = useState(90);
+     const [defaultValue, setDefaultValue] = useState(0);
+     const [color, setColor] = useState<string>(DEFAULT_RIG_COLOR);
++    const [group, setGroup] = useState<string>('');
++    const [newGroupMode, setNewGroupMode] = useState(false);
+     const [formError, setFormError] = useState('');
+ 
+     // 拖拉排序 state
+@@ -385,11 +388,14 @@ function RigsSection() {
+             step: getRigStep(type),
+             defaultValue: isVis ? defaultValue : defaultValue,
+             color,
++            group: group.trim() || undefined,
+         };
+         addRig(rig);
+ 
+         // 重置表單
+         setName('');
++        setGroup('');
++        setNewGroupMode(false);
+         setFormError('');
+         setShowForm(false);
+     };
+@@ -499,6 +505,42 @@ function RigsSection() {
+                         ))}
+                     </div>
+ 
++                    {/* 群組:同名機關在前端聚合於同一標題下;選既有或新增 */}
++                    <div className="flex items-center gap-1.5">
++                        <span className="text-[10px] text-gray-500 flex-shrink-0">群組</span>
++                        {newGroupMode || existingGroups.length === 0 ? (
++                            <input
++                                type="text"
++                                value={group}
++                                onChange={(e) => setGroup(e.target.value)}
++                                placeholder="群組名稱(留空=不分組)"
++                                className="flex-1 min-w-0 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:border-violet-500 focus:outline-none"
++                            />
++                        ) : (
++                            <select
++                                value={group}
++                                onChange={(e) => {
++                                    if (e.target.value === '__new__') { setNewGroupMode(true); setGroup(''); }
++                                    else setGroup(e.target.value);
++                                }}
++                                className="flex-1 min-w-0 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-violet-500 focus:outline-none"
++                            >
++                                <option value="">（不分組,平鋪)</option>
++                                {existingGroups.map(g => <option key={g} value={g}>{g}</option>)}
++                                <option value="__new__">+ 新增群組…</option>
++                            </select>
++                        )}
++                        {newGroupMode && existingGroups.length > 0 && (
++                            <button
++                                onClick={() => { setNewGroupMode(false); setGroup(''); }}
++                                className="text-[10px] text-gray-400 hover:text-white flex-shrink-0"
++                                title="改選既有群組"
++                            >
++                                ↩
++                            </button>
++                        )}
++                    </div>
++
+                     {/* 行程設定:visibility 改為單一「初始狀態」開關 */}
+                     {type === 'visibility' ? (
+                         <div className="flex items-center gap-2">
+@@ -589,6 +631,22 @@ function RigsSection() {
+                             {targetName(rig)} · {isVis ? '👁 顯示控制' : `${rig.type === 'rotation' ? '旋轉' : '位移'} ${rig.axis.toUpperCase()} 軸`}
+                         </p>
+ 
++                        {/* 群組歸屬(可改) */}
++                        <div className="flex items-center gap-1">
++                            <span className="text-[10px] text-gray-500 flex-shrink-0">群組</span>
++                            <select
++                                value={rig.group || ''}
++                                onChange={(e) => updateRig(rig.id, { group: e.target.value || undefined })}
++                                className="flex-1 min-w-0 bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5 text-[10px] text-gray-200 focus:border-violet-500 focus:outline-none"
++                            >
++                                <option value="">（不分組）</option>
++                                {existingGroups.map(g => <option key={g} value={g}>{g}</option>)}
++                                {rig.group && !existingGroups.includes(rig.group) && (
++                                    <option value={rig.group}>{rig.group}</option>
++                                )}
++                            </select>
++                        </div>
++
+                         {/* 顏色選擇(列表內可改) */}
+                         <div className="flex items-center gap-1">
+                             {RIG_COLORS.map(c => (
+diff --git a/src/components/client/RigPanel.tsx b/src/components/client/RigPanel.tsx
+index 662334a..574a588 100644
+--- a/src/components/client/RigPanel.tsx
++++ b/src/components/client/RigPanel.tsx
+@@ -37,6 +37,29 @@ export function RigPanel() {
+ 
+     if (validRigs.length === 0) return null;
+ 
++    // 依 rigs 陣列順序掃描,組成「顯示區塊」:
++    // - 有 group 的機關歸入該群組區塊(區塊位置 = 群組首個成員出現處)
++    // - 無 group 的機關為獨立平鋪項
++    // 拖拉/箭頭排序改的是 rigs 陣列順序,此處讀順序故自動反映。
++    type Block =
++        | { kind: 'single'; rig: typeof validRigs[number]; index: number }
++        | { kind: 'group'; name: string; items: { rig: typeof validRigs[number]; index: number }[] };
++    const blocks: Block[] = [];
++    const groupBlockMap = new Map<string, Extract<Block, { kind: 'group' }>>();
++    validRigs.forEach((rig, index) => {
++        if (rig.group) {
++            let blk = groupBlockMap.get(rig.group);
++            if (!blk) {
++                blk = { kind: 'group', name: rig.group, items: [] };
++                groupBlockMap.set(rig.group, blk);
++                blocks.push(blk);
++            }
++            blk.items.push({ rig, index });
++        } else {
++            blocks.push({ kind: 'single', rig, index });
++        }
++    });
++
+     const isAdmin = mode === 'admin';
+ 
+     // 定位邏輯:
+@@ -78,7 +101,8 @@ export function RigPanel() {
+ 
+                         {/* 機關滑桿列表 */}
+                         <div className="p-3 space-y-3 max-h-[45vh] overflow-y-auto">
+-                            {validRigs.map((rig, index) => {
++                            {(() => {
++                              const renderRig = (rig: typeof validRigs[number], index: number) => {
+                                 const value = quantizeRigValue(rig.type, rigValues[rig.id] ?? rig.defaultValue);
+                                 const unit = rig.type === 'rotation' ? '°' : rig.type === 'translation' ? 'm' : '';
+                                 const isDefault = value === rig.defaultValue;
+@@ -161,7 +185,26 @@ export function RigPanel() {
+                                         )}
+                                     </div>
+                                 );
+-                            })}
++                              };
++
++                              // 按區塊渲染:群組顯示標題 + 縮排成員,平鋪項直接渲染
++                              return blocks.map((blk, bi) => {
++                                if (blk.kind === 'single') return renderRig(blk.rig, blk.index);
++                                const headRgb = rigColorRgb(blk.items[0]?.rig.color);
++                                return (
++                                  <div key={`grp_${blk.name}_${bi}`} className="rounded-lg border border-white/5 bg-white/[0.02] p-2 space-y-2">
++                                    <div className="flex items-center gap-1.5">
++                                      <span className="w-1.5 h-4 rounded-sm flex-shrink-0" style={{ background: `rgba(${headRgb}, 0.7)` }} />
++                                      <span className="text-[11px] font-semibold text-gray-300 tracking-wide truncate">{blk.name}</span>
++                                      <span className="text-[9px] text-gray-600">({blk.items.length})</span>
++                                    </div>
++                                    <div className="pl-2 space-y-3">
++                                      {blk.items.map(it => renderRig(it.rig, it.index))}
++                                    </div>
++                                  </div>
++                                );
++                              });
++                            })()}
+                         </div>
+                     </div>
+                 )}
+diff --git a/src/store/useStore.ts b/src/store/useStore.ts
+index 60b7b81..f48e27e 100644
+--- a/src/store/useStore.ts
++++ b/src/store/useStore.ts
+@@ -72,6 +72,7 @@ export interface RigControl {
+     step?: number;                 // 滑桿步進
+     defaultValue: number;          // 須在 [min, max] 內;visibility: 0=隱藏 1=顯示
+     color?: string;                // 分類顏色(預設 6 色之一,半透明融入面板)
++    group?: string;                // 群組名稱;同名機關在前端聚合於同一標題下(空=平鋪)
+ }
+ 
+ // 機關分類顏色:淡色、半透明,與面板 UI 一致。值為 RGB,套用時自帶透明度。

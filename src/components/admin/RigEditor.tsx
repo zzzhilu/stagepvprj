@@ -313,6 +313,7 @@ function RigsSection() {
     const removeRig = useStore((s) => s.removeRig);
     const setRigValue = useStore((s) => s.setRigValue);
     const reorderRigs = useStore((s) => s.reorderRigs);
+    const existingGroups = Array.from(new Set(rigs.map(r => r.group).filter((g): g is string => !!g)));
 
     // 新增表單 state
     const [showForm, setShowForm] = useState(false);
@@ -324,6 +325,8 @@ function RigsSection() {
     const [max, setMax] = useState(90);
     const [defaultValue, setDefaultValue] = useState(0);
     const [color, setColor] = useState<string>(DEFAULT_RIG_COLOR);
+    const [group, setGroup] = useState<string>('');
+    const [newGroupMode, setNewGroupMode] = useState(false);
     const [formError, setFormError] = useState('');
 
     // 拖拉排序 state
@@ -385,11 +388,14 @@ function RigsSection() {
             step: getRigStep(type),
             defaultValue: isVis ? defaultValue : defaultValue,
             color,
+            group: group.trim() || undefined,
         };
         addRig(rig);
 
         // 重置表單
         setName('');
+        setGroup('');
+        setNewGroupMode(false);
         setFormError('');
         setShowForm(false);
     };
@@ -499,6 +505,42 @@ function RigsSection() {
                         ))}
                     </div>
 
+                    {/* 群組:同名機關在前端聚合於同一標題下;選既有或新增 */}
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-gray-500 flex-shrink-0">群組</span>
+                        {newGroupMode || existingGroups.length === 0 ? (
+                            <input
+                                type="text"
+                                value={group}
+                                onChange={(e) => setGroup(e.target.value)}
+                                placeholder="群組名稱(留空=不分組)"
+                                className="flex-1 min-w-0 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:border-violet-500 focus:outline-none"
+                            />
+                        ) : (
+                            <select
+                                value={group}
+                                onChange={(e) => {
+                                    if (e.target.value === '__new__') { setNewGroupMode(true); setGroup(''); }
+                                    else setGroup(e.target.value);
+                                }}
+                                className="flex-1 min-w-0 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-violet-500 focus:outline-none"
+                            >
+                                <option value="">（不分組,平鋪)</option>
+                                {existingGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                                <option value="__new__">+ 新增群組…</option>
+                            </select>
+                        )}
+                        {newGroupMode && existingGroups.length > 0 && (
+                            <button
+                                onClick={() => { setNewGroupMode(false); setGroup(''); }}
+                                className="text-[10px] text-gray-400 hover:text-white flex-shrink-0"
+                                title="改選既有群組"
+                            >
+                                ↩
+                            </button>
+                        )}
+                    </div>
+
                     {/* 行程設定:visibility 改為單一「初始狀態」開關 */}
                     {type === 'visibility' ? (
                         <div className="flex items-center gap-2">
@@ -588,6 +630,22 @@ function RigsSection() {
                         <p className="text-[10px] text-gray-500">
                             {targetName(rig)} · {isVis ? '👁 顯示控制' : `${rig.type === 'rotation' ? '旋轉' : '位移'} ${rig.axis.toUpperCase()} 軸`}
                         </p>
+
+                        {/* 群組歸屬(可改) */}
+                        <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-gray-500 flex-shrink-0">群組</span>
+                            <select
+                                value={rig.group || ''}
+                                onChange={(e) => updateRig(rig.id, { group: e.target.value || undefined })}
+                                className="flex-1 min-w-0 bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5 text-[10px] text-gray-200 focus:border-violet-500 focus:outline-none"
+                            >
+                                <option value="">（不分組）</option>
+                                {existingGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                                {rig.group && !existingGroups.includes(rig.group) && (
+                                    <option value={rig.group}>{rig.group}</option>
+                                )}
+                            </select>
+                        </div>
 
                         {/* 顏色選擇(列表內可改) */}
                         <div className="flex items-center gap-1">

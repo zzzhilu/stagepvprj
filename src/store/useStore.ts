@@ -72,6 +72,7 @@ export interface RigControl {
     step?: number;                 // 滑桿步進
     defaultValue: number;          // 須在 [min, max] 內;visibility: 0=隱藏 1=顯示
     color?: string;                // 分類顏色(預設 6 色之一,半透明融入面板)
+    group?: string;                // 群組名稱;同名機關在前端聚合於同一標題下(空=平鋪)
 }
 
 // 機關分類顏色:淡色、半透明,與面板 UI 一致。值為 RGB,套用時自帶透明度。

@@ -1,0 +1,131 @@
+diff --git a/src/components/admin/GDriveVideoManager.tsx b/src/components/admin/GDriveVideoManager.tsx
+index 35a5613..c760be5 100644
+--- a/src/components/admin/GDriveVideoManager.tsx
++++ b/src/components/admin/GDriveVideoManager.tsx
+@@ -7,6 +7,7 @@ import { resolveGDriveUrl } from '@/lib/gdrive-direct';
+ export function GDriveVideoManager({ projectId, onSave }: { projectId: string; onSave?: () => void }) {
+     const [folderIdInput, setFolderIdInput] = useState('');
+     const [isSyncing, setIsSyncing] = useState(false);
++    const [lastSync, setLastSync] = useState<number | null>(null);
+     const [copiedId, setCopiedId] = useState<string | null>(null);
+ 
+     const gdriveFolders = useStore(state => state.gdriveFolders);
+@@ -139,6 +140,7 @@ export function GDriveVideoManager({ projectId, onSave }: { projectId: string; o
+                 alert('同步失敗: ' + error.message);
+             }
+         } finally {
++            setLastSync(Date.now());
+             if (!isAuto) setIsSyncing(false);
+         }
+     };
+@@ -258,6 +260,9 @@ export function GDriveVideoManager({ projectId, onSave }: { projectId: string; o
+                         <span className="text-xs text-gray-400">目前綁定資料夾: </span>
+                         <span className="text-xs text-violet-300 font-mono">{currentFolderId}</span>
+                         <span className="ml-2 text-[10px] text-gray-400">手動同步模式</span>
++                        {lastSync && (
++                            <span className="ml-2 text-[10px] text-gray-500">· 上次更新 {new Date(lastSync).toLocaleTimeString()}</span>
++                        )}
+                     </div>
+                     <button
+                         onClick={() => handleSync(false)}
+diff --git a/src/components/client/ClientPlaylistSidebar.tsx b/src/components/client/ClientPlaylistSidebar.tsx
+index 0e31d2f..b741041 100644
+--- a/src/components/client/ClientPlaylistSidebar.tsx
++++ b/src/components/client/ClientPlaylistSidebar.tsx
+@@ -1,6 +1,6 @@
+ 'use client';
+ 
+-import { useState, useEffect } from 'react';
++import { useState, useEffect, useCallback } from 'react';
+ import { useStore } from '@/store/useStore';
+ import { resolveGDriveUrl } from '@/lib/gdrive-direct';
+ import { ProjectService } from '@/lib/project-service';
+@@ -9,6 +9,8 @@ export function ClientPlaylistSidebar({ projectId }: { projectId: string }) {
+     const [isOpen, setIsOpen] = useState(true);
+     const [hasAutoPlayed, setHasAutoPlayed] = useState(false);
+     const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
++    const [isSyncing, setIsSyncing] = useState(false);
++    const [lastSync, setLastSync] = useState<number | null>(null);
+     
+     // 從 store 取得專案的影片清單與相關函式
+     const gdriveVideos = useStore(state => state.gdriveVideos);
+@@ -74,20 +76,17 @@ export function ClientPlaylistSidebar({ projectId }: { projectId: string }) {
+         }
+     };
+ 
+-    useEffect(() => {
+-        let isMounted = true;
+-        
+-        const fetchLatestVideos = async () => {
+-            if (!currentFolderId) return;
+-            try {
+-                const res = await fetch(`/api/drive/sync?folderId=${currentFolderId}`);
+-                if (!res.ok) return;
+-                
+-                const data = await res.json();
+-                if (!isMounted) return;
+-                
+-                const currentState = useStore.getState();
+-                const currentGDriveVideos = currentState.gdriveVideos || [];
++    const fetchLatestVideos = useCallback(async (opts?: { manual?: boolean }) => {
++        if (!currentFolderId) return;
++        if (opts?.manual) setIsSyncing(true);
++        try {
++            const res = await fetch(`/api/drive/sync?folderId=${currentFolderId}${opts?.manual ? '&t=' + Date.now() : ''}`);
++            if (!res.ok) return;
++            
++            const data = await res.json();
++            
++            const currentState = useStore.getState();
++            const currentGDriveVideos = currentState.gdriveVideos || [];
+                 const currentCues = currentState.cues || [];
+                 const currentProjectVideos = currentGDriveVideos.filter((v: any) => v.folderId === currentFolderId);
+                 
+@@ -177,13 +176,17 @@ export function ClientPlaylistSidebar({ projectId }: { projectId: string }) {
+                     handleVideoSelect(projectVideos[0]);
+                     setHasAutoPlayed(true);
+                 }
++            } finally {
++                setLastSync(Date.now());
++                if (opts?.manual) setIsSyncing(false);
+             }
+-        };
++        // eslint-disable-next-line react-hooks/exhaustive-deps
++    }, [currentFolderId, hasAutoPlayed, projectId]);
+ 
++    // 掛載 / 資料夾變更時自動同步一次
++    useEffect(() => {
+         fetchLatestVideos();
+-
+-        return () => { isMounted = false; };
+-    }, [currentFolderId, hasAutoPlayed]);
++    }, [fetchLatestVideos]);
+ 
+ 
+     return (
+@@ -215,11 +218,24 @@ export function ClientPlaylistSidebar({ projectId }: { projectId: string }) {
+                     isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                 }`}
+             >
+-                <div className="p-3 border-b border-green-500/20 bg-gray-900/60">
++                <div className="p-3 border-b border-green-500/20 bg-gray-900/60 flex items-center justify-between">
+                     <h3 className="text-white text-sm font-medium flex items-center gap-2">
+                         <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg>
+                         GDrive 播放列表
+                     </h3>
++                    <button
++                        onClick={() => fetchLatestVideos({ manual: true })}
++                        disabled={isSyncing || !currentFolderId}
++                        title={lastSync ? `上次更新:${new Date(lastSync).toLocaleTimeString()}` : '重新整理列表'}
++                        className="text-green-300/70 hover:text-green-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors p-1 -m-1"
++                    >
++                        <svg
++                            className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`}
++                            fill="none" stroke="currentColor" viewBox="0 0 24 24"
++                        >
++                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
++                        </svg>
++                    </button>
+                 </div>
+                 
+                 <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">

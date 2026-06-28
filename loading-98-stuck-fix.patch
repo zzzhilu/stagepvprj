@@ -1,0 +1,84 @@
+diff --git a/src/components/canvas/SceneGraph.tsx b/src/components/canvas/SceneGraph.tsx
+index fa88117..dc88604 100644
+--- a/src/components/canvas/SceneGraph.tsx
++++ b/src/components/canvas/SceneGraph.tsx
+@@ -29,13 +29,20 @@ import { rigDelta, addVec3 } from '@/lib/rig-utils';
+ function FirstFrameGate() {
+     const { active } = useProgress();
+     const setFirstFrameRendered = useStore((state) => state.setFirstFrameRendered);
++    const framesAfterIdleRef = useRef(0);
+ 
+     useFrame(() => {
+         const flag = useStore.getState().firstFrameRendered;
+         if (active) {
+-            if (flag) setFirstFrameRendered(false); // 新一輪載入開始,歸零
+-        } else if (!flag) {
+-            setFirstFrameRendered(true); // 載入結束後的首幀
++            // 載入活動中:歸零(進入新一輪載入)
++            framesAfterIdleRef.current = 0;
++            if (flag) setFirstFrameRendered(false);
++        } else {
++            // 無載入活動:連續渲染數幀後判定首幀已穩定呈現
++            framesAfterIdleRef.current += 1;
++            if (framesAfterIdleRef.current >= 2 && !flag) {
++                setFirstFrameRendered(true);
++            }
+         }
+     });
+ 
+diff --git a/src/components/ui/AssetLoadingOverlay.tsx b/src/components/ui/AssetLoadingOverlay.tsx
+index 625a07f..0b07907 100644
+--- a/src/components/ui/AssetLoadingOverlay.tsx
++++ b/src/components/ui/AssetLoadingOverlay.tsx
+@@ -45,6 +45,32 @@ export function AssetLoadingOverlay({
+         return () => clearTimeout(t);
+     }, []);
+ 
++    // 卡關保險絲:某些資產(GDrive 影片貼圖、慢速 GLB)可能永遠停在 pending,
++    // 讓 useProgress 的 active 一直為 true、progress 卡在 ~99% → 整個 loading 鎖死在 98%。
++    // 兩道保險:① 資料就緒後進度爬到 ≥90% 但停滯 4 秒 → 放行;② 資料就緒後總計 15 秒硬上限 → 放行。
++    const [forceReady, setForceReady] = useState(false);
++    const progressRef = useRef(0);
++    progressRef.current = progress;
++    useEffect(() => {
++        if (!dataReady) return;
++        // ① 停滯偵測:每秒檢查,進度高位且 3 次無變化即放行
++        let stalls = 0;
++        let lastP = -1;
++        const stallTimer = setInterval(() => {
++            const p = progressRef.current;
++            if (p >= 90 && Math.abs(p - lastP) < 0.5) {
++                stalls += 1;
++                if (stalls >= 3) { setForceReady(true); clearInterval(stallTimer); }
++            } else {
++                stalls = 0;
++            }
++            lastP = p;
++        }, 1300);
++        // ② 硬上限
++        const hardTimer = setTimeout(() => setForceReady(true), 15000);
++        return () => { clearInterval(stallTimer); clearTimeout(hardTimer); };
++    }, [dataReady]);
++
+     // 等待階段(資料抓取/初始化場景)沒有 loader 進度事件,
+     // 用 tick 驅動重繪:讓爬升百分比與省略號動畫持續跳動,表示頁面正在運作
+     const [tick, setTick] = useState(0);
+@@ -57,11 +83,13 @@ export function AssetLoadingOverlay({
+     const dots = '.'.repeat((tick % 3) + 1);
+ 
+     const ready =
+-        dataReady &&
+-        firstFrameRendered &&
+-        !active &&
+-        (everActive || graceTimedOut) &&
+-        minTimePassed;
++        forceReady || (
++            dataReady &&
++            firstFrameRendered &&
++            !active &&
++            (everActive || graceTimedOut) &&
++            minTimePassed
++        );
+ 
+     // 淡出 → 卸載
+     const [fading, setFading] = useState(false);

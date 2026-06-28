@@ -1,0 +1,569 @@
+diff --git a/src/components/admin/RigEditor.tsx b/src/components/admin/RigEditor.tsx
+index 21a6196..683d9be 100644
+--- a/src/components/admin/RigEditor.tsx
++++ b/src/components/admin/RigEditor.tsx
+@@ -1,6 +1,6 @@
+ 'use client';
+ 
+-import { useStore, NullNode, RigControl, RigType, RigAxis } from '@/store/useStore';
++import { useStore, NullNode, RigControl, RigType, RigAxis, RIG_COLORS, DEFAULT_RIG_COLOR, rigColorRgb } from '@/store/useStore';
+ import { useState, useRef, useEffect } from 'react';
+ import * as THREE from 'three';
+ import { isSelfOrDescendant, objectWorldPosition, worldPosToLocal } from '@/lib/rig-utils';
+@@ -312,6 +312,7 @@ function RigsSection() {
+     const updateRig = useStore((s) => s.updateRig);
+     const removeRig = useStore((s) => s.removeRig);
+     const setRigValue = useStore((s) => s.setRigValue);
++    const reorderRigs = useStore((s) => s.reorderRigs);
+ 
+     // 新增表單 state
+     const [showForm, setShowForm] = useState(false);
+@@ -322,8 +323,13 @@ function RigsSection() {
+     const [min, setMin] = useState(0);
+     const [max, setMax] = useState(90);
+     const [defaultValue, setDefaultValue] = useState(0);
++    const [color, setColor] = useState<string>(DEFAULT_RIG_COLOR);
+     const [formError, setFormError] = useState('');
+ 
++    // 拖拉排序 state
++    const [dragIndex, setDragIndex] = useState<number | null>(null);
++    const [overIndex, setOverIndex] = useState<number | null>(null);
++
+     // 長按刪除(沿用專案慣例)
+     const [deletingId, setDeletingId] = useState<string | null>(null);
+     const deleteTimerRef = useRef<NodeJS.Timeout | null>(null);
+@@ -358,8 +364,12 @@ function RigsSection() {
+         const target = decodeTarget(targetKey);
+         if (!name.trim()) { setFormError('請輸入機關名稱'); return; }
+         if (!target) { setFormError('請選擇目標'); return; }
+-        if (!(min < max)) { setFormError('下限必須小於上限'); return; }
+-        if (defaultValue < min || defaultValue > max) { setFormError('預設值必須在上下限之間'); return; }
++
++        const isVis = type === 'visibility';
++        if (!isVis) {
++            if (!(min < max)) { setFormError('下限必須小於上限'); return; }
++            if (defaultValue < min || defaultValue > max) { setFormError('預設值必須在上下限之間'); return; }
++        }
+ 
+         const rig: RigControl = {
+             id: `rig_${Date.now()}`,
+@@ -369,10 +379,12 @@ function RigsSection() {
+             instanceIndex: target.instanceIndex ?? 0,
+             type,
+             axis,
+-            min,
+-            max,
++            // visibility: 固定 0~1,預設值即「初始是否顯示」
++            min: isVis ? 0 : min,
++            max: isVis ? 1 : max,
+             step: getRigStep(type),
+-            defaultValue,
++            defaultValue: isVis ? defaultValue : defaultValue,
++            color,
+         };
+         addRig(rig);
+ 
+@@ -386,10 +398,11 @@ function RigsSection() {
+     const handleTypeChange = (t: RigType) => {
+         setType(t);
+         if (t === 'rotation') { setMin(0); setMax(90); setDefaultValue(0); }
+-        else { setMin(0); setMax(3); setDefaultValue(0); }
++        else if (t === 'translation') { setMin(0); setMax(3); setDefaultValue(0); }
++        else { setMin(0); setMax(1); setDefaultValue(1); } // visibility:預設顯示
+     };
+ 
+-    const unit = (t: RigType) => t === 'rotation' ? '°' : 'm';
++    const unit = (t: RigType) => t === 'rotation' ? '°' : t === 'translation' ? 'm' : '';
+ 
+     return (
+         <div className="space-y-2">
+@@ -437,46 +450,82 @@ function RigsSection() {
+                         )}
+                     </select>
+ 
+-                    {/* 類型 + 軸向 */}
++                    {/* 類型 */}
+                     <div className="flex gap-1">
+-                        {(['rotation', 'translation'] as RigType[]).map(t => (
++                        {(['rotation', 'translation', 'visibility'] as RigType[]).map(t => (
+                             <button
+                                 key={t}
+                                 onClick={() => handleTypeChange(t)}
+                                 className={`flex-1 py-1 rounded text-xs ${type === t ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                             >
+                                 <span className="flex items-center justify-center gap-1">
+-                                    {t === 'rotation' ? <RotateIcon className="w-3 h-3" /> : <TranslateIcon className="w-3 h-3" />}
+-                                    {t === 'rotation' ? '旋轉' : '位移'}
++                                    {t === 'rotation' ? <><RotateIcon className="w-3 h-3" />旋轉</>
++                                     : t === 'translation' ? <><TranslateIcon className="w-3 h-3" />位移</>
++                                     : <>👁 顯示</>}
+                                 </span>
+                             </button>
+                         ))}
+-                        {AXIS_OPTIONS.map(a => (
++                    </div>
++
++                    {/* 軸向(visibility 不需要)*/}
++                    {type !== 'visibility' && (
++                        <div className="flex gap-1">
++                            {AXIS_OPTIONS.map(a => (
++                                <button
++                                    key={a}
++                                    onClick={() => setAxis(a)}
++                                    className={`flex-1 py-1 rounded text-xs uppercase ${axis === a ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
++                                >
++                                    {a} 軸
++                                </button>
++                            ))}
++                        </div>
++                    )}
++
++                    {/* 顏色分類 */}
++                    <div className="flex items-center gap-1.5">
++                        <span className="text-[10px] text-gray-500 flex-shrink-0">顏色</span>
++                        {RIG_COLORS.map(c => (
+                             <button
+-                                key={a}
+-                                onClick={() => setAxis(a)}
+-                                className={`w-8 py-1 rounded text-xs uppercase ${axis === a ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+-                            >
+-                                {a}
+-                            </button>
++                                key={c.id}
++                                onClick={() => setColor(c.id)}
++                                title={c.label}
++                                className="w-5 h-5 rounded-full flex-shrink-0 transition-transform hover:scale-110"
++                                style={{
++                                    background: `rgba(${c.rgb}, 0.55)`,
++                                    boxShadow: color === c.id ? `0 0 0 2px rgba(${c.rgb}, 1)` : 'none',
++                                }}
++                            />
+                         ))}
+                     </div>
+ 
+-                    {/* min / max / default */}
+-                    <div className="flex items-center gap-1">
+-                        <div className="flex-1 min-w-0">
+-                            <span className="text-[10px] text-gray-500 block">下限 ({unit(type)})</span>
+-                            <NumberField value={min} onCommit={setMin} className="w-full" />
+-                        </div>
+-                        <div className="flex-1 min-w-0">
+-                            <span className="text-[10px] text-gray-500 block">上限 ({unit(type)})</span>
+-                            <NumberField value={max} onCommit={setMax} className="w-full" />
++                    {/* 行程設定:visibility 改為單一「初始狀態」開關 */}
++                    {type === 'visibility' ? (
++                        <div className="flex items-center gap-2">
++                            <span className="text-[10px] text-gray-500">初始狀態</span>
++                            <button
++                                onClick={() => setDefaultValue(defaultValue >= 0.5 ? 0 : 1)}
++                                className={`flex-1 py-1.5 rounded text-xs font-semibold ${defaultValue >= 0.5 ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300'}`}
++                            >
++                                {defaultValue >= 0.5 ? '👁 顯示' : '🚫 隱藏'}
++                            </button>
+                         </div>
+-                        <div className="flex-1 min-w-0">
+-                            <span className="text-[10px] text-gray-500 block">預設值</span>
+-                            <NumberField value={defaultValue} onCommit={setDefaultValue} className="w-full" />
++                    ) : (
++                        <div className="flex items-center gap-1">
++                            <div className="flex-1 min-w-0">
++                                <span className="text-[10px] text-gray-500 block">下限 ({unit(type)})</span>
++                                <NumberField value={min} onCommit={setMin} className="w-full" />
++                            </div>
++                            <div className="flex-1 min-w-0">
++                                <span className="text-[10px] text-gray-500 block">上限 ({unit(type)})</span>
++                                <NumberField value={max} onCommit={setMax} className="w-full" />
++                            </div>
++                            <div className="flex-1 min-w-0">
++                                <span className="text-[10px] text-gray-500 block">預設值</span>
++                                <NumberField value={defaultValue} onCommit={setDefaultValue} className="w-full" />
++                            </div>
+                         </div>
+-                    </div>
++                    )}
+ 
+                     {formError && <p className="text-red-400 text-[10px]">{formError}</p>}
+ 
+@@ -494,12 +543,29 @@ function RigsSection() {
+                 <p className="text-gray-500 text-xs text-center py-2">尚未建立任何機關</p>
+             )}
+ 
+-            {rigs.map(rig => {
++            {rigs.map((rig, index) => {
+                 const value = rigValues[rig.id] ?? rig.defaultValue;
+                 const isDeleting = deletingId === rig.id;
++                const rgb = rigColorRgb(rig.color);
++                const isVis = rig.type === 'visibility';
++                const isDragOver = overIndex === index && dragIndex !== null && dragIndex !== index;
+                 return (
+-                    <div key={rig.id} className={`bg-gray-800 rounded p-2 space-y-1.5 ${isDeleting ? 'ring-1 ring-red-500' : ''}`}>
++                    <div
++                        key={rig.id}
++                        draggable
++                        onDragStart={() => setDragIndex(index)}
++                        onDragOver={(e) => { e.preventDefault(); setOverIndex(index); }}
++                        onDragEnd={() => {
++                            if (dragIndex !== null && overIndex !== null && dragIndex !== overIndex) {
++                                reorderRigs(dragIndex, overIndex);
++                            }
++                            setDragIndex(null); setOverIndex(null);
++                        }}
++                        className={`bg-gray-800 rounded p-2 space-y-1.5 border-l-[3px] cursor-grab active:cursor-grabbing ${isDeleting ? 'ring-1 ring-red-500' : ''} ${isDragOver ? 'ring-1 ring-violet-400' : ''}`}
++                        style={{ borderLeftColor: `rgba(${rgb}, 0.6)`, background: `rgba(${rgb}, 0.08)` }}
++                    >
+                         <div className="flex items-center gap-2">
++                            <span className="text-gray-600 text-xs flex-shrink-0 select-none" title="拖拉排序">⠿</span>
+                             <input
+                                 type="text"
+                                 value={rig.name}
+@@ -520,26 +586,54 @@ function RigsSection() {
+                         </div>
+ 
+                         <p className="text-[10px] text-gray-500">
+-                            {targetName(rig)} · {rig.type === 'rotation' ? '旋轉' : '位移'} {rig.axis.toUpperCase()} 軸
++                            {targetName(rig)} · {isVis ? '👁 顯示控制' : `${rig.type === 'rotation' ? '旋轉' : '位移'} ${rig.axis.toUpperCase()} 軸`}
+                         </p>
+ 
+-                        {/* 即時預覽滑桿 */}
+-                        <div className="flex items-center gap-2">
+-                            <input
+-                                type="range"
+-                                min={rig.min}
+-                                max={rig.max}
+-                                step={getRigStep(rig.type)}
+-                                value={value}
+-                                onChange={(e) => setRigValue(rig.id, parseFloat(e.target.value))}
+-                                className="flex-1 accent-violet-500"
+-                            />
+-                            <span className="text-xs text-violet-300 w-16 text-right flex-shrink-0 font-mono">
+-                                {value.toFixed(rig.type === 'translation' ? 2 : 0)}{unit(rig.type)}
+-                            </span>
++                        {/* 顏色選擇(列表內可改) */}
++                        <div className="flex items-center gap-1">
++                            {RIG_COLORS.map(c => (
++                                <button
++                                    key={c.id}
++                                    onClick={() => updateRig(rig.id, { color: c.id })}
++                                    title={c.label}
++                                    className="w-4 h-4 rounded-full flex-shrink-0 transition-transform hover:scale-110"
++                                    style={{
++                                        background: `rgba(${c.rgb}, 0.55)`,
++                                        boxShadow: (rig.color || 'violet') === c.id ? `0 0 0 2px rgba(${c.rgb}, 1)` : 'none',
++                                    }}
++                                />
++                            ))}
+                         </div>
+ 
+-                        {/* 行程設定 */}
++                        {/* 即時預覽:visibility 顯示開關,其餘顯示滑桿 */}
++                        {isVis ? (
++                            <button
++                                onClick={() => setRigValue(rig.id, value >= 0.5 ? 0 : 1)}
++                                className={`w-full py-1.5 rounded text-xs font-semibold transition-colors ${value >= 0.5 ? 'text-white' : 'bg-gray-700 text-gray-400'}`}
++                                style={value >= 0.5 ? { background: `rgba(${rgb}, 0.7)` } : undefined}
++                            >
++                                {value >= 0.5 ? '👁 顯示中' : '🚫 已隱藏'}
++                            </button>
++                        ) : (
++                            <div className="flex items-center gap-2">
++                                <input
++                                    type="range"
++                                    min={rig.min}
++                                    max={rig.max}
++                                    step={getRigStep(rig.type)}
++                                    value={value}
++                                    onChange={(e) => setRigValue(rig.id, parseFloat(e.target.value))}
++                                    className="flex-1"
++                                    style={{ accentColor: `rgba(${rgb}, 0.9)` }}
++                                />
++                                <span className="text-xs w-16 text-right flex-shrink-0 font-mono" style={{ color: `rgba(${rgb}, 1)` }}>
++                                    {value.toFixed(rig.type === 'translation' ? 2 : 0)}{unit(rig.type)}
++                                </span>
++                            </div>
++                        )}
++
++                        {/* 行程設定(visibility 不需要)*/}
++                        {!isVis && (
+                         <div className="flex items-center gap-1">
+                             <NumberField
+                                 value={rig.min}
+@@ -561,6 +655,7 @@ function RigsSection() {
+                                 className="w-full min-w-0"
+                             />
+                         </div>
++                        )}
+                     </div>
+                 );
+             })}
+diff --git a/src/components/canvas/SceneGraph.tsx b/src/components/canvas/SceneGraph.tsx
+index dc88604..f1883e6 100644
+--- a/src/components/canvas/SceneGraph.tsx
++++ b/src/components/canvas/SceneGraph.tsx
+@@ -19,7 +19,7 @@ import * as THREE from 'three';
+ import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+ import { PerfectRenderEnvironment } from './PerfectRenderEnvironment';
+ import { ToneMappingMode } from 'postprocessing';
+-import { rigDelta, addVec3 } from '@/lib/rig-utils';
++import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
+ 
+ /**
+  * 首幀信號:資產載入完成後,實際渲染出第一幀時通知 store。
+@@ -137,6 +137,9 @@ function NullGroup({
+ 
+     const delta = rigDelta(rigs, rigValues, 'null', node.id);
+ 
++    // 可見性機關:控制整個 Null group(含子物件)的顯示/隱藏
++    const nullVisible = rigVisibility(rigs, rigValues, 'null', node.id);
++
+     const childNulls = nulls.filter(n => n.parentId === node.id);
+     const allChildObjects = stageObjects.filter(o => o.parentId === node.id);
+     const childObjects = allChildObjects.filter(o => !o.rigMirror);
+@@ -166,8 +169,8 @@ function NullGroup({
+                 />
+             )}
+ 
+-            {/* 機關偏移層:位移/旋轉沿 Null 自身本地軸作用 */}
+-            <group position={delta.pos} rotation={delta.rot}>
++            {/* 機關偏移層:位移/旋轉沿 Null 自身本地軸作用;可見性控制子物件顯示 */}
++            <group position={delta.pos} rotation={delta.rot} visible={nullVisible !== false}>
+ 
+             {childNulls.map(n => (
+                 <NullGroup
+diff --git a/src/components/canvas/StageObjectRenderer.tsx b/src/components/canvas/StageObjectRenderer.tsx
+index 2603cfc..269db31 100644
+--- a/src/components/canvas/StageObjectRenderer.tsx
++++ b/src/components/canvas/StageObjectRenderer.tsx
+@@ -6,7 +6,7 @@ import { useMemo, useEffect, useState, useRef, forwardRef } from 'react';
+ import { globalVideoElement } from './VideoManager';
+ import { useFrame } from '@react-three/fiber';
+ import { parseGIF, decompressFrames } from 'gifuct-js';
+-import { rigDelta, addVec3 } from '@/lib/rig-utils';
++import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
+ 
+ // Calculate lerp speed based on distance (0.5s - 1.5s)
+ function calculateLerpSpeed(distance: number): number {
+@@ -678,7 +678,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
+     }
+ 
+     return (
+-        <group ref={groupRef} scale={worldTransform.scale} onClick={onClick}>
++        <group ref={groupRef} scale={worldTransform.scale} onClick={onClick} visible={rigVisibility(rigs, rigValues, 'object', object.id, 0) !== false}>
+             {meshNodes.map((node, i) => {
+                 const geometry = clonedGeometries[i];
+                 if (!geometry) return null;
+diff --git a/src/components/client/RigPanel.tsx b/src/components/client/RigPanel.tsx
+index fce4595..662334a 100644
+--- a/src/components/client/RigPanel.tsx
++++ b/src/components/client/RigPanel.tsx
+@@ -2,6 +2,7 @@
+ 
+ import { useStore } from '@/store/useStore';
+ import { getRigStep, quantizeRigValue } from '@/lib/rig-utils';
++import { rigColorRgb } from '@/store/useStore';
+ import { useState } from 'react';
+ import { RigIcon } from '@/components/ui/icons';
+ 
+@@ -79,8 +80,10 @@ export function RigPanel() {
+                         <div className="p-3 space-y-3 max-h-[45vh] overflow-y-auto">
+                             {validRigs.map((rig, index) => {
+                                 const value = quantizeRigValue(rig.type, rigValues[rig.id] ?? rig.defaultValue);
+-                                const unit = rig.type === 'rotation' ? '°' : 'm';
++                                const unit = rig.type === 'rotation' ? '°' : rig.type === 'translation' ? 'm' : '';
+                                 const isDefault = value === rig.defaultValue;
++                                const rgb = rigColorRgb(rig.color);
++                                const isVis = rig.type === 'visibility';
+                                 return (
+                                     <div key={rig.id} className="group/rig">
+                                         <div className="flex items-center justify-between mb-1">
+@@ -110,12 +113,15 @@ export function RigPanel() {
+                                                         </button>
+                                                     </div>
+                                                 )}
++                                                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: `rgba(${rgb}, 0.7)` }} />
+                                                 <span className="text-xs text-gray-200 truncate">{rig.name}</span>
+                                             </div>
+                                             <div className="flex items-center gap-1.5 flex-shrink-0">
+-                                                <span className="text-xs text-gray-300 font-mono">
+-                                                    {value.toFixed(rig.type === 'translation' ? 2 : 0)}{unit}
+-                                                </span>
++                                                {!isVis && (
++                                                    <span className="text-xs text-gray-300 font-mono">
++                                                        {value.toFixed(rig.type === 'translation' ? 2 : 0)}{unit}
++                                                    </span>
++                                                )}
+                                                 {!isDefault && (
+                                                     <button
+                                                         onClick={() => setRigValue(rig.id, rig.defaultValue)}
+@@ -127,19 +133,32 @@ export function RigPanel() {
+                                                 )}
+                                             </div>
+                                         </div>
+-                                        <input
+-                                            type="range"
+-                                            min={rig.min}
+-                                            max={rig.max}
+-                                            step={getRigStep(rig.type)}
+-                                            value={value}
+-                                            onChange={(e) => setRigValue(rig.id, parseFloat(e.target.value))}
+-                                            className="w-full accent-gray-300 cursor-pointer h-1"
+-                                        />
+-                                        <div className="flex justify-between text-[9px] text-gray-600 font-mono">
+-                                            <span>{rig.min}{unit}</span>
+-                                            <span>{rig.max}{unit}</span>
+-                                        </div>
++                                        {isVis ? (
++                                            <button
++                                                onClick={() => setRigValue(rig.id, value >= 0.5 ? 0 : 1)}
++                                                className={`w-full py-1 rounded text-[11px] font-medium transition-colors ${value >= 0.5 ? 'text-white' : 'bg-white/5 text-gray-500'}`}
++                                                style={value >= 0.5 ? { background: `rgba(${rgb}, 0.6)` } : undefined}
++                                            >
++                                                {value >= 0.5 ? '顯示中' : '已隱藏'}
++                                            </button>
++                                        ) : (
++                                            <>
++                                                <input
++                                                    type="range"
++                                                    min={rig.min}
++                                                    max={rig.max}
++                                                    step={getRigStep(rig.type)}
++                                                    value={value}
++                                                    onChange={(e) => setRigValue(rig.id, parseFloat(e.target.value))}
++                                                    className="w-full cursor-pointer h-1"
++                                                    style={{ accentColor: `rgba(${rgb}, 0.9)` }}
++                                                />
++                                                <div className="flex justify-between text-[9px] text-gray-600 font-mono">
++                                                    <span>{rig.min}{unit}</span>
++                                                    <span>{rig.max}{unit}</span>
++                                                </div>
++                                            </>
++                                        )}
+                                     </div>
+                                 );
+                             })}
+diff --git a/src/lib/rig-utils.ts b/src/lib/rig-utils.ts
+index 2389e3b..5f7d352 100644
+--- a/src/lib/rig-utils.ts
++++ b/src/lib/rig-utils.ts
+@@ -6,12 +6,12 @@ import type { NullNode, RigControl, Instance } from '@/store/useStore';
+  * 位移:0.05(如 0 → 0.05 → 0.10);旋轉:1 度。
+  * 不依賴每個機關存的 step 欄位,避免舊機關殘留舊值 — 由型別即時決定。
+  */
+-export function getRigStep(type: 'rotation' | 'translation'): number {
+-    return type === 'translation' ? 0.05 : 1;
++export function getRigStep(type: 'rotation' | 'translation' | 'visibility'): number {
++    return type === 'translation' ? 0.05 : 1; // visibility/rotation: 1
+ }
+ 
+ /** 把值對齊到該型別的步進(位移 0.05 / 旋轉 1),修正舊機關殘留的非整數值 */
+-export function quantizeRigValue(type: 'rotation' | 'translation', value: number): number {
++export function quantizeRigValue(type: 'rotation' | 'translation' | 'visibility', value: number): number {
+     const step = getRigStep(type);
+     return Math.round(value / step) * step;
+ }
+@@ -113,6 +113,7 @@ export function rigDelta(
+     for (const rig of rigs) {
+         if (rig.targetType !== targetType || rig.targetId !== targetId) continue;
+         if (targetType === 'object' && (rig.instanceIndex ?? 0) !== (instanceIndex ?? 0)) continue;
++        if (rig.type === 'visibility') continue; // 可見性不參與 transform,由 rigVisibility 處理
+ 
+         const raw = rigValues[rig.id] ?? rig.defaultValue;
+         // NaN 防護:任一數值非有限數即跳過此機關,避免 NaN 污染矩陣導致模型永久隱形
+@@ -134,6 +135,31 @@ export function rigDelta(
+     };
+ }
+ 
++/**
++ * 計算某節點(Null 或 object instance)的可見性。
++ * 回傳 null = 無 visibility 機關控制此節點(維持預設顯示);
++ * true/false = 由 visibility 機關決定(值 ≥ 0.5 視為顯示)。
++ * 多個 visibility 機關時,任一要求隱藏即隱藏(AND 邏輯,較安全)。
++ */
++export function rigVisibility(
++    rigs: RigControl[],
++    rigValues: Record<string, number>,
++    targetType: 'null' | 'object',
++    targetId: string,
++    instanceIndex?: number
++): boolean | null {
++    let result: boolean | null = null;
++    for (const rig of rigs) {
++        if (rig.type !== 'visibility') continue;
++        if (rig.targetType !== targetType || rig.targetId !== targetId) continue;
++        if (targetType === 'object' && (rig.instanceIndex ?? 0) !== (instanceIndex ?? 0)) continue;
++        const v = rigValues[rig.id] ?? rig.defaultValue;
++        const visible = v >= 0.5;
++        result = result === null ? visible : (result && visible);
++    }
++    return result;
++}
++
+ /**
+  * 判斷 candidateId 是否為 ancestorId 的後代(或自身)。
+  * RigEditor 的 parent 下拉用來排除選項,防止循環。
+diff --git a/src/store/useStore.ts b/src/store/useStore.ts
+index cf455b8..9146b06 100644
+--- a/src/store/useStore.ts
++++ b/src/store/useStore.ts
+@@ -55,7 +55,7 @@ export interface NullNode {
+     rot: [number, number, number]; // 基底旋轉(弧度)
+ }
+ 
+-export type RigType = 'rotation' | 'translation';
++export type RigType = 'rotation' | 'translation' | 'visibility';
+ export type RigAxis = 'x' | 'y' | 'z';
+ 
+ /** 機關:一個受限的可動自由度,目標可為 Null 或物件 instance */
+@@ -67,10 +67,25 @@ export interface RigControl {
+     instanceIndex?: number;        // targetType === 'object' 時指定 instance(預設 0)
+     type: RigType;
+     axis: RigAxis;
+-    min: number;                   // translation: scene units;rotation: 度
+-    max: number;
++    min: number;                   // translation: scene units;rotation: 度;visibility: 0
++    max: number;                   // visibility: 1
+     step?: number;                 // 滑桿步進
+-    defaultValue: number;          // 須在 [min, max] 內
++    defaultValue: number;          // 須在 [min, max] 內;visibility: 0=隱藏 1=顯示
++    color?: string;                // 分類顏色(預設 6 色之一,半透明融入面板)
++}
++
++// 機關分類顏色:淡色、半透明,與面板 UI 一致。值為 RGB,套用時自帶透明度。
++export const RIG_COLORS: { id: string; label: string; rgb: string }[] = [
++    { id: 'violet', label: '紫', rgb: '139, 122, 246' },
++    { id: 'blue',   label: '藍', rgb: '96, 165, 250' },
++    { id: 'green',  label: '綠', rgb: '110, 200, 160' },
++    { id: 'amber',  label: '橘', rgb: '230, 180, 110' },
++    { id: 'rose',   label: '紅', rgb: '230, 140, 150' },
++    { id: 'cyan',   label: '青', rgb: '110, 200, 210' },
++];
++export const DEFAULT_RIG_COLOR = 'violet';
++export function rigColorRgb(colorId?: string): string {
++    return (RIG_COLORS.find(c => c.id === colorId) || RIG_COLORS[0]).rgb;
+ }
+ 
+ 
+@@ -348,6 +363,7 @@ interface State {
+     resetRigValues: () => void;
+     animateRigValues: (target: Record<string, number>, duration?: number) => void;
+     moveRig: (id: string, direction: -1 | 1) => void;
++    reorderRigs: (fromIndex: number, toIndex: number) => void;
+     setSelectedNull: (id: string | null) => void;
+ 
+     // UI 共享狀態:左側小工具列展開(供 RigPanel 等浮動面板避讓)
+@@ -913,6 +929,16 @@ export const useStore = create<State>()(
+                 return { rigs };
+             }),
+ 
++            // 拖拉排序:把 fromIndex 的機關移到 toIndex(陣列順序即顯示順序,隨專案同步)
++            reorderRigs: (fromIndex, toIndex) => set((state) => {
++                if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return {};
++                if (fromIndex >= state.rigs.length || toIndex >= state.rigs.length) return {};
++                const rigs = [...state.rigs];
++                const [moved] = rigs.splice(fromIndex, 1);
++                rigs.splice(toIndex, 0, moved);
++                return { rigs };
++            }),
++
+             addContentTexture: (texture) => set((state) => ({
+                 contentTextures: [...state.contentTextures, texture],
+                 // Auto-select first uploaded content

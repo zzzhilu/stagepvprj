@@ -1,0 +1,384 @@
+diff --git a/src/components/admin/MaterialSelector.tsx b/src/components/admin/MaterialSelector.tsx
+index f156378..cd5cf1a 100644
+--- a/src/components/admin/MaterialSelector.tsx
++++ b/src/components/admin/MaterialSelector.tsx
+@@ -1,27 +1,46 @@
+-import { MaterialId, getMaterialOptions } from '@/lib/materials';
++import { MaterialId, getMaterialOptions, MATERIAL_LIBRARY } from '@/lib/materials';
+ 
+ interface MaterialSelectorProps {
+     currentMaterial: MaterialId;
+     onChange: (materialId: MaterialId) => void;
++    doubleSided?: boolean;
++    onDoubleSidedChange?: (doubleSided: boolean) => void;
+ }
+ 
+-export function MaterialSelector({ currentMaterial, onChange }: MaterialSelectorProps) {
++export function MaterialSelector({ currentMaterial, onChange, doubleSided, onDoubleSidedChange }: MaterialSelectorProps) {
+     const materialOptions = getMaterialOptions();
+ 
++    // 未明確設定時，落回材質預設值，讓 checkbox 反映實際渲染狀態
++    const effectiveDoubleSided = doubleSided ?? MATERIAL_LIBRARY[currentMaterial]?.doubleSided ?? false;
++
+     return (
+-        <div className="flex items-center gap-2 mt-1">
+-            <label className="text-xs text-gray-500">材質:</label>
+-            <select
+-                value={currentMaterial}
+-                onChange={(e) => onChange(e.target.value as MaterialId)}
+-                className="flex-1 text-xs bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-300 focus:border-violet-500 focus:outline-none hover:border-gray-600 transition-colors"
+-            >
+-                {materialOptions.map(mat => (
+-                    <option key={mat.id} value={mat.id}>
+-                        {mat.name}
+-                    </option>
+-                ))}
+-            </select>
++        <div className="flex flex-col gap-1 mt-1">
++            <div className="flex items-center gap-2">
++                <label className="text-xs text-gray-500">材質:</label>
++                <select
++                    value={currentMaterial}
++                    onChange={(e) => onChange(e.target.value as MaterialId)}
++                    className="flex-1 text-xs bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-300 focus:border-violet-500 focus:outline-none hover:border-gray-600 transition-colors"
++                >
++                    {materialOptions.map(mat => (
++                        <option key={mat.id} value={mat.id}>
++                            {mat.name}
++                        </option>
++                    ))}
++                </select>
++            </div>
++            {onDoubleSidedChange && (
++                <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer select-none">
++                    <input
++                        type="checkbox"
++                        checked={effectiveDoubleSided}
++                        onChange={(e) => onDoubleSidedChange(e.target.checked)}
++                        className="accent-violet-500"
++                    />
++                    雙面渲染 (DoubleSide)
++                    <span className="text-gray-600">薄片/布幕/螢幕才需要</span>
++                </label>
++            )}
+         </div>
+     );
+ }
+diff --git a/src/components/admin/ModelUploader.tsx b/src/components/admin/ModelUploader.tsx
+index 1adc504..f905d1d 100644
+--- a/src/components/admin/ModelUploader.tsx
++++ b/src/components/admin/ModelUploader.tsx
+@@ -25,6 +25,7 @@ export function ModelUploader() {
+     const addObject = useStore((state) => state.addObject);
+     const removeObject = useStore((state) => state.removeObject);
+     const updateObjectMaterial = useStore((state) => state.updateObjectMaterial);
++    const updateObjectDoubleSided = useStore((state) => state.updateObjectDoubleSided);
+     const stageObjects = useStore((state) => state.stageObjects);
+     const setLoading = useStore((state) => state.setLoading);
+     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+@@ -45,6 +46,10 @@ export function ModelUploader() {
+         updateObjectMaterial(objectId, materialId);
+     };
+ 
++    const handleDoubleSidedChange = (objectId: string, doubleSided: boolean) => {
++        updateObjectDoubleSided(objectId, doubleSided);
++    };
++
+     const getDefaultMaterial = (type: ModelType): MaterialId => {
+         switch (type) {
+             case 'venues':
+@@ -522,6 +527,8 @@ export function ModelUploader() {
+                                                 <MaterialSelector
+                                                     currentMaterial={obj.material_id}
+                                                     onChange={(materialId) => handleMaterialChange(obj.id, materialId)}
++                                                    doubleSided={obj.doubleSided}
++                                                    onDoubleSidedChange={(v) => handleDoubleSidedChange(obj.id, v)}
+                                                 />
+                                             </div>
+                                         );
+diff --git a/src/components/canvas/StageObjectRenderer.tsx b/src/components/canvas/StageObjectRenderer.tsx
+index 7999844..cd53a17 100644
+--- a/src/components/canvas/StageObjectRenderer.tsx
++++ b/src/components/canvas/StageObjectRenderer.tsx
+@@ -1,7 +1,8 @@
+ import { useGLTF, Instances, Instance } from '@react-three/drei';
+ import { StageObject, useStore } from '@/store/useStore';
++import { useThree } from '@react-three/fiber';
+ import * as THREE from 'three';
+-import { createMaterial, MATERIAL_LIBRARY } from '@/lib/materials';
++import { createMaterial, resolveSide, MATERIAL_LIBRARY } from '@/lib/materials';
+ import { useMemo, useEffect, useState } from 'react';
+ import { globalVideoElement } from './VideoManager';
+ 
+@@ -13,12 +14,14 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
+     // Use useGLTF hook with Draco decoder path
+     const gltfData = useGLTF(object.model_path, 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+ 
++    // 取得 GPU 支援的最大 anisotropy，讓舞台螢幕貼圖在斜視角更清晰（textures skill 建議）
++    const maxAnisotropy = useThree((state) => state.gl.capabilities.getMaxAnisotropy());
++
+     // Get active texture for emissive materials (using selected content)
+     const activeTexture = useMemo(() => {
+         if (activeContentId) {
+             const selected = contentTextures.find(t => t.id === activeContentId);
+             if (selected) {
+-                console.log('Active texture selected:', selected);
+                 return selected;
+             }
+         }
+@@ -28,13 +31,12 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
+     // Create and manage video texture using global video element
+     useEffect(() => {
+         if (!activeTexture || activeTexture.type !== 'video') {
+-            if (videoTexture) {
+-                videoTexture.dispose();
+-                setVideoTexture(null);
+-            }
+             return;
+         }
+ 
++        // 用區域變數追蹤「本次 effect 建立的 texture」，避免 cleanup 讀到閉包裡的舊 state
++        let createdTexture: THREE.VideoTexture | null = null;
++
+         // Wait for global video element to be available
+         const checkVideo = setInterval(() => {
+             if (globalVideoElement) {
+@@ -45,35 +47,31 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
+                 texture.wrapT = THREE.ClampToEdgeWrapping;
+                 texture.minFilter = THREE.LinearFilter;
+                 texture.magFilter = THREE.LinearFilter;
++                texture.anisotropy = maxAnisotropy;
+                 texture.flipY = false;
+ 
+-                // Flip horizontally (mirror U coordinate) - REMOVED per user request
+-                // texture.repeat.x = -1;
+-                // texture.offset.x = 1;
+-
+-                setVideoTexture(texture);
+-                console.log('Video texture created from global video element');
++                createdTexture = texture;
++                setVideoTexture(texture); // 在 interval callback（非同步）內，不觸發 set-state-in-effect
+             }
+         }, 100);
+ 
+         return () => {
+             clearInterval(checkVideo);
+-            if (videoTexture) {
+-                videoTexture.dispose();
++            // 回收本次建立的 texture，並在 cleanup（非 effect body）重置 state
++            if (createdTexture) {
++                createdTexture.dispose();
+             }
++            setVideoTexture(null);
+         };
+-    }, [activeTexture]);
++    }, [activeTexture, maxAnisotropy]);
+ 
+     // Create static image texture
+     const imageTexture = useMemo(() => {
+         if (!activeTexture || activeTexture.type !== 'image') return null;
+ 
+-        console.log('Loading image texture from:', activeTexture.file_path);
+         const texture = new THREE.TextureLoader().load(
+             activeTexture.file_path,
+-            (tex) => {
+-                console.log('Image texture loaded successfully', tex);
+-            },
++            undefined,
+             undefined,
+             (err) => {
+                 console.error('Image texture loading error:', err);
+@@ -83,16 +81,21 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
+         texture.colorSpace = THREE.SRGBColorSpace;
+         texture.wrapS = THREE.ClampToEdgeWrapping;
+         texture.wrapT = THREE.ClampToEdgeWrapping;
+-        texture.minFilter = THREE.LinearFilter;
++        // Mipmap + anisotropy：靜態圖在斜視角/縮小時更清晰（anisotropy 需要 mipmap 才有效）
++        texture.minFilter = THREE.LinearMipmapLinearFilter;
+         texture.magFilter = THREE.LinearFilter;
++        texture.anisotropy = maxAnisotropy;
+         texture.flipY = false; // Important: GLTF uses top-left origin
+ 
+-        // Flip horizontally (mirror U coordinate) - REMOVED per user request
+-        // texture.repeat.x = -1;
+-        // texture.offset.x = 1;
+-
+         return texture;
+-    }, [activeTexture]);
++    }, [activeTexture, maxAnisotropy]);
++
++    // 圖片貼圖切換/卸載時回收 GPU 記憶體（先前只有 video 有 dispose，image 會洩漏）
++    useEffect(() => {
++        return () => {
++            imageTexture?.dispose();
++        };
++    }, [imageTexture]);
+ 
+ 
+     // Select active texture map
+@@ -100,26 +103,27 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
+ 
+     // Create material based on render mode
+     const material = useMemo(() => {
++        // 由開關決定 side：物件覆寫 > 材質預設 > FrontSide
++        const side = resolveSide(object.material_id, object.doubleSided);
+         switch (renderMode) {
+             case 'wireframe':
+                 return new THREE.MeshBasicMaterial({
+                     color: '#00ffff',
+                     wireframe: true,
+-                    side: THREE.DoubleSide,
++                    side,
+                 });
+             case 'clay':
+                 return new THREE.MeshStandardMaterial({
+                     color: '#cccccc',
+                     roughness: 0.8,
+                     metalness: 0.0,
+-                    side: THREE.DoubleSide,
++                    side,
+                 });
+             case 'beauty':
+             default:
+                 // For emissive material with texture
+                 if (object.material_id === 'emissive') {
+                     const matDef = MATERIAL_LIBRARY.emissive;
+-                    console.log('Creating emissive material, has texture:', !!textureMap);
+ 
+                     if (textureMap) {
+                         // Use texture as emissive map with black base color
+@@ -127,7 +131,7 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
+                             color: new THREE.Color('#000000'), // Black base - no ambient contribution
+                             roughness: 1.0,
+                             metalness: 0.0,
+-                            side: THREE.DoubleSide,
++                            side,
+                             emissive: new THREE.Color('#ffffff'), // White multiplier for emissive map
+                             emissiveMap: textureMap,
+                             emissiveIntensity: matDef.emissiveIntensity || 2.0,
+@@ -138,15 +142,22 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
+                             color: new THREE.Color('#000000'), // Black base
+                             roughness: matDef.roughness,
+                             metalness: matDef.metalness,
+-                            side: THREE.DoubleSide,
++                            side,
+                             emissive: new THREE.Color(matDef.emissive || '#ffaa00'),
+                             emissiveIntensity: matDef.emissiveIntensity || 2.0,
+                         });
+                     }
+                 }
+-                return createMaterial(object.material_id);
++                return createMaterial(object.material_id, object.doubleSided);
+         }
+-    }, [renderMode, object.material_id, textureMap]);
++    }, [renderMode, object.material_id, textureMap, object.doubleSided]);
++
++    // 材質切換/卸載時回收 GPU 記憶體（先前每次切 render mode / 換貼圖都會漏一顆材質）
++    useEffect(() => {
++        return () => {
++            material.dispose();
++        };
++    }, [material]);
+ 
+     // Show error placeholder if loading failed
+     if (!gltfData) return null;
+@@ -178,21 +189,14 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
+     return (
+         <group>
+             {meshNodes.map((node) => {
+-                // Clone the geometry to ensure UV attributes are preserved
+-                const geometry = node.geometry.clone();
+-
+-                // Log UV information for debugging
+-                if (geometry.attributes.uv) {
+-                    console.log(`Mesh ${node.name} has UV coordinates`);
+-                } else {
+-                    console.warn(`Mesh ${node.name} is missing UV coordinates`);
+-                }
+-
++                // 直接使用 drei 快取的 GLTF geometry（由 drei 管理生命週期）。
++                // 先前每次 render 都 clone 一份 BufferGeometry 又不回收 → 純洩漏，
++                // 且 clone 並不會「補出」缺少的 UV，所以原本的理由不成立。
+                 return (
+                     <Instances
+                         key={node.uuid}
+                         range={object.instances.length}
+-                        geometry={geometry}
++                        geometry={node.geometry}
+                         material={material}
+                     >
+                         {object.instances.map((inst, i) => (
+diff --git a/src/lib/materials.ts b/src/lib/materials.ts
+index cc22548..f98acfc 100644
+--- a/src/lib/materials.ts
++++ b/src/lib/materials.ts
+@@ -10,6 +10,7 @@ export interface MaterialDefinition {
+     metalness: number;
+     emissive?: string;
+     emissiveIntensity?: number;
++    doubleSided?: boolean; // 材質層級的雙面渲染預設（物件可覆寫）
+ }
+ 
+ // 參數化 PBR 材質庫
+@@ -42,19 +43,28 @@ export const MATERIAL_LIBRARY: Record<MaterialId, MaterialDefinition> = {
+         roughness: 0.9,
+         metalness: 0.0,
+         emissive: '#ffaa00',
+-        emissiveIntensity: 2.0
++        emissiveIntensity: 2.0,
++        doubleSided: true // 螢幕/布幕通常是薄片，預設雙面
+     }
+ };
+ 
++// 解析最終的 side：物件層覆寫 > 材質預設 > FrontSide
++// FrontSide 是效能預設（背面剔除）；只有真正需要看到背面的薄片才用 DoubleSide
++export function resolveSide(materialId: MaterialId, doubleSidedOverride?: boolean): THREE.Side {
++    const def = MATERIAL_LIBRARY[materialId];
++    const doubleSided = doubleSidedOverride ?? def.doubleSided ?? false;
++    return doubleSided ? THREE.DoubleSide : THREE.FrontSide;
++}
++
+ // 創建 Three.js 材質實例
+-export function createMaterial(materialId: MaterialId): THREE.MeshStandardMaterial {
++export function createMaterial(materialId: MaterialId, doubleSidedOverride?: boolean): THREE.MeshStandardMaterial {
+     const def = MATERIAL_LIBRARY[materialId];
+ 
+     return new THREE.MeshStandardMaterial({
+         color: new THREE.Color(def.color),
+         roughness: def.roughness,
+         metalness: def.metalness,
+-        side: THREE.DoubleSide, // 雙面渲染，避免背面簍空
++        side: resolveSide(materialId, doubleSidedOverride), // 由開關決定，預設 FrontSide
+         emissive: def.emissive ? new THREE.Color(def.emissive) : new THREE.Color(0x000000),
+         emissiveIntensity: def.emissiveIntensity || 0,
+     });
+diff --git a/src/store/useStore.ts b/src/store/useStore.ts
+index 88c2bed..e751a46 100644
+--- a/src/store/useStore.ts
++++ b/src/store/useStore.ts
+@@ -18,6 +18,7 @@ export interface StageObject {
+     instances: Instance[];
+     type: ModelType; // Model category type
+     meshNames?: string[]; // Optional: specific mesh names to filter from the GLB
++    doubleSided?: boolean; // Optional: 物件層級覆寫雙面渲染（未設則用材質預設）
+ }
+ 
+ 
+@@ -76,6 +77,7 @@ interface State {
+     addObject: (obj: StageObject) => void;
+     updateObjectInstances: (id: string, instances: Instance[]) => void;
+     updateObjectMaterial: (id: string, materialId: MaterialId) => void;
++    updateObjectDoubleSided: (id: string, doubleSided: boolean) => void;
+     addView: (view: CameraView) => void;
+     removeObject: (id: string) => void;
+     addContentTexture: (texture: ContentTexture) => void;
+@@ -138,6 +140,9 @@ export const useStore = create<State>()(
+             updateObjectMaterial: (id, materialId) => set((state) => ({
+                 stageObjects: state.stageObjects.map(obj => obj.id === id ? { ...obj, material_id: materialId } : obj)
+             })),
++            updateObjectDoubleSided: (id, doubleSided) => set((state) => ({
++                stageObjects: state.stageObjects.map(obj => obj.id === id ? { ...obj, doubleSided } : obj)
++            })),
+             addView: (view) => set((state) => ({ views: [...state.views, view] })),
+ 
+             removeObject: (id) => set((state) => ({

@@ -1,0 +1,58 @@
+diff --git a/src/components/canvas/VideoTimelineController.tsx b/src/components/canvas/VideoTimelineController.tsx
+index eba65e8..b11cd45 100644
+--- a/src/components/canvas/VideoTimelineController.tsx
++++ b/src/components/canvas/VideoTimelineController.tsx
+@@ -185,10 +185,34 @@ export function VideoTimelineController() {
+             });
+         }
+ 
++        // 機關值插值:cueA → cueB 過渡時,把兩個 cue 的 rigValues 快照按 progress 線性插值。
++        // 寫進 store 的 rigValues 後,3D 場景的機關會動,RigPanel 的 slider 因讀同一份 rigValues 也同步動。
++        let newRigValues: Record<string, number> | null = null;
++        const rigsA = stageCueA.rigValues;
++        const rigsB = targetCueB.rigValues;
++        if (rigsA || rigsB) {
++            const candidate: Record<string, number> = { ...state.rigValues };
++            let rigChanged = false;
++            for (const rig of state.rigs) {
++                const a = rigsA?.[rig.id] ?? rig.defaultValue;
++                const b = rigsB?.[rig.id] ?? rig.defaultValue;
++                const v = THREE.MathUtils.lerp(a, b, progress);
++                if (Math.abs((state.rigValues[rig.id] ?? rig.defaultValue) - v) > 0.0001) {
++                    candidate[rig.id] = v;
++                    rigChanged = true;
++                }
++            }
++            if (rigChanged) {
++                newRigValues = candidate;
++                hasChanges = true;
++            }
++        }
++
+         if (hasChanges) {
+             useStore.setState({ 
+                 stageObjects: newObjects,
+-                stageLights: newLights
++                stageLights: newLights,
++                ...(newRigValues ? { rigValues: newRigValues } : {})
+             });
+         }
+     });
+diff --git a/src/components/client/ClientPlaylistSidebar.tsx b/src/components/client/ClientPlaylistSidebar.tsx
+index 2a5e9b2..4442cd5 100644
+--- a/src/components/client/ClientPlaylistSidebar.tsx
++++ b/src/components/client/ClientPlaylistSidebar.tsx
+@@ -71,8 +71,11 @@ export function ClientPlaylistSidebar({ projectId }: { projectId: string }) {
+             setVideoPlaying(true);
+         }
+ 
+-        // 如果影片有綁定的 cue，則自動套用 cue
+-        if (video.cueId) {
++        // Cue 優先級:時間軸 cues > 後台/檔名指定的單一 cue。
++        // 若此影片有時間軸 cues,交由 VideoTimelineController 全權驅動(含機關),
++        // 不再 applyCue,避免兩套同時寫 rigValues 打架。
++        const hasTimeline = Array.isArray(video.timelineCues) && video.timelineCues.length > 0;
++        if (video.cueId && !hasTimeline) {
+             // 小延遲確保前面狀態更新後才吃燈光等 cue
+             setTimeout(() => applyCue(video.cueId), 100);
+         }

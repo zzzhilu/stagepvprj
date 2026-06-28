@@ -37,6 +37,29 @@ export function RigPanel() {
 
     if (validRigs.length === 0) return null;
 
+    // 依 rigs 陣列順序掃描,組成「顯示區塊」:
+    // - 有 group 的機關歸入該群組區塊(區塊位置 = 群組首個成員出現處)
+    // - 無 group 的機關為獨立平鋪項
+    // 拖拉/箭頭排序改的是 rigs 陣列順序,此處讀順序故自動反映。
+    type Block =
+        | { kind: 'single'; rig: typeof validRigs[number]; index: number }
+        | { kind: 'group'; name: string; items: { rig: typeof validRigs[number]; index: number }[] };
+    const blocks: Block[] = [];
+    const groupBlockMap = new Map<string, Extract<Block, { kind: 'group' }>>();
+    validRigs.forEach((rig, index) => {
+        if (rig.group) {
+            let blk = groupBlockMap.get(rig.group);
+            if (!blk) {
+                blk = { kind: 'group', name: rig.group, items: [] };
+                groupBlockMap.set(rig.group, blk);
+                blocks.push(blk);
+            }
+            blk.items.push({ rig, index });
+        } else {
+            blocks.push({ kind: 'single', rig, index });
+        }
+    });
+
     const isAdmin = mode === 'admin';
 
     // 定位邏輯:
@@ -78,7 +101,8 @@ export function RigPanel() {
 
                         {/* 機關滑桿列表 */}
                         <div className="p-3 space-y-3 max-h-[45vh] overflow-y-auto">
-                            {validRigs.map((rig, index) => {
+                            {(() => {
+                              const renderRig = (rig: typeof validRigs[number], index: number) => {
                                 const value = quantizeRigValue(rig.type, rigValues[rig.id] ?? rig.defaultValue);
                                 const unit = rig.type === 'rotation' ? '°' : rig.type === 'translation' ? 'm' : '';
                                 const isDefault = value === rig.defaultValue;
@@ -161,7 +185,26 @@ export function RigPanel() {
                                         )}
                                     </div>
                                 );
-                            })}
+                              };
+
+                              // 按區塊渲染:群組顯示標題 + 縮排成員,平鋪項直接渲染
+                              return blocks.map((blk, bi) => {
+                                if (blk.kind === 'single') return renderRig(blk.rig, blk.index);
+                                const headRgb = rigColorRgb(blk.items[0]?.rig.color);
+                                return (
+                                  <div key={`grp_${blk.name}_${bi}`} className="rounded-lg border border-white/5 bg-white/[0.02] p-2 space-y-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="w-1.5 h-4 rounded-sm flex-shrink-0" style={{ background: `rgba(${headRgb}, 0.7)` }} />
+                                      <span className="text-[11px] font-semibold text-gray-300 tracking-wide truncate">{blk.name}</span>
+                                      <span className="text-[9px] text-gray-600">({blk.items.length})</span>
+                                    </div>
+                                    <div className="pl-2 space-y-3">
+                                      {blk.items.map(it => renderRig(it.rig, it.index))}
+                                    </div>
+                                  </div>
+                                );
+                              });
+                            })()}
                         </div>
                     </div>
                 )}
