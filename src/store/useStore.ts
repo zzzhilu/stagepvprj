@@ -42,6 +42,7 @@ export interface StageObject {
     materialOverrides?: MaterialOverrides; // 材質參數微調(基底 material_id 之上的覆寫)
     parentId?: string | null; // 掛載的 Null 節點或父物件 ID;一旦有 parent,instances 的 pos/rot 即為相對 parent 的本地座標
     curvature?: number; // [NEW] Arc curvature for projection screens (-1 to 1)
+    ledResolution?: { w: number; h: number }; // LED 原生解析度(像素);跨排列共用,放進畫布時作為預設大小
 }
 
 // ===== 機關系統 (Rig System) =====
@@ -492,6 +493,9 @@ interface State {
     objectBounds: Record<string, { min: [number, number, number]; max: [number, number, number] }>;
     setObjectBounds: (objectId: string, min: [number, number, number], max: [number, number, number]) => void;
     setLedRect: (layoutId: string, objectId: string, patch: Partial<LedLayoutRect>) => void;
+    setLedResolution: (objectId: string, w: number, h: number) => void;
+    addLedToLayout: (layoutId: string, objectId: string) => void;
+    removeLedFromLayout: (layoutId: string, objectId: string) => void;
     setAllGDriveFolders: (mapping: Record<string, string>) => void;
     setGDriveFolder: (projectId: string, folderId: string) => void;
     addGDriveVideo: (video: GDriveVideo) => void;
@@ -1125,13 +1129,10 @@ export const useStore = create<State>()(
 
             addLedLayout: (name, canvasWidth, canvasHeight) => set((state) => {
                 const id = `layout_${Date.now()}_${Math.random().toString(36).slice(2,5)}`;
-                // 新排列預設帶入所有 LED 物件,初始矩形平鋪整張大圖、啟用
-                const leds = state.stageObjects.filter(o => o.type === 'static_LED' || o.type === 'moving_LED');
-                const rects: LedLayoutRect[] = leds.map(o => ({
-                    objectId: o.id, x: 0, y: 0, w: canvasWidth, h: canvasHeight, enabled: true,
-                }));
+                // 新排列為「空白畫布」:不自動帶入 LED,由使用者點擊側邊清單逐塊加入。
+                // 未加入的 LED = 此排列中黑屏不參與。
                 return {
-                    ledLayouts: [...state.ledLayouts, { id, name, canvasWidth, canvasHeight, rects }],
+                    ledLayouts: [...state.ledLayouts, { id, name, canvasWidth, canvasHeight, rects: [] }],
                     activeLedLayoutId: id,
                 };
             }),
@@ -1151,6 +1152,29 @@ export const useStore = create<State>()(
                     && prev.max[0] === max[0] && prev.max[1] === max[1] && prev.max[2] === max[2]) return {};
                 return { objectBounds: { ...state.objectBounds, [objectId]: { min, max } } };
             }),
+
+            // 設定 LED 原生解析度(物件屬性,跨排列共用)
+            setLedResolution: (objectId, w, h) => set((state) => ({
+                stageObjects: state.stageObjects.map(o =>
+                    o.id === objectId ? { ...o, ledResolution: { w, h } } : o)
+            })),
+            // 把 LED 加進排列(用其原生解析度當預設大小;已在則不重複)
+            addLedToLayout: (layoutId, objectId) => set((state) => ({
+                ledLayouts: state.ledLayouts.map(l => {
+                    if (l.id !== layoutId) return l;
+                    if (l.rects.some(r => r.objectId === objectId)) return l;
+                    const obj = state.stageObjects.find(o => o.id === objectId);
+                    const res = obj?.ledResolution;
+                    const w = res?.w ?? Math.round(l.canvasWidth / 4);
+                    const h = res?.h ?? Math.round(l.canvasHeight / 4);
+                    return { ...l, rects: [...l.rects, { objectId, x: 0, y: 0, w, h, enabled: true }] };
+                })
+            })),
+            // 從排列移除 LED(= 此排列中黑屏不參與)
+            removeLedFromLayout: (layoutId, objectId) => set((state) => ({
+                ledLayouts: state.ledLayouts.map(l =>
+                    l.id === layoutId ? { ...l, rects: l.rects.filter(r => r.objectId !== objectId) } : l)
+            })),
             setLedRect: (layoutId, objectId, patch) => set((state) => ({
                 ledLayouts: state.ledLayouts.map(l => {
                     if (l.id !== layoutId) return l;

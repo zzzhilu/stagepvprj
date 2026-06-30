@@ -369,8 +369,8 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     const activeLedLayoutId = useStore((state) => state.activeLedLayoutId);
     const activeLayout = activeLedLayoutId ? ledLayouts.find(l => l.id === activeLedLayoutId) : null;
     const layoutRect = activeLayout?.rects.find(r => r.objectId === object.id);
-    // 此排列中明確設為不啟用 → 黑屏(不顯示內容)
-    const layoutDisabled = !!activeLayout && layoutRect ? !layoutRect.enabled : false;
+    // 有 active 排列時:此 LED 不在排列中(沒被加進畫布)→ 黑屏;在排列中但 enabled=false 也黑屏(相容舊資料)
+    const layoutDisabled = !!activeLayout && (!layoutRect || layoutRect.enabled === false);
 
     // Clone texture map to apply per-object property offsets/repeats and filter by targetNodeId
     const textureMap = useMemo(() => {
