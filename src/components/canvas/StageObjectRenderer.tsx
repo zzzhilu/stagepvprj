@@ -493,6 +493,13 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                                 toneMapped: false,
                             });
                         }
+                    } else if (layoutDisabled) {
+                        // 排列中未加入此 LED → 真正黑屏(不發光),而非待機亮橘色
+                        return new THREE.MeshBasicMaterial({
+                            color: new THREE.Color('#000000'),
+                            side: THREE.FrontSide,
+                            toneMapped: false,
+                        });
                     } else {
                         // Fallback: no texture, show solid emissive color
                         return new THREE.MeshBasicMaterial({
@@ -530,6 +537,15 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                                 alphaMap: alphaMap,
                             });
                         }
+                    } else if (layoutDisabled) {
+                        // 排列中未加入 → 黑屏(不發光)
+                        return new THREE.MeshBasicMaterial({
+                            color: new THREE.Color('#000000'),
+                            side: THREE.FrontSide,
+                            toneMapped: false,
+                            transparent: true,
+                            alphaMap: alphaMap,
+                        });
                     } else {
                         return new THREE.MeshBasicMaterial({
                             color: new THREE.Color('#ffaa00'),
@@ -545,7 +561,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                     ? createPerfectMaterial(object.material_id)
                     : createMaterial(object.material_id);
         }
-    }, [renderMode, object.material_id, object.type, textureMap, floorPlanTexture, perfectRenderEnabled]);
+    }, [renderMode, object.material_id, object.type, textureMap, floorPlanTexture, perfectRenderEnabled, layoutDisabled]);
 
     // Apply realtime envMap to non-emissive materials for LED reflection
     useEffect(() => {
