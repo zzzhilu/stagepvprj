@@ -1,0 +1,98 @@
+diff --git a/src/components/admin/LedLayoutEditor.tsx b/src/components/admin/LedLayoutEditor.tsx
+index 800a6ab..c10eda7 100644
+--- a/src/components/admin/LedLayoutEditor.tsx
++++ b/src/components/admin/LedLayoutEditor.tsx
+@@ -72,6 +72,55 @@ function LayoutEditorModal({ leds, onClose, ledLayouts, activeLedLayoutId, layou
+     const [newName, setNewName] = useState('');
+     const [newW, setNewW] = useState(9344);
+     const [newH, setNewH] = useState(3584);
++
++    // 背景對位參考圖:每個排列各自一張,存 localStorage(純本地對位輔助,不進專案/不同步)。
++    const bgKey = layout ? `led-layout-bg-${layout.id}` : null;
++    const bgAlphaKey = layout ? `led-layout-bg-alpha-${layout.id}` : null;
++    const [bgImage, setBgImage] = useState<string | null>(null);
++    const [bgAlpha, setBgAlpha] = useState(0.4);
++    const bgFileRef = useRef<HTMLInputElement>(null);
++
++    // 切換排列時載入該排列的背景圖
++    useEffect(() => {
++        if (!bgKey) { setBgImage(null); return; }
++        try {
++            setBgImage(localStorage.getItem(bgKey));
++            const a = bgAlphaKey ? localStorage.getItem(bgAlphaKey) : null;
++            setBgAlpha(a ? parseFloat(a) : 0.4);
++        } catch { setBgImage(null); }
++    }, [bgKey, bgAlphaKey]);
++
++    const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
++        const file = e.target.files?.[0];
++        if (!file || !bgKey) return;
++        if (file.size > 3 * 1024 * 1024) {
++            alert('參考圖請小於 3MB(localStorage 容量限制)。對位線框圖通常很小,可先壓縮。');
++            return;
++        }
++        const reader = new FileReader();
++        reader.onload = () => {
++            const dataUrl = reader.result as string;
++            try {
++                localStorage.setItem(bgKey, dataUrl);
++                setBgImage(dataUrl);
++            } catch {
++                alert('儲存失敗:圖檔太大超過瀏覽器容量限制,請用更小的圖。');
++            }
++        };
++        reader.readAsDataURL(file);
++        e.target.value = '';
++    };
++
++    const handleBgClear = () => {
++        if (!bgKey) return;
++        try { localStorage.removeItem(bgKey); } catch {}
++        setBgImage(null);
++    };
++
++    const handleAlphaChange = (a: number) => {
++        setBgAlpha(a);
++        if (bgAlphaKey) { try { localStorage.setItem(bgAlphaKey, String(a)); } catch {} }
++    };
+     const dragRef = useRef<{ objId: string; startX: number; startY: number; origX: number; origY: number } | null>(null);
+ 
+     const inLayout = (id: string) => !!layout?.rects.find((r: any) => r.objectId === id);
+@@ -182,7 +231,37 @@ function LayoutEditorModal({ leds, onClose, ledLayouts, activeLedLayoutId, layou
+                                             className="text-[10px] text-gray-500 hover:text-red-400">刪除排列</button>
+                                     </div>
+                                 </div>
++
++                                {/* 背景對位參考圖(本地輔助,不同步) */}
++                                <div className="flex items-center gap-2 w-full max-w-3xl mb-2 text-[10px] text-gray-400">
++                                    <input ref={bgFileRef} type="file" accept="image/*" onChange={handleBgUpload} className="hidden" />
++                                    <button onClick={() => bgFileRef.current?.click()}
++                                        className="bg-gray-700 hover:bg-gray-600 text-gray-200 rounded px-2 py-1">
++                                        {bgImage ? '更換對位圖' : '上傳對位圖'}
++                                    </button>
++                                    {bgImage && (
++                                        <>
++                                            <button onClick={handleBgClear} className="text-gray-500 hover:text-red-400">清除</button>
++                                            <span className="text-gray-500">透明度</span>
++                                            <input type="range" min={0.05} max={1} step={0.05} value={bgAlpha}
++                                                onChange={e => handleAlphaChange(parseFloat(e.target.value))}
++                                                className="flex-1 max-w-[160px] accent-violet-500" />
++                                            <span className="font-mono w-8">{Math.round(bgAlpha * 100)}%</span>
++                                        </>
++                                    )}
++                                    <span className="text-gray-600 ml-auto">參考圖僅存於本機,不上傳/不同步</span>
++                                </div>
++
+                                 <div className="relative bg-gray-950 border border-gray-700" style={{ width: dispW, height: dispH }}>
++                                    {bgImage && (
++                                        <img
++                                            src={bgImage}
++                                            alt="對位參考圖"
++                                            className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none"
++                                            style={{ opacity: bgAlpha }}
++                                            draggable={false}
++                                        />
++                                    )}
+                                     {layout.rects.map((r: any) => {
+                                         const led = leds.find((l: any) => l.id === r.objectId);
+                                         const sel = selObjId === r.objectId;
