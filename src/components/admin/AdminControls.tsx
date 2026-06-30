@@ -12,6 +12,7 @@ import { QuickAddPanel } from './QuickAddPanel';
 import { StageLightingPanel } from './StageLightingPanel';
 import { R2VideoManager } from '@/components/client/R2VideoManager';
 import { GDriveVideoManager } from './GDriveVideoManager';
+import { LedLayoutEditor } from './LedLayoutEditor';
 import ContentInspector from './ContentInspector';
 import { RigEditor } from './RigEditor';
 import { RigIcon } from '@/components/ui/icons';
@@ -358,6 +359,7 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                                 <TextureUploader />
                             )}
                             {/* 始終顯示 Google Drive 同步，不論在哪個模式 */}
+                            <LedLayoutEditor />
                             <GDriveVideoManager projectId={projectId} onSave={onSave} />
                         </div>
                     )}

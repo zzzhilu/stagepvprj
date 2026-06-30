@@ -94,6 +94,35 @@ export function rigColorRgb(colorId?: string): string {
 
 export type TextureType = 'image' | 'video' | 'r2_video' | 'gif';
 
+// ===== LED 排列系統(UV 拼圖佈局)=====
+// 每塊 LED 在「大圖」上對應一個像素矩形;一組矩形分配 = 一個具名排列(排列A/B/C)。
+// 切換排列 → 所有 LED 按該排列的矩形讀大圖對應區域(用 repeat/offset 實現)。
+export interface LedLayoutRect {
+    objectId: string;       // StageObject.id
+    x: number; y: number;   // 矩形左上角(像素,原點左上)
+    w: number; h: number;   // 矩形寬高(像素)
+    enabled: boolean;       // 此排列中是否啟用;false = 該 LED 黑屏不顯示
+}
+export interface LedLayout {
+    id: string;
+    name: string;           // 自由命名:「排列A」
+    canvasWidth: number;    // 大圖像素規格
+    canvasHeight: number;
+    rects: LedLayoutRect[];
+}
+
+/**
+ * 像素矩形 → UV repeat/offset。
+ * UV 原點在左下、像素原點在左上,故 Y 需翻轉。
+ */
+export function rectToUv(rect: { x: number; y: number; w: number; h: number }, canvasW: number, canvasH: number) {
+    const rw = canvasW > 0 ? rect.w / canvasW : 1;
+    const rh = canvasH > 0 ? rect.h / canvasH : 1;
+    const ox = canvasW > 0 ? rect.x / canvasW : 0;
+    const oy = canvasH > 0 ? (canvasH - rect.y - rect.h) / canvasH : 0; // Y 翻轉
+    return { repeat: [rw, rh] as [number, number], offset: [ox, oy] as [number, number] };
+}
+
 export interface ContentTexture {
     id: string;
     name: string;
@@ -450,6 +479,15 @@ interface State {
 
     // GDrive Actions
     setGDriveVideos: (videos: GDriveVideo[]) => void;
+
+    // LED 排列系統
+    ledLayouts: LedLayout[];
+    activeLedLayoutId: string | null;
+    addLedLayout: (name: string, canvasWidth: number, canvasHeight: number) => void;
+    updateLedLayout: (id: string, patch: Partial<Omit<LedLayout, 'id'>>) => void;
+    removeLedLayout: (id: string) => void;
+    setActiveLedLayout: (id: string | null) => void;
+    setLedRect: (layoutId: string, objectId: string, patch: Partial<LedLayoutRect>) => void;
     setAllGDriveFolders: (mapping: Record<string, string>) => void;
     setGDriveFolder: (projectId: string, folderId: string) => void;
     addGDriveVideo: (video: GDriveVideo) => void;
@@ -490,6 +528,8 @@ export const useStore = create<State>()(
             r2Videos: [],
             videoFolders: [],
             gdriveVideos: [],
+            ledLayouts: [],
+            activeLedLayoutId: null,
             gdriveFolders: {},
             materialSlots: [],
             capturePending: false,
@@ -1077,6 +1117,37 @@ export const useStore = create<State>()(
 
             // GDrive Actions
             setGDriveVideos: (videos) => set({ gdriveVideos: videos }),
+
+            addLedLayout: (name, canvasWidth, canvasHeight) => set((state) => {
+                const id = `layout_${Date.now()}_${Math.random().toString(36).slice(2,5)}`;
+                // 新排列預設帶入所有 LED 物件,初始矩形平鋪整張大圖、啟用
+                const leds = state.stageObjects.filter(o => o.type === 'static_LED' || o.type === 'moving_LED');
+                const rects: LedLayoutRect[] = leds.map(o => ({
+                    objectId: o.id, x: 0, y: 0, w: canvasWidth, h: canvasHeight, enabled: true,
+                }));
+                return {
+                    ledLayouts: [...state.ledLayouts, { id, name, canvasWidth, canvasHeight, rects }],
+                    activeLedLayoutId: id,
+                };
+            }),
+            updateLedLayout: (id, patch) => set((state) => ({
+                ledLayouts: state.ledLayouts.map(l => l.id === id ? { ...l, ...patch, id } : l)
+            })),
+            removeLedLayout: (id) => set((state) => ({
+                ledLayouts: state.ledLayouts.filter(l => l.id !== id),
+                activeLedLayoutId: state.activeLedLayoutId === id ? null : state.activeLedLayoutId,
+            })),
+            setActiveLedLayout: (id) => set({ activeLedLayoutId: id }),
+            setLedRect: (layoutId, objectId, patch) => set((state) => ({
+                ledLayouts: state.ledLayouts.map(l => {
+                    if (l.id !== layoutId) return l;
+                    const exists = l.rects.some(r => r.objectId === objectId);
+                    const rects = exists
+                        ? l.rects.map(r => r.objectId === objectId ? { ...r, ...patch } : r)
+                        : [...l.rects, { objectId, x: 0, y: 0, w: l.canvasWidth, h: l.canvasHeight, enabled: true, ...patch }];
+                    return { ...l, rects };
+                })
+            })),
             setAllGDriveFolders: (mapping) => set({ gdriveFolders: mapping }),
             setGDriveFolder: (projectId, folderId) => set((state) => ({
                 gdriveFolders: { ...state.gdriveFolders, [projectId]: folderId }

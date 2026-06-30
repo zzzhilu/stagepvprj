@@ -118,6 +118,8 @@ export default function VideoProgressEditorPage() {
     const setR2Videos = useStore(state => state.setR2Videos);
     const setVideoFolders = useStore(state => state.setVideoFolders);
     const setGDriveVideos = useStore(state => state.setGDriveVideos);
+    const ledLayouts = useStore(state => state.ledLayouts);
+    const activeLedLayoutId = useStore(state => state.activeLedLayoutId);
     const setAllGDriveFolders = useStore(state => state.setAllGDriveFolders);
     const setFloorPlanTexture = useStore(state => state.setFloorPlanTexture);
     const setMode = useStore(state => state.setMode);
@@ -193,6 +195,7 @@ export default function VideoProgressEditorPage() {
                 if (data.r2Videos) setR2Videos(data.r2Videos);
                 if (data.videoFolders) setVideoFolders(data.videoFolders);
                 if (data.gdriveVideos) setGDriveVideos(data.gdriveVideos);
+                if (data.ledLayouts) useStore.setState({ ledLayouts: data.ledLayouts, activeLedLayoutId: data.activeLedLayoutId ?? null });
                 if (data.gdriveFolders) setAllGDriveFolders(data.gdriveFolders);
                 if (data.floorPlanTextureUrl !== undefined) setFloorPlanTexture(data.floorPlanTextureUrl);
                 // Restore lighting settings from project
@@ -232,6 +235,8 @@ export default function VideoProgressEditorPage() {
                 r2Videos,
                 videoFolders,
                 gdriveVideos,
+                ledLayouts,
+                activeLedLayoutId,
                 gdriveFolders,
                 floorPlanTextureUrl,
                 // Lighting settings
@@ -253,7 +258,7 @@ export default function VideoProgressEditorPage() {
         } catch (error) {
             console.error('Save failed:', error);
         }
-    }, [projectId, stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness]);
+    }, [projectId, stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, ledLayouts, activeLedLayoutId, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness]);
 
     // Auto-save effect (debounced)
     useEffect(() => {
@@ -271,6 +276,8 @@ export default function VideoProgressEditorPage() {
                     r2Videos,
                     videoFolders,
                     gdriveVideos,
+                    ledLayouts,
+                    activeLedLayoutId,
                     gdriveFolders,
                     floorPlanTextureUrl,
                     // Lighting settings
@@ -295,7 +302,7 @@ export default function VideoProgressEditorPage() {
         }, 2000); // Debounce 2 seconds
 
         return () => clearTimeout(timeoutId);
-    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, isAuthenticated, isLoading, projectId]);
+    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, ledLayouts, activeLedLayoutId, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, isAuthenticated, isLoading, projectId]);
 
     // Show loading while checking auth
     if (isChecking) {

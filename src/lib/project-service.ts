@@ -14,6 +14,8 @@ export interface ProjectState {
     r2Videos?: R2Video[]; // R2 videos for Image Progress
     videoFolders?: any[];
     gdriveVideos?: any[]; // GDrive videos
+    ledLayouts?: any[]; // LED 排列
+    activeLedLayoutId?: string | null;
     gdriveFolders?: Record<string, string>; // GDrive folders mapping
     floorPlanTextureUrl?: string | null;
     // Lighting & Post-processing settings (synced to client)

@@ -1,5 +1,5 @@
 import { useGLTF } from '@react-three/drei';
-import { StageObject, useStore } from '@/store/useStore';
+import { StageObject, useStore, rectToUv } from '@/store/useStore';
 import * as THREE from 'three';
 import { createMaterial, createPerfectMaterial, MATERIAL_LIBRARY, createMeshLEDAlphaMap, applyMaterialOverrides } from '@/lib/materials';
 import { useMemo, useEffect, useState, useRef, forwardRef } from 'react';
@@ -364,9 +364,18 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                 ? (gifReady ? gifTextureRef.current : null)
                 : imageTexture;
 
+    // LED 排列:有 active 排列且此物件在排列中,依矩形讀大圖(覆蓋預設 repeat/offset)
+    const ledLayouts = useStore((state) => state.ledLayouts);
+    const activeLedLayoutId = useStore((state) => state.activeLedLayoutId);
+    const activeLayout = activeLedLayoutId ? ledLayouts.find(l => l.id === activeLedLayoutId) : null;
+    const layoutRect = activeLayout?.rects.find(r => r.objectId === object.id);
+    // 此排列中明確設為不啟用 → 黑屏(不顯示內容)
+    const layoutDisabled = !!activeLayout && layoutRect ? !layoutRect.enabled : false;
+
     // Clone texture map to apply per-object property offsets/repeats and filter by targetNodeId
     const textureMap = useMemo(() => {
         if (!rawTextureMap) return null;
+        if (layoutDisabled) return null; // 排列中不啟用 → 不貼內容(黑屏)
         // Skip targetNodeId filter when camera is active (camera goes to all LEDs)
         if (!cameraStreamActive && activeTexture?.targetNodeId && activeTexture.targetNodeId !== object.id) {
             return null;
@@ -378,6 +387,11 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
             // Camera mode: horizontal mirror flip
             cloned.repeat.set(-1, 1);
             cloned.offset.set(1, 0);
+        } else if (activeLayout && layoutRect && layoutRect.enabled) {
+            // 排列優先:依像素矩形換算 UV(rectToUv 已處理 Y 翻轉)
+            const uv = rectToUv(layoutRect, activeLayout.canvasWidth, activeLayout.canvasHeight);
+            cloned.repeat.set(uv.repeat[0], uv.repeat[1]);
+            cloned.offset.set(uv.offset[0], uv.offset[1]);
         } else {
             const w = activeTexture?.width ?? 1;
             const h = activeTexture?.height ?? 1;
@@ -390,7 +404,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         cloned.needsUpdate = true;
 
         return cloned;
-    }, [rawTextureMap, activeTexture, object.id, cameraStreamActive]);
+    }, [rawTextureMap, activeTexture, object.id, cameraStreamActive, activeLayout, layoutRect, layoutDisabled]);
 
     // Floor plan texture
     const floorPlanTexture = useMemo(() => {
