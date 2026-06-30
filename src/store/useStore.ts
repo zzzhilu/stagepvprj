@@ -120,7 +120,9 @@ export function rectToUv(rect: { x: number; y: number; w: number; h: number }, c
     const rw = canvasW > 0 ? rect.w / canvasW : 1;
     const rh = canvasH > 0 ? rect.h / canvasH : 1;
     const ox = canvasW > 0 ? rect.x / canvasW : 0;
-    const oy = canvasH > 0 ? (canvasH - rect.y - rect.h) / canvasH : 0; // Y 翻轉
+    // Y 不翻轉:編輯器畫布「上」直接對應貼圖「上」,所見即所得
+    // (實測貼圖在場景的映射方向與畫布一致,先前的翻轉造成上下顛倒)
+    const oy = canvasH > 0 ? rect.y / canvasH : 0;
     return { repeat: [rw, rh] as [number, number], offset: [ox, oy] as [number, number] };
 }
 
