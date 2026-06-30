@@ -202,3 +202,48 @@ export function worldPosToLocal(worldPos: Vec3, parentId: string | null, nulls: 
     const p = new THREE.Vector3(worldPos[0], worldPos[1], worldPos[2]).applyMatrix4(inv);
     return [p.x, p.y, p.z];
 }
+
+// 包圍盒特徵點:27 個(8 角 + 12 邊中點 + 6 面中心 + 1 中心)。
+// t 值 0=min,0.5=中,1=max。
+export type BoundsFeatureId = string; // 形如 "0,0,0"(min角) / "0.5,1,0.5"(頂面中心)
+export interface BoundsFeature {
+    id: BoundsFeatureId;
+    label: string;
+    t: [number, number, number]; // 各軸 0 / 0.5 / 1
+}
+
+export const BOUNDS_FEATURES: BoundsFeature[] = (() => {
+    const vals = [0, 0.5, 1];
+    const axisLabel = (v: number, lo: string, mid: string, hi: string) => v === 0 ? lo : v === 1 ? hi : mid;
+    const out: BoundsFeature[] = [];
+    for (const ty of vals) for (const tz of vals) for (const tx of vals) {
+        const t: [number, number, number] = [tx, ty, tz];
+        const nMid = t.filter(v => v === 0.5).length;
+        let label: string;
+        if (nMid === 3) label = '中心';
+        else {
+            // 高度(Y)為主描述
+            const yL = axisLabel(ty, '底', '中', '頂');
+            const xL = axisLabel(tx, '左', '', '右');
+            const zL = axisLabel(tz, '前', '', '後');
+            const parts = [yL, xL, zL].filter(Boolean);
+            label = parts.join('') + (nMid === 2 ? '面中心' : nMid === 1 ? '邊中' : '角');
+        }
+        out.push({ id: `${tx},${ty},${tz}`, label, t });
+    }
+    return out;
+})();
+
+/**
+ * 從世界空間包圍盒 + 特徵點 t 值,算出該特徵點的世界座標。
+ */
+export function boundsFeatureWorldPos(
+    bounds: { min: [number, number, number]; max: [number, number, number] },
+    t: [number, number, number]
+): Vec3 {
+    return [
+        bounds.min[0] + (bounds.max[0] - bounds.min[0]) * t[0],
+        bounds.min[1] + (bounds.max[1] - bounds.min[1]) * t[1],
+        bounds.min[2] + (bounds.max[2] - bounds.min[2]) * t[2],
+    ];
+}

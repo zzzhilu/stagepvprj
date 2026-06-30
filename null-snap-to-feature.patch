@@ -1,0 +1,218 @@
+diff --git a/src/components/admin/RigEditor.tsx b/src/components/admin/RigEditor.tsx
+index 3c6ca55..b1d98c1 100644
+--- a/src/components/admin/RigEditor.tsx
++++ b/src/components/admin/RigEditor.tsx
+@@ -3,7 +3,7 @@
+ import { useStore, NullNode, RigControl, RigType, RigAxis, RIG_COLORS, DEFAULT_RIG_COLOR, rigColorRgb } from '@/store/useStore';
+ import { useState, useRef, useEffect } from 'react';
+ import * as THREE from 'three';
+-import { isSelfOrDescendant, objectWorldPosition, worldPosToLocal } from '@/lib/rig-utils';
++import { isSelfOrDescendant, objectWorldPosition, worldPosToLocal, BOUNDS_FEATURES, boundsFeatureWorldPos } from '@/lib/rig-utils';
+ import { RigIcon, NullIcon, LinkIcon, RotateIcon, TranslateIcon, PickIcon } from '@/components/ui/icons';
+ import { getObjectLabel } from '@/lib/object-utils';
+ import { getRigStep } from '@/lib/rig-utils';
+@@ -75,6 +75,8 @@ function NullSection() {
+     };
+ 
+     const [alignTarget, setAlignTarget] = useState<Record<string, string>>({}); // nullId → objectId
++    const [alignFeature, setAlignFeature] = useState<Record<string, string>>({}); // nullId → featureId
++    const objectBounds = useStore((s) => s.objectBounds);
+ 
+     const handleAdd = () => {
+         const node: NullNode = {
+@@ -102,7 +104,17 @@ function NullSection() {
+         const objId = alignTarget[node.id];
+         const obj = stageObjects.find(o => o.id === objId);
+         if (!obj) return;
+-        const worldPos = objectWorldPosition(obj, nulls);
++        const featureId = alignFeature[node.id];
++        const bounds = objectBounds[objId];
++        let worldPos;
++        if (featureId && bounds) {
++            // 對齊到包圍盒特徵點(世界空間)
++            const feat = BOUNDS_FEATURES.find(f => f.id === featureId);
++            worldPos = feat ? boundsFeatureWorldPos(bounds, feat.t) : objectWorldPosition(obj, nulls);
++        } else {
++            // 無特徵點/無包圍盒 → fallback 物件位置(原行為)
++            worldPos = objectWorldPosition(obj, nulls);
++        }
+         const localPos = worldPosToLocal(worldPos, node.parentId, nulls);
+         updateNull(node.id, { pos: localPos });
+     };
+@@ -207,9 +219,10 @@ function NullSection() {
+                         ))}
+                     </div>
+ 
+-                    {/* 以物件位置為軸心 */}
++                    {/* 以物件位置/特徵點為軸心 */}
+                     {stageObjects.length > 0 && (
+-                        <div className="flex items-center gap-1">
++                        <div className="space-y-1">
++                          <div className="flex items-center gap-1">
+                             <select
+                                 value={alignTarget[node.id] ?? ''}
+                                 onChange={(e) => setAlignTarget(prev => ({ ...prev, [node.id]: e.target.value }))}
+@@ -224,10 +237,27 @@ function NullSection() {
+                                 onClick={() => handleAlign(node)}
+                                 disabled={!alignTarget[node.id]}
+                                 className="text-[10px] bg-gray-700 hover:bg-gray-600 disabled:opacity-40 text-white px-2 py-1 rounded flex-shrink-0"
+-                                title="把此 Null 移到所選物件的位置"
++                                title="把此 Null 移到所選物件的位置/特徵點"
+                             >
+                                 對齊
+                             </button>
++                          </div>
++                          {/* 特徵點選擇(吸附到包圍盒的角/邊中/面中心/中心) */}
++                          {alignTarget[node.id] && (
++                            <select
++                                value={alignFeature[node.id] ?? ''}
++                                onChange={(e) => setAlignFeature(prev => ({ ...prev, [node.id]: e.target.value }))}
++                                className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-[10px] text-gray-200 focus:border-violet-500 focus:outline-none"
++                            >
++                                <option value="">物件中心點(預設)</option>
++                                {BOUNDS_FEATURES.map(f => (
++                                    <option key={f.id} value={f.id}>{f.label}</option>
++                                ))}
++                            </select>
++                          )}
++                          {alignTarget[node.id] && !objectBounds[alignTarget[node.id]] && (
++                            <p className="text-[9px] text-amber-500/80">⚠ 此物件包圍盒尚未就緒(需在場景中載入顯示後),特徵點對齊暫時 fallback 至物件中心</p>
++                          )}
+                         </div>
+                     )}
+                 </div>
+diff --git a/src/components/canvas/StageObjectRenderer.tsx b/src/components/canvas/StageObjectRenderer.tsx
+index fe19eb3..524a89c 100644
+--- a/src/components/canvas/StageObjectRenderer.tsx
++++ b/src/components/canvas/StageObjectRenderer.tsx
+@@ -609,6 +609,39 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
+         [object, stageObjects]
+     );
+ 
++    // 計算物件世界空間包圍盒,寫入 store 供 Null「對齊到特徵點」使用。
++    const setObjectBounds = useStore((state) => state.setObjectBounds);
++    useEffect(() => {
++        const grp = groupRef.current;
++        if (!grp || clonedGeometries.length === 0) return;
++        const id = requestAnimationFrame(() => {
++            if (!groupRef.current) return;
++            groupRef.current.updateWorldMatrix(true, false);
++            const world = groupRef.current.matrixWorld;
++            const box = new THREE.Box3();
++            const v = new THREE.Vector3();
++            let has = false;
++            for (const geo of clonedGeometries) {
++                if (!geo.boundingBox) geo.computeBoundingBox();
++                const bb = geo.boundingBox;
++                if (!bb) continue;
++                for (let i = 0; i < 8; i++) {
++                    v.set(
++                        i & 1 ? bb.max.x : bb.min.x,
++                        i & 2 ? bb.max.y : bb.min.y,
++                        i & 4 ? bb.max.z : bb.min.z,
++                    ).applyMatrix4(world);
++                    box.expandByPoint(v);
++                    has = true;
++                }
++            }
++            if (has && isFinite(box.min.x) && isFinite(box.max.x)) {
++                setObjectBounds(object.id, [box.min.x, box.min.y, box.min.z], [box.max.x, box.max.y, box.max.z]);
++            }
++        });
++        return () => cancelAnimationFrame(id);
++    }, [clonedGeometries, object.id, setObjectBounds, worldTransform]);
++
+     // Animate position/rotation using useFrame
+     useFrame((_, delta) => {
+         if (!groupRef.current) return;
+diff --git a/src/lib/rig-utils.ts b/src/lib/rig-utils.ts
+index 5f7d352..cbf0b02 100644
+--- a/src/lib/rig-utils.ts
++++ b/src/lib/rig-utils.ts
+@@ -202,3 +202,48 @@ export function worldPosToLocal(worldPos: Vec3, parentId: string | null, nulls:
+     const p = new THREE.Vector3(worldPos[0], worldPos[1], worldPos[2]).applyMatrix4(inv);
+     return [p.x, p.y, p.z];
+ }
++
++// 包圍盒特徵點:27 個(8 角 + 12 邊中點 + 6 面中心 + 1 中心)。
++// t 值 0=min,0.5=中,1=max。
++export type BoundsFeatureId = string; // 形如 "0,0,0"(min角) / "0.5,1,0.5"(頂面中心)
++export interface BoundsFeature {
++    id: BoundsFeatureId;
++    label: string;
++    t: [number, number, number]; // 各軸 0 / 0.5 / 1
++}
++
++export const BOUNDS_FEATURES: BoundsFeature[] = (() => {
++    const vals = [0, 0.5, 1];
++    const axisLabel = (v: number, lo: string, mid: string, hi: string) => v === 0 ? lo : v === 1 ? hi : mid;
++    const out: BoundsFeature[] = [];
++    for (const ty of vals) for (const tz of vals) for (const tx of vals) {
++        const t: [number, number, number] = [tx, ty, tz];
++        const nMid = t.filter(v => v === 0.5).length;
++        let label: string;
++        if (nMid === 3) label = '中心';
++        else {
++            // 高度(Y)為主描述
++            const yL = axisLabel(ty, '底', '中', '頂');
++            const xL = axisLabel(tx, '左', '', '右');
++            const zL = axisLabel(tz, '前', '', '後');
++            const parts = [yL, xL, zL].filter(Boolean);
++            label = parts.join('') + (nMid === 2 ? '面中心' : nMid === 1 ? '邊中' : '角');
++        }
++        out.push({ id: `${tx},${ty},${tz}`, label, t });
++    }
++    return out;
++})();
++
++/**
++ * 從世界空間包圍盒 + 特徵點 t 值,算出該特徵點的世界座標。
++ */
++export function boundsFeatureWorldPos(
++    bounds: { min: [number, number, number]; max: [number, number, number] },
++    t: [number, number, number]
++): Vec3 {
++    return [
++        bounds.min[0] + (bounds.max[0] - bounds.min[0]) * t[0],
++        bounds.min[1] + (bounds.max[1] - bounds.min[1]) * t[1],
++        bounds.min[2] + (bounds.max[2] - bounds.min[2]) * t[2],
++    ];
++}
+diff --git a/src/store/useStore.ts b/src/store/useStore.ts
+index 26ec29c..34ea058 100644
+--- a/src/store/useStore.ts
++++ b/src/store/useStore.ts
+@@ -487,6 +487,10 @@ interface State {
+     updateLedLayout: (id: string, patch: Partial<Omit<LedLayout, 'id'>>) => void;
+     removeLedLayout: (id: string) => void;
+     setActiveLedLayout: (id: string | null) => void;
++
++    // 物件世界空間包圍盒快取(runtime-only,由渲染層計算後寫入,不同步)
++    objectBounds: Record<string, { min: [number, number, number]; max: [number, number, number] }>;
++    setObjectBounds: (objectId: string, min: [number, number, number], max: [number, number, number]) => void;
+     setLedRect: (layoutId: string, objectId: string, patch: Partial<LedLayoutRect>) => void;
+     setAllGDriveFolders: (mapping: Record<string, string>) => void;
+     setGDriveFolder: (projectId: string, folderId: string) => void;
+@@ -530,6 +534,7 @@ export const useStore = create<State>()(
+             gdriveVideos: [],
+             ledLayouts: [],
+             activeLedLayoutId: null,
++            objectBounds: {},
+             gdriveFolders: {},
+             materialSlots: [],
+             capturePending: false,
+@@ -1138,6 +1143,14 @@ export const useStore = create<State>()(
+                 activeLedLayoutId: state.activeLedLayoutId === id ? null : state.activeLedLayoutId,
+             })),
+             setActiveLedLayout: (id) => set({ activeLedLayoutId: id }),
++
++            setObjectBounds: (objectId, min, max) => set((state) => {
++                const prev = state.objectBounds[objectId];
++                // 僅在實際變化時更新,避免無謂 re-render
++                if (prev && prev.min[0] === min[0] && prev.min[1] === min[1] && prev.min[2] === min[2]
++                    && prev.max[0] === max[0] && prev.max[1] === max[1] && prev.max[2] === max[2]) return {};
++                return { objectBounds: { ...state.objectBounds, [objectId]: { min, max } } };
++            }),
+             setLedRect: (layoutId, objectId, patch) => set((state) => ({
+                 ledLayouts: state.ledLayouts.map(l => {
+                     if (l.id !== layoutId) return l;

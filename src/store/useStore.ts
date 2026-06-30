@@ -487,6 +487,10 @@ interface State {
     updateLedLayout: (id: string, patch: Partial<Omit<LedLayout, 'id'>>) => void;
     removeLedLayout: (id: string) => void;
     setActiveLedLayout: (id: string | null) => void;
+
+    // 物件世界空間包圍盒快取(runtime-only,由渲染層計算後寫入,不同步)
+    objectBounds: Record<string, { min: [number, number, number]; max: [number, number, number] }>;
+    setObjectBounds: (objectId: string, min: [number, number, number], max: [number, number, number]) => void;
     setLedRect: (layoutId: string, objectId: string, patch: Partial<LedLayoutRect>) => void;
     setAllGDriveFolders: (mapping: Record<string, string>) => void;
     setGDriveFolder: (projectId: string, folderId: string) => void;
@@ -530,6 +534,7 @@ export const useStore = create<State>()(
             gdriveVideos: [],
             ledLayouts: [],
             activeLedLayoutId: null,
+            objectBounds: {},
             gdriveFolders: {},
             materialSlots: [],
             capturePending: false,
@@ -1138,6 +1143,14 @@ export const useStore = create<State>()(
                 activeLedLayoutId: state.activeLedLayoutId === id ? null : state.activeLedLayoutId,
             })),
             setActiveLedLayout: (id) => set({ activeLedLayoutId: id }),
+
+            setObjectBounds: (objectId, min, max) => set((state) => {
+                const prev = state.objectBounds[objectId];
+                // 僅在實際變化時更新,避免無謂 re-render
+                if (prev && prev.min[0] === min[0] && prev.min[1] === min[1] && prev.min[2] === min[2]
+                    && prev.max[0] === max[0] && prev.max[1] === max[1] && prev.max[2] === max[2]) return {};
+                return { objectBounds: { ...state.objectBounds, [objectId]: { min, max } } };
+            }),
             setLedRect: (layoutId, objectId, patch) => set((state) => ({
                 ledLayouts: state.ledLayouts.map(l => {
                     if (l.id !== layoutId) return l;

@@ -3,7 +3,7 @@
 import { useStore, NullNode, RigControl, RigType, RigAxis, RIG_COLORS, DEFAULT_RIG_COLOR, rigColorRgb } from '@/store/useStore';
 import { useState, useRef, useEffect } from 'react';
 import * as THREE from 'three';
-import { isSelfOrDescendant, objectWorldPosition, worldPosToLocal } from '@/lib/rig-utils';
+import { isSelfOrDescendant, objectWorldPosition, worldPosToLocal, BOUNDS_FEATURES, boundsFeatureWorldPos } from '@/lib/rig-utils';
 import { RigIcon, NullIcon, LinkIcon, RotateIcon, TranslateIcon, PickIcon } from '@/components/ui/icons';
 import { getObjectLabel } from '@/lib/object-utils';
 import { getRigStep } from '@/lib/rig-utils';
@@ -75,6 +75,8 @@ function NullSection() {
     };
 
     const [alignTarget, setAlignTarget] = useState<Record<string, string>>({}); // nullId → objectId
+    const [alignFeature, setAlignFeature] = useState<Record<string, string>>({}); // nullId → featureId
+    const objectBounds = useStore((s) => s.objectBounds);
 
     const handleAdd = () => {
         const node: NullNode = {
@@ -102,7 +104,17 @@ function NullSection() {
         const objId = alignTarget[node.id];
         const obj = stageObjects.find(o => o.id === objId);
         if (!obj) return;
-        const worldPos = objectWorldPosition(obj, nulls);
+        const featureId = alignFeature[node.id];
+        const bounds = objectBounds[objId];
+        let worldPos;
+        if (featureId && bounds) {
+            // 對齊到包圍盒特徵點(世界空間)
+            const feat = BOUNDS_FEATURES.find(f => f.id === featureId);
+            worldPos = feat ? boundsFeatureWorldPos(bounds, feat.t) : objectWorldPosition(obj, nulls);
+        } else {
+            // 無特徵點/無包圍盒 → fallback 物件位置(原行為)
+            worldPos = objectWorldPosition(obj, nulls);
+        }
         const localPos = worldPosToLocal(worldPos, node.parentId, nulls);
         updateNull(node.id, { pos: localPos });
     };
@@ -207,9 +219,10 @@ function NullSection() {
                         ))}
                     </div>
 
-                    {/* 以物件位置為軸心 */}
+                    {/* 以物件位置/特徵點為軸心 */}
                     {stageObjects.length > 0 && (
-                        <div className="flex items-center gap-1">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1">
                             <select
                                 value={alignTarget[node.id] ?? ''}
                                 onChange={(e) => setAlignTarget(prev => ({ ...prev, [node.id]: e.target.value }))}
@@ -224,10 +237,27 @@ function NullSection() {
                                 onClick={() => handleAlign(node)}
                                 disabled={!alignTarget[node.id]}
                                 className="text-[10px] bg-gray-700 hover:bg-gray-600 disabled:opacity-40 text-white px-2 py-1 rounded flex-shrink-0"
-                                title="把此 Null 移到所選物件的位置"
+                                title="把此 Null 移到所選物件的位置/特徵點"
                             >
                                 對齊
                             </button>
+                          </div>
+                          {/* 特徵點選擇(吸附到包圍盒的角/邊中/面中心/中心) */}
+                          {alignTarget[node.id] && (
+                            <select
+                                value={alignFeature[node.id] ?? ''}
+                                onChange={(e) => setAlignFeature(prev => ({ ...prev, [node.id]: e.target.value }))}
+                                className="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-[10px] text-gray-200 focus:border-violet-500 focus:outline-none"
+                            >
+                                <option value="">物件中心點(預設)</option>
+                                {BOUNDS_FEATURES.map(f => (
+                                    <option key={f.id} value={f.id}>{f.label}</option>
+                                ))}
+                            </select>
+                          )}
+                          {alignTarget[node.id] && !objectBounds[alignTarget[node.id]] && (
+                            <p className="text-[9px] text-amber-500/80">⚠ 此物件包圍盒尚未就緒(需在場景中載入顯示後),特徵點對齊暫時 fallback 至物件中心</p>
+                          )}
                         </div>
                     )}
                 </div>

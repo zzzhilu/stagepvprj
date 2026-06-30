@@ -609,6 +609,39 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         [object, stageObjects]
     );
 
+    // 計算物件世界空間包圍盒,寫入 store 供 Null「對齊到特徵點」使用。
+    const setObjectBounds = useStore((state) => state.setObjectBounds);
+    useEffect(() => {
+        const grp = groupRef.current;
+        if (!grp || clonedGeometries.length === 0) return;
+        const id = requestAnimationFrame(() => {
+            if (!groupRef.current) return;
+            groupRef.current.updateWorldMatrix(true, false);
+            const world = groupRef.current.matrixWorld;
+            const box = new THREE.Box3();
+            const v = new THREE.Vector3();
+            let has = false;
+            for (const geo of clonedGeometries) {
+                if (!geo.boundingBox) geo.computeBoundingBox();
+                const bb = geo.boundingBox;
+                if (!bb) continue;
+                for (let i = 0; i < 8; i++) {
+                    v.set(
+                        i & 1 ? bb.max.x : bb.min.x,
+                        i & 2 ? bb.max.y : bb.min.y,
+                        i & 4 ? bb.max.z : bb.min.z,
+                    ).applyMatrix4(world);
+                    box.expandByPoint(v);
+                    has = true;
+                }
+            }
+            if (has && isFinite(box.min.x) && isFinite(box.max.x)) {
+                setObjectBounds(object.id, [box.min.x, box.min.y, box.min.z], [box.max.x, box.max.y, box.max.z]);
+            }
+        });
+        return () => cancelAnimationFrame(id);
+    }, [clonedGeometries, object.id, setObjectBounds, worldTransform]);
+
     // Animate position/rotation using useFrame
     useFrame((_, delta) => {
         if (!groupRef.current) return;
