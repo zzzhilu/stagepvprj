@@ -1,0 +1,94 @@
+diff --git a/src/components/admin/LedLayoutEditor.tsx b/src/components/admin/LedLayoutEditor.tsx
+index 68ffbd4..800a6ab 100644
+--- a/src/components/admin/LedLayoutEditor.tsx
++++ b/src/components/admin/LedLayoutEditor.tsx
+@@ -1,6 +1,6 @@
+ 'use client';
+ 
+-import { useState, useRef } from 'react';
++import { useState, useRef, useEffect } from 'react';
+ import { createPortal } from 'react-dom';
+ import { useStore } from '@/store/useStore';
+ import { getObjectDisplayName } from '@/lib/object-utils';
+@@ -17,6 +17,7 @@ export function LedLayoutEditor() {
+     const activeLedLayoutId = useStore((s) => s.activeLedLayoutId);
+     const addLedLayout = useStore((s) => s.addLedLayout);
+     const removeLedLayout = useStore((s) => s.removeLedLayout);
++    const updateLedLayout = useStore((s) => s.updateLedLayout);
+     const setActiveLedLayout = useStore((s) => s.setActiveLedLayout);
+     const setLedRect = useStore((s) => s.setLedRect);
+     const setLedResolution = useStore((s) => s.setLedResolution);
+@@ -24,6 +25,8 @@ export function LedLayoutEditor() {
+     const removeLedFromLayout = useStore((s) => s.removeLedFromLayout);
+ 
+     const [open, setOpen] = useState(false);
++    const [mounted, setMounted] = useState(false);
++    useEffect(() => { setMounted(true); }, []);
+     const leds = stageObjects.filter(o => o.type === 'static_LED' || o.type === 'moving_LED');
+     const layout = ledLayouts.find(l => l.id === activeLedLayoutId) || null;
+ 
+@@ -51,11 +54,11 @@ export function LedLayoutEditor() {
+                 開啟排列編輯器
+             </button>
+ 
+-            {open && createPortal(
++            {open && mounted && createPortal(
+                 <LayoutEditorModal
+                     leds={leds}
+                     onClose={() => setOpen(false)}
+-                    {...{ ledLayouts, activeLedLayoutId, layout, addLedLayout, removeLedLayout, setActiveLedLayout, setLedRect, setLedResolution, addLedToLayout, removeLedFromLayout }}
++                    {...{ ledLayouts, activeLedLayoutId, layout, addLedLayout, removeLedLayout, updateLedLayout, setActiveLedLayout, setLedRect, setLedResolution, addLedToLayout, removeLedFromLayout }}
+                 />,
+                 document.body
+             )}
+@@ -64,7 +67,7 @@ export function LedLayoutEditor() {
+ }
+ 
+ // ===== 全螢幕編輯 Modal =====
+-function LayoutEditorModal({ leds, onClose, ledLayouts, activeLedLayoutId, layout, addLedLayout, removeLedLayout, setActiveLedLayout, setLedRect, setLedResolution, addLedToLayout, removeLedFromLayout }: any) {
++function LayoutEditorModal({ leds, onClose, ledLayouts, activeLedLayoutId, layout, addLedLayout, removeLedLayout, updateLedLayout, setActiveLedLayout, setLedRect, setLedResolution, addLedToLayout, removeLedFromLayout }: any) {
+     const [selObjId, setSelObjId] = useState<string | null>(null);
+     const [newName, setNewName] = useState('');
+     const [newW, setNewW] = useState(9344);
+@@ -74,11 +77,13 @@ function LayoutEditorModal({ leds, onClose, ledLayouts, activeLedLayoutId, layou
+     const inLayout = (id: string) => !!layout?.rects.find((r: any) => r.objectId === id);
+     const selRect = layout && selObjId ? layout.rects.find((r: any) => r.objectId === selObjId) : null;
+ 
+-    // 畫布顯示:等比縮放至最大寬 720
++    // 畫布顯示:等比縮放至最大寬 720(防護:canvas 尺寸異常時不產生 Infinity/NaN)
+     const MAXW = 720;
+-    const scale = layout ? Math.min(MAXW / layout.canvasWidth, 460 / layout.canvasHeight) : 1;
+-    const dispW = layout ? layout.canvasWidth * scale : 0;
+-    const dispH = layout ? layout.canvasHeight * scale : 0;
++    const cw = layout && layout.canvasWidth > 0 ? layout.canvasWidth : 1920;
++    const ch = layout && layout.canvasHeight > 0 ? layout.canvasHeight : 1080;
++    const scale = layout ? Math.min(MAXW / cw, 460 / ch) : 1;
++    const dispW = layout ? cw * scale : 0;
++    const dispH = layout ? ch * scale : 0;
+ 
+     const onDown = (e: React.PointerEvent, objId: string) => {
+         if (!layout) return;
+@@ -170,8 +175,12 @@ function LayoutEditorModal({ leds, onClose, ledLayouts, activeLedLayoutId, layou
+                             <>
+                                 <div className="flex items-center justify-between w-full max-w-3xl mb-2">
+                                     <span className="text-[11px] text-gray-400">{layout.name} · 大圖 {layout.canvasWidth}×{layout.canvasHeight} · 未加入的 LED 在此排列為黑屏</span>
+-                                    <button onClick={() => { if (confirm(`刪除排列「${layout.name}」?`)) removeLedLayout(layout.id); }}
+-                                        className="text-[10px] text-gray-500 hover:text-red-400">刪除排列</button>
++                                    <div className="flex items-center gap-2">
++                                        <button onClick={() => { if (confirm(`清空「${layout.name}」畫布上所有 LED?\\n(LED 會回到左側清單,可重新加入)`)) updateLedLayout(layout.id, { rects: [] }); }}
++                                            className="text-[10px] text-gray-500 hover:text-amber-400">清空畫布</button>
++                                        <button onClick={() => { if (confirm(`刪除排列「${layout.name}」?`)) removeLedLayout(layout.id); }}
++                                            className="text-[10px] text-gray-500 hover:text-red-400">刪除排列</button>
++                                    </div>
+                                 </div>
+                                 <div className="relative bg-gray-950 border border-gray-700" style={{ width: dispW, height: dispH }}>
+                                     {layout.rects.map((r: any) => {
+@@ -190,7 +199,7 @@ function LayoutEditorModal({ leds, onClose, ledLayouts, activeLedLayoutId, layou
+                                 </div>
+ 
+                                 {/* 選中 LED 數值 */}
+-                                {selRect ? (
++                                {selRect && leds.find((l: any) => l.id === selObjId) ? (
+                                     <div className="mt-3 bg-gray-800/60 rounded-lg p-3 w-full max-w-3xl">
+                                         <div className="text-[12px] text-violet-300 font-medium mb-2">{getObjectDisplayName(leds.find((l: any) => l.id === selObjId))}</div>
+                                         <div className="grid grid-cols-4 gap-2">
