@@ -453,6 +453,8 @@ export function SceneGraph() {
                 makeDefault
                 position={[0, 5, 20]}
                 fov={fov}
+                near={0.1}
+                far={5000}
             />
 
             {/* OrbitControls with vertical rotation limits (disabled during drawing/walkMode) */}
@@ -464,7 +466,7 @@ export function SceneGraph() {
                 enableZoom={true}
                 enableRotate={true}
                 minDistance={2}
-                maxDistance={100}
+                maxDistance={500}
                 minPolarAngle={0.1}
                 maxPolarAngle={Math.PI * 0.85}
                 dampingFactor={0.05}
