@@ -312,6 +312,7 @@ interface State {
     // Camera Stream State [NEW]
     cameraStreamActive: boolean;
     cameraStreamDeviceId: string | null;
+    cameraStreamMode: 'webcam' | 'screen'; // 訊號來源:webcam 或螢幕/視窗擷取(runtime-only)
     cameraStreamError: string | null;
 
     // Paper Figure State [NEW]
@@ -447,6 +448,7 @@ interface State {
     // Camera Stream Actions [NEW]
     setCameraStreamActive: (active: boolean) => void;
     setCameraStreamDeviceId: (deviceId: string | null) => void;
+    setCameraStreamMode: (mode: 'webcam' | 'screen') => void;
     setCameraStreamError: (error: string | null) => void;
 
     // Paper Figure Actions [NEW]
@@ -579,6 +581,7 @@ export const useStore = create<State>()(
             // Camera Stream defaults [NEW]
             cameraStreamActive: false,
             cameraStreamDeviceId: null,
+            cameraStreamMode: 'webcam',
             cameraStreamError: null,
 
             // Paper Figure defaults
@@ -1064,6 +1067,7 @@ export const useStore = create<State>()(
             // Camera Stream Actions [NEW]
             setCameraStreamActive: (active) => set({ cameraStreamActive: active }),
             setCameraStreamDeviceId: (deviceId) => set({ cameraStreamDeviceId: deviceId }),
+            setCameraStreamMode: (mode) => set({ cameraStreamMode: mode }),
             setCameraStreamError: (error) => {
                 set({ cameraStreamError: error });
                 if (error) {

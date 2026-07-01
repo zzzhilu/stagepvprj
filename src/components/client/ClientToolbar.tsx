@@ -32,6 +32,7 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
     const cameraStreamActive = useStore(s => s.cameraStreamActive);
     const setCameraStreamActive = useStore(s => s.setCameraStreamActive);
     const setCameraStreamDeviceId = useStore(s => s.setCameraStreamDeviceId);
+    const setCameraStreamMode = useStore(s => s.setCameraStreamMode);
     const cameraStreamError = useStore(s => s.cameraStreamError);
     const [showCameraPanel, setShowCameraPanel] = useState(false);
     const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
@@ -101,10 +102,19 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
     }, [cameraStreamActive, setCameraStreamActive, setCameraStreamDeviceId, enumerateCameraDevices]);
 
     const selectCameraDevice = useCallback((deviceId: string) => {
+        setCameraStreamMode('webcam');
         setCameraStreamDeviceId(deviceId);
         setCameraStreamActive(true);
         setShowCameraPanel(false);
-    }, [setCameraStreamDeviceId, setCameraStreamActive]);
+    }, [setCameraStreamMode, setCameraStreamDeviceId, setCameraStreamActive]);
+
+    // 螢幕/視窗擷取(方案 A):不受 webcam 解析度限制,適合抓 NDI 預覽視窗
+    const selectScreenCapture = useCallback(() => {
+        setCameraStreamMode('screen');
+        setCameraStreamDeviceId('__screen__'); // 佔位,screen 模式不實際使用
+        setCameraStreamActive(true);
+        setShowCameraPanel(false);
+    }, [setCameraStreamMode, setCameraStreamDeviceId, setCameraStreamActive]);
 
     // Close camera panel on outside click
     useEffect(() => {
@@ -282,9 +292,18 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
                                     </svg>
                                     <span className="text-white/70 text-xs font-medium">選擇攝影機訊號</span>
                                 </div>
+                                <button
+                                    onClick={selectScreenCapture}
+                                    className="w-full text-left px-3 py-2.5 text-cyan-300 text-xs hover:bg-cyan-500/10 transition-colors flex items-center gap-2 border-b border-white/10"
+                                >
+                                    <span className="w-5 h-5 rounded bg-cyan-500/20 flex items-center justify-center shrink-0">
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><rect x="3" y="4" width="18" height="12" rx="1" /><path d="M8 20h8M12 16v4" /></svg>
+                                    </span>
+                                    <span>螢幕 / 視窗擷取(完整比例,適合 NDI)</span>
+                                </button>
                                 {cameraDevices.length === 0 ? (
                                     <div className="px-3 py-4 text-white/40 text-xs text-center">
-                                        未偵測到攝影機裝置
+                                        未偵測到攝影機裝置(仍可用上方螢幕擷取)
                                     </div>
                                 ) : (
                                     <div className="max-h-[200px] overflow-y-auto">

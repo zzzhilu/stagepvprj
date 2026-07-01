@@ -21,6 +21,7 @@ export function VideoManager() {
     // Camera stream state [NEW]
     const cameraStreamActive = useStore((state) => state.cameraStreamActive);
     const cameraStreamDeviceId = useStore((state) => state.cameraStreamDeviceId);
+    const cameraStreamMode = useStore((state) => state.cameraStreamMode);
     const setCameraStreamActive = useStore((state) => state.setCameraStreamActive);
     const setCameraStreamError = useStore((state) => state.setCameraStreamError);
 
@@ -37,7 +38,8 @@ export function VideoManager() {
 
     // ========== CAMERA STREAM (HIGHEST PRIORITY) ==========
     useEffect(() => {
-        if (!cameraStreamActive || !cameraStreamDeviceId) {
+        // webcam 需要 deviceId;screen 模式用 getDisplayMedia 不需 deviceId
+        if (!cameraStreamActive || (cameraStreamMode === 'webcam' && !cameraStreamDeviceId)) {
             // Cleanup camera stream
             if (cameraStreamRef.current) {
                 cameraStreamRef.current.getTracks().forEach(t => t.stop());
@@ -63,14 +65,32 @@ export function VideoManager() {
 
         const startCamera = async () => {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        deviceId: { exact: cameraStreamDeviceId },
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                    },
-                    audio: false,
-                });
+                let stream: MediaStream;
+                if (cameraStreamMode === 'screen') {
+                    // 螢幕/視窗擷取:解析度跟隨來源(不受 webcam 限制),適合抓 NDI 預覽視窗
+                    stream = await navigator.mediaDevices.getDisplayMedia({
+                        video: {
+                            width: { ideal: 3840 },
+                            height: { ideal: 2160 },
+                            frameRate: { ideal: 30 },
+                        },
+                        audio: false,
+                    });
+                    // 使用者按瀏覽器原生「停止分享」時,自動關閉本功能
+                    stream.getVideoTracks()[0]?.addEventListener('ended', () => {
+                        setCameraStreamActive(false);
+                    });
+                } else {
+                    // webcam:盡量要求高解析度(治標:避免預設 640×480)
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            deviceId: { exact: cameraStreamDeviceId! },
+                            width: { ideal: 3840 },
+                            height: { ideal: 2160 },
+                        },
+                        audio: false,
+                    });
+                }
 
                 if (cancelled) {
                     stream.getTracks().forEach(t => t.stop());
@@ -131,7 +151,7 @@ export function VideoManager() {
             }
             // Don't clear globalVideoElement here — let the video effect handle it
         };
-    }, [cameraStreamActive, cameraStreamDeviceId, setCameraStreamActive, setCameraStreamError]);
+    }, [cameraStreamActive, cameraStreamDeviceId, cameraStreamMode, setCameraStreamActive, setCameraStreamError]);
 
     // ========== CONTENT VIDEO (lower priority — skipped when camera is active) ==========
     useEffect(() => {
