@@ -539,10 +539,10 @@ export function ClientToolbar({ projectId, isAdmin = false }: ClientToolbarProps
                     <div className="bg-black/70 backdrop-blur-md text-white px-4 py-3 rounded-xl border border-white/10 shadow-lg w-64">
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-medium text-white/90">裁切上段（保留底部）</span>
-                            <span className="text-xs font-mono text-cyan-300">{Math.round(effectiveCrop * 100)}%</span>
+                            <span className="text-xs font-mono text-cyan-300">{(effectiveCrop * 100).toFixed(1)}%</span>
                         </div>
                         <input
-                            type="range" min={0.1} max={1} step={0.01}
+                            type="range" min={0.1} max={1} step={0.005}
                             value={effectiveCrop}
                             onChange={(e) => applyCrop(parseFloat(e.target.value))}
                             className="w-full accent-cyan-400"
