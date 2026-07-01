@@ -7,9 +7,10 @@ import { MeasurementPanel } from './MeasurementOverlay';
 
 interface ClientToolbarProps {
     projectId?: string;
+    isAdmin?: boolean; // 自由測試(後台)=true → 調整同步的預設裁切;客戶端=false → 臨時覆蓋
 }
 
-export function ClientToolbar({ projectId }: ClientToolbarProps) {
+export function ClientToolbar({ projectId, isAdmin = false }: ClientToolbarProps) {
     const expanded = useStore((state) => state.toolbarExpanded);
     const setExpanded = useStore((state) => state.setToolbarExpanded);
     const drawingMode = useStore(s => s.drawingMode);
@@ -33,6 +34,14 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
     const setCameraStreamActive = useStore(s => s.setCameraStreamActive);
     const setCameraStreamDeviceId = useStore(s => s.setCameraStreamDeviceId);
     const setCameraStreamMode = useStore(s => s.setCameraStreamMode);
+    const cameraStreamMode = useStore(s => s.cameraStreamMode);
+    const screenCropRatio = useStore(s => s.screenCropRatio);
+    const screenCropOverride = useStore(s => s.screenCropOverride);
+    const setScreenCropRatio = useStore(s => s.setScreenCropRatio);
+    const setScreenCropOverride = useStore(s => s.setScreenCropOverride);
+    // 有效裁切:後台直接調同步值;客戶端調臨時覆蓋(預設繼承後台值)
+    const effectiveCrop = screenCropOverride !== null ? screenCropOverride : screenCropRatio;
+    const applyCrop = (r: number) => { if (isAdmin) setScreenCropRatio(r); else setScreenCropOverride(r); };
     const cameraStreamError = useStore(s => s.cameraStreamError);
     const [showCameraPanel, setShowCameraPanel] = useState(false);
     const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
@@ -517,6 +526,36 @@ export function ClientToolbar({ projectId }: ClientToolbarProps) {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* 螢幕擷取裁切控制(保留底部高度,裁掉上段系統 bar) */}
+            {cameraStreamActive && cameraStreamMode === 'screen' && (
+                <div
+                    data-ui-element
+                    className="fixed bottom-20 right-6 z-[100] animate-fade-in pointer-events-auto"
+                >
+                    <div className="bg-black/70 backdrop-blur-md text-white px-4 py-3 rounded-xl border border-white/10 shadow-lg w-64">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium text-white/90">裁切上段（保留底部）</span>
+                            <span className="text-xs font-mono text-cyan-300">{Math.round(effectiveCrop * 100)}%</span>
+                        </div>
+                        <input
+                            type="range" min={0.1} max={1} step={0.01}
+                            value={effectiveCrop}
+                            onChange={(e) => applyCrop(parseFloat(e.target.value))}
+                            className="w-full accent-cyan-400"
+                        />
+                        <p className="text-[10px] text-white/40 mt-1.5">
+                            {isAdmin ? '此為專案預設值（會儲存）' : '臨時預覽（不影響存檔）'}
+                        </p>
+                        {!isAdmin && screenCropOverride !== null && (
+                            <button
+                                onClick={() => setScreenCropOverride(null)}
+                                className="text-[10px] text-cyan-300 hover:text-cyan-200 mt-1"
+                            >↩ 回到後台預設</button>
+                        )}
                     </div>
                 </div>
             )}

@@ -69,6 +69,11 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     const stageObjects = useStore((state) => state.stageObjects);
     const floorPlanTextureUrl = useStore((state) => state.floorPlanTextureUrl);
     const cameraStreamActive = useStore((state) => state.cameraStreamActive);
+    const cameraStreamMode = useStore((state) => state.cameraStreamMode);
+    const screenCropRatio = useStore((state) => state.screenCropRatio);
+    const screenCropOverride = useStore((state) => state.screenCropOverride);
+    // 客戶端臨時覆蓋優先,否則用後台預設
+    const effectiveCropRatio = screenCropOverride !== null ? screenCropOverride : screenCropRatio;
     const rigs = useStore((state) => state.rigs);
     const rigValues = useStore((state) => state.rigValues);
     const [videoTexture, setVideoTexture] = useState<THREE.VideoTexture | null>(null);
@@ -400,11 +405,18 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
 
             cloned.repeat.set(w, h);
             cloned.offset.set(x, y);
+
+            // 螢幕擷取裁切:保留底部 cropRatio 的高度(fit 寬、左下對齊、裁掉上段系統 bar)
+            // flipY=false 時 texture Y 原點在上,保留「底部」需 offset.y 下移 (1-crop)、repeat.y 縮為 crop
+            if (cameraStreamActive && cameraStreamMode === 'screen' && effectiveCropRatio < 1) {
+                cloned.repeat.set(w, h * effectiveCropRatio);
+                cloned.offset.set(x, y + (1 - effectiveCropRatio));
+            }
         }
         cloned.needsUpdate = true;
 
         return cloned;
-    }, [rawTextureMap, activeTexture, object.id, cameraStreamActive, activeLayout, layoutRect, layoutDisabled]);
+    }, [rawTextureMap, activeTexture, object.id, cameraStreamActive, cameraStreamMode, effectiveCropRatio, activeLayout, layoutRect, layoutDisabled]);
 
     // Floor plan texture
     const floorPlanTexture = useMemo(() => {

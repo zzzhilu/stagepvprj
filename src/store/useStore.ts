@@ -313,6 +313,8 @@ interface State {
     cameraStreamActive: boolean;
     cameraStreamDeviceId: string | null;
     cameraStreamMode: 'webcam' | 'screen'; // 訊號來源:webcam 或螢幕/視窗擷取(runtime-only)
+    screenCropRatio: number;          // 螢幕擷取保留底部高度比例(0~1;後台預設,同步)
+    screenCropOverride: number | null; // 客戶端臨時覆蓋(runtime-only,不同步;null=用後台預設)
     cameraStreamError: string | null;
 
     // Paper Figure State [NEW]
@@ -449,6 +451,8 @@ interface State {
     setCameraStreamActive: (active: boolean) => void;
     setCameraStreamDeviceId: (deviceId: string | null) => void;
     setCameraStreamMode: (mode: 'webcam' | 'screen') => void;
+    setScreenCropRatio: (ratio: number) => void;
+    setScreenCropOverride: (ratio: number | null) => void;
     setCameraStreamError: (error: string | null) => void;
 
     // Paper Figure Actions [NEW]
@@ -582,6 +586,8 @@ export const useStore = create<State>()(
             cameraStreamActive: false,
             cameraStreamDeviceId: null,
             cameraStreamMode: 'webcam',
+            screenCropRatio: 1,
+            screenCropOverride: null,
             cameraStreamError: null,
 
             // Paper Figure defaults
@@ -1068,6 +1074,8 @@ export const useStore = create<State>()(
             setCameraStreamActive: (active) => set({ cameraStreamActive: active }),
             setCameraStreamDeviceId: (deviceId) => set({ cameraStreamDeviceId: deviceId }),
             setCameraStreamMode: (mode) => set({ cameraStreamMode: mode }),
+            setScreenCropRatio: (ratio) => set({ screenCropRatio: Math.min(Math.max(ratio, 0.05), 1) }),
+            setScreenCropOverride: (ratio) => set({ screenCropOverride: ratio === null ? null : Math.min(Math.max(ratio, 0.05), 1) }),
             setCameraStreamError: (error) => {
                 set({ cameraStreamError: error });
                 if (error) {
@@ -1277,6 +1285,7 @@ export const useStore = create<State>()(
                 // 機關系統:定義持久化,rigValues(當前值)刻意不持久化
                 nulls: state.nulls,
                 rigs: state.rigs,
+                screenCropRatio: state.screenCropRatio, // 螢幕擷取裁切比例(後台預設)
             }),
             // Migration: convert old spotLights to stageLights on hydration
             onRehydrateStorage: () => (state) => {

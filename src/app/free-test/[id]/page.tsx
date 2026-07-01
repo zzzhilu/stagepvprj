@@ -125,6 +125,7 @@ function ProjectEditorContent() {
     const setVideoFolders = useStore(state => state.setVideoFolders);
     const setGDriveVideos = useStore(state => state.setGDriveVideos);
     const ledLayouts = useStore(state => state.ledLayouts);
+    const screenCropRatio = useStore(state => state.screenCropRatio);
     const activeLedLayoutId = useStore(state => state.activeLedLayoutId);
     const setAllGDriveFolders = useStore(state => state.setAllGDriveFolders);
     const setFloorPlanTexture = useStore(state => state.setFloorPlanTexture);
@@ -212,6 +213,7 @@ function ProjectEditorContent() {
                 if (data.videoFolders) setVideoFolders(data.videoFolders);
                 if (data.gdriveVideos) setGDriveVideos(data.gdriveVideos);
                 if (data.ledLayouts) useStore.setState({ ledLayouts: data.ledLayouts, activeLedLayoutId: data.activeLedLayoutId ?? null });
+                if (typeof data.screenCropRatio === 'number') useStore.setState({ screenCropRatio: data.screenCropRatio });
                 if (data.gdriveFolders) setAllGDriveFolders(data.gdriveFolders);
                 if (data.floorPlanTextureUrl !== undefined) setFloorPlanTexture(data.floorPlanTextureUrl);
                 // Restore lighting settings from project (if saved)
@@ -263,6 +265,7 @@ function ProjectEditorContent() {
                     gdriveVideos,
                     ledLayouts,
                     activeLedLayoutId,
+                    screenCropRatio,
                     gdriveFolders,
                     floorPlanTextureUrl,
                     // Lighting settings
@@ -290,7 +293,7 @@ function ProjectEditorContent() {
         }, 2000); // Debounce 2 seconds
 
         return () => clearTimeout(timeoutId);
-    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, ledLayouts, activeLedLayoutId, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, nulls, rigs, isAuthenticated, isShareMode, isLoading, projectId]);
+    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, ledLayouts, activeLedLayoutId, screenCropRatio, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, nulls, rigs, isAuthenticated, isShareMode, isLoading, projectId]);
 
     // Show loading while checking auth
     if (isChecking) {
@@ -322,7 +325,7 @@ function ProjectEditorContent() {
             )}
 
             {/* Client Toolbar - Side tools */}
-            <ClientToolbar projectId={projectId} />
+            <ClientToolbar projectId={projectId} isAdmin={!isShareMode} />
 
             {/* Drawing Overlay */}
             <DrawingOverlay projectId={projectId} />
