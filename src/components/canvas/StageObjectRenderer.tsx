@@ -386,16 +386,13 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
 
         const cloned = rawTextureMap.clone();
         
-        if (cameraStreamActive) {
-            // Camera mode: horizontal mirror flip
-            cloned.repeat.set(-1, 1);
-            cloned.offset.set(1, 0);
-        } else if (activeLayout && layoutRect && layoutRect.enabled) {
-            // 排列優先:依像素矩形換算 UV(rectToUv 已處理 Y 翻轉)
+        if (activeLayout && layoutRect && layoutRect.enabled) {
+            // 排列優先(攝影機或內容皆適用):依像素矩形換算 UV,不做鏡像等額外處理
             const uv = rectToUv(layoutRect, activeLayout.canvasWidth, activeLayout.canvasHeight);
             cloned.repeat.set(uv.repeat[0], uv.repeat[1]);
             cloned.offset.set(uv.offset[0], uv.offset[1]);
         } else {
+            // 無排列:吃預設 UV(攝影機與內容一致)
             const w = activeTexture?.width ?? 1;
             const h = activeTexture?.height ?? 1;
             const x = activeTexture?.x ?? 0;
