@@ -367,7 +367,10 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     // LED 排列:有 active 排列且此物件在排列中,依矩形讀大圖(覆蓋預設 repeat/offset)
     const ledLayouts = useStore((state) => state.ledLayouts);
     const activeLedLayoutId = useStore((state) => state.activeLedLayoutId);
-    const activeLayout = activeLedLayoutId ? ledLayouts.find(l => l.id === activeLedLayoutId) : null;
+    const clientLayoutOverride = useStore((state) => state.clientLayoutOverride);
+    // 客戶端臨時覆蓋優先:undefined=跟隨後台存檔;null=強制預設(關閉);string=指定排列
+    const effectiveLayoutId = clientLayoutOverride !== undefined ? clientLayoutOverride : activeLedLayoutId;
+    const activeLayout = effectiveLayoutId ? ledLayouts.find(l => l.id === effectiveLayoutId) : null;
     const layoutRect = activeLayout?.rects.find(r => r.objectId === object.id);
     // 有 active 排列時:此 LED 不在排列中(沒被加進畫布)→ 黑屏;在排列中但 enabled=false 也黑屏(相容舊資料)
     const layoutDisabled = !!activeLayout && (!layoutRect || layoutRect.enabled === false);

@@ -353,6 +353,7 @@ interface State {
     // Cue Actions [NEW]
     addCue: (name: string) => void;
     updateCue: (id: string) => void;
+    renameCue: (id: string, name: string) => void;
     removeCue: (id: string) => void;
     applyCue: (id: string) => void;
 
@@ -486,6 +487,8 @@ interface State {
     // LED 排列系統
     ledLayouts: LedLayout[];
     activeLedLayoutId: string | null;
+    clientLayoutOverride: string | null | undefined; // 客戶端臨時覆蓋(runtime-only,不同步);undefined=未覆蓋跟隨後台,null=強制預設,string=指定排列
+    setClientLayoutOverride: (id: string | null | undefined) => void;
     addLedLayout: (name: string, canvasWidth: number, canvasHeight: number) => void;
     updateLedLayout: (id: string, patch: Partial<Omit<LedLayout, 'id'>>) => void;
     removeLedLayout: (id: string) => void;
@@ -540,6 +543,7 @@ export const useStore = create<State>()(
             gdriveVideos: [],
             ledLayouts: [],
             activeLedLayoutId: null,
+            clientLayoutOverride: undefined,
             objectBounds: {},
             gdriveFolders: {},
             materialSlots: [],
@@ -696,6 +700,11 @@ export const useStore = create<State>()(
                         : c)
                 };
             }),
+
+            // 僅改名稱,不動狀態快照
+            renameCue: (id, name) => set((state) => ({
+                cues: state.cues.map(c => c.id === id ? { ...c, name } : c)
+            })),
 
             removeCue: (id) => set((state) => ({
                 cues: state.cues.filter(c => c.id !== id),
@@ -1146,6 +1155,7 @@ export const useStore = create<State>()(
                 activeLedLayoutId: state.activeLedLayoutId === id ? null : state.activeLedLayoutId,
             })),
             setActiveLedLayout: (id) => set({ activeLedLayoutId: id }),
+            setClientLayoutOverride: (id) => set({ clientLayoutOverride: id }),
 
             setObjectBounds: (objectId, min, max) => set((state) => {
                 const prev = state.objectBounds[objectId];

@@ -8,11 +8,14 @@ export default function CueManager() {
     const activeCueId = useStore((state) => state.activeCueId);
     const addCue = useStore((state) => state.addCue);
     const updateCue = useStore((state) => state.updateCue);
+    const renameCue = useStore((state) => state.renameCue);
     const removeCue = useStore((state) => state.removeCue);
     const applyCue = useStore((state) => state.applyCue);
 
     const [isCreating, setIsCreating] = useState(false);
     const [newCueName, setNewCueName] = useState('');
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editingName, setEditingName] = useState('');
 
     // Auto-Play State
     const [isPlaying, setIsPlaying] = useState(false);
@@ -171,7 +174,26 @@ export default function CueManager() {
                                     }`}>
                                     {index}
                                 </span>
-                                <span className="text-sm font-medium text-white">{cue.name}</span>
+                                {editingId === cue.id ? (
+                                    <input
+                                        autoFocus
+                                        value={editingName}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) => setEditingName(e.target.value)}
+                                        onBlur={() => { if (editingName.trim()) renameCue(cue.id, editingName.trim()); setEditingId(null); }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') { if (editingName.trim()) renameCue(cue.id, editingName.trim()); setEditingId(null); }
+                                            if (e.key === 'Escape') setEditingId(null);
+                                        }}
+                                        className="text-sm font-medium bg-gray-900 border border-violet-500 rounded px-1.5 py-0.5 text-white focus:outline-none w-32"
+                                    />
+                                ) : (
+                                    <span
+                                        className="text-sm font-medium text-white hover:text-violet-300"
+                                        onDoubleClick={(e) => { e.stopPropagation(); setEditingId(cue.id); setEditingName(cue.name); }}
+                                        title="雙擊更改名稱"
+                                    >{cue.name}</span>
+                                )}
                             </div>
                             {activeCueId === cue.id && (
                                 <span className="text-xs text-violet-400 font-bold">ACTIVE</span>

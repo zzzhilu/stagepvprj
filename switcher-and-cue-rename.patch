@@ -1,0 +1,228 @@
+diff --git a/src/app/free-test/[id]/page.tsx b/src/app/free-test/[id]/page.tsx
+index c8e5ffb..3f80053 100644
+--- a/src/app/free-test/[id]/page.tsx
++++ b/src/app/free-test/[id]/page.tsx
+@@ -9,6 +9,7 @@ import { VideoControls } from '@/components/client/VideoControls';
+ import { BottomLeftPanel } from '@/components/client/BottomLeftPanel';
+ import { ErrorBoundary } from '@/components/ErrorBoundary';
+ import { ClientUploader } from '@/components/client/ClientUploader';
++import { ClientLayoutSwitcher } from '@/components/client/ClientLayoutSwitcher';
+ import { ClientToolbar } from '@/components/client/ClientToolbar';
+ import { DrawingOverlay } from '@/components/client/DrawingOverlay';
+ import { ProjectService } from '@/lib/project-service';
+@@ -340,6 +341,7 @@ function ProjectEditorContent() {
+ 
+             {/* Client Uploader - Share mode only */}
+             {isShareMode && <div data-ui-element><ClientUploader /></div>}
++            {isShareMode && <div data-ui-element><ClientLayoutSwitcher /></div>}
+ 
+             {/* 機關控制面板 */}
+             <RigPanel />
+diff --git a/src/app/share/[id]/page.tsx b/src/app/share/[id]/page.tsx
+index bea505e..c99beb2 100644
+--- a/src/app/share/[id]/page.tsx
++++ b/src/app/share/[id]/page.tsx
+@@ -10,6 +10,7 @@ import { RigPanel } from '@/components/client/RigPanel';
+ import { AssetLoadingOverlay } from '@/components/ui/AssetLoadingOverlay';
+ import { ErrorBoundary } from '@/components/ErrorBoundary';
+ import { ClientToolbar } from '@/components/client/ClientToolbar';
++import { ClientLayoutSwitcher } from '@/components/client/ClientLayoutSwitcher';
+ import { DrawingOverlay } from '@/components/client/DrawingOverlay';
+ import { ProjectService } from '@/lib/project-service';
+ import { useStore } from '@/store/useStore';
+@@ -308,6 +309,9 @@ function SharePageContent() {
+             {/* Client Toolbar - Side tools */}
+             <ClientToolbar projectId={projectId} />
+ 
++            {/* LED 排列切換器(左上,上傳 icon 右側) */}
++            <ClientLayoutSwitcher />
++
+             {/* Drawing Overlay */}
+             <DrawingOverlay projectId={projectId} />
+ 
+diff --git a/src/components/admin/CueManager.tsx b/src/components/admin/CueManager.tsx
+index c2c3183..6b918aa 100644
+--- a/src/components/admin/CueManager.tsx
++++ b/src/components/admin/CueManager.tsx
+@@ -8,11 +8,14 @@ export default function CueManager() {
+     const activeCueId = useStore((state) => state.activeCueId);
+     const addCue = useStore((state) => state.addCue);
+     const updateCue = useStore((state) => state.updateCue);
++    const renameCue = useStore((state) => state.renameCue);
+     const removeCue = useStore((state) => state.removeCue);
+     const applyCue = useStore((state) => state.applyCue);
+ 
+     const [isCreating, setIsCreating] = useState(false);
+     const [newCueName, setNewCueName] = useState('');
++    const [editingId, setEditingId] = useState<string | null>(null);
++    const [editingName, setEditingName] = useState('');
+ 
+     // Auto-Play State
+     const [isPlaying, setIsPlaying] = useState(false);
+@@ -171,7 +174,26 @@ export default function CueManager() {
+                                     }`}>
+                                     {index}
+                                 </span>
+-                                <span className="text-sm font-medium text-white">{cue.name}</span>
++                                {editingId === cue.id ? (
++                                    <input
++                                        autoFocus
++                                        value={editingName}
++                                        onClick={(e) => e.stopPropagation()}
++                                        onChange={(e) => setEditingName(e.target.value)}
++                                        onBlur={() => { if (editingName.trim()) renameCue(cue.id, editingName.trim()); setEditingId(null); }}
++                                        onKeyDown={(e) => {
++                                            if (e.key === 'Enter') { if (editingName.trim()) renameCue(cue.id, editingName.trim()); setEditingId(null); }
++                                            if (e.key === 'Escape') setEditingId(null);
++                                        }}
++                                        className="text-sm font-medium bg-gray-900 border border-violet-500 rounded px-1.5 py-0.5 text-white focus:outline-none w-32"
++                                    />
++                                ) : (
++                                    <span
++                                        className="text-sm font-medium text-white hover:text-violet-300"
++                                        onDoubleClick={(e) => { e.stopPropagation(); setEditingId(cue.id); setEditingName(cue.name); }}
++                                        title="雙擊更改名稱"
++                                    >{cue.name}</span>
++                                )}
+                             </div>
+                             {activeCueId === cue.id && (
+                                 <span className="text-xs text-violet-400 font-bold">ACTIVE</span>
+diff --git a/src/components/canvas/StageObjectRenderer.tsx b/src/components/canvas/StageObjectRenderer.tsx
+index 067e913..76ed715 100644
+--- a/src/components/canvas/StageObjectRenderer.tsx
++++ b/src/components/canvas/StageObjectRenderer.tsx
+@@ -367,7 +367,10 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
+     // LED 排列:有 active 排列且此物件在排列中,依矩形讀大圖(覆蓋預設 repeat/offset)
+     const ledLayouts = useStore((state) => state.ledLayouts);
+     const activeLedLayoutId = useStore((state) => state.activeLedLayoutId);
+-    const activeLayout = activeLedLayoutId ? ledLayouts.find(l => l.id === activeLedLayoutId) : null;
++    const clientLayoutOverride = useStore((state) => state.clientLayoutOverride);
++    // 客戶端臨時覆蓋優先:undefined=跟隨後台存檔;null=強制預設(關閉);string=指定排列
++    const effectiveLayoutId = clientLayoutOverride !== undefined ? clientLayoutOverride : activeLedLayoutId;
++    const activeLayout = effectiveLayoutId ? ledLayouts.find(l => l.id === effectiveLayoutId) : null;
+     const layoutRect = activeLayout?.rects.find(r => r.objectId === object.id);
+     // 有 active 排列時:此 LED 不在排列中(沒被加進畫布)→ 黑屏;在排列中但 enabled=false 也黑屏(相容舊資料)
+     const layoutDisabled = !!activeLayout && (!layoutRect || layoutRect.enabled === false);
+diff --git a/src/components/client/ClientLayoutSwitcher.tsx b/src/components/client/ClientLayoutSwitcher.tsx
+new file mode 100644
+index 0000000..389d562
+--- /dev/null
++++ b/src/components/client/ClientLayoutSwitcher.tsx
+@@ -0,0 +1,68 @@
++'use client';
++
++import { useState } from 'react';
++import { useStore } from '@/store/useStore';
++
++/**
++ * 客戶端 LED 排列切換器(左上角,上傳 icon 右側)。
++ * 讓客戶端臨時切換不同排列預覽自己的視覺,不影響後台存檔。
++ * - 「跟隨後台」= 用後台存檔的排列設定(預設)
++ * - 「預設 UV」= 強制關閉排列,用模型原始 UV
++ * - 各排列 = 臨時套用該排列
++ */
++export function ClientLayoutSwitcher() {
++    const ledLayouts = useStore((s) => s.ledLayouts);
++    const activeLedLayoutId = useStore((s) => s.activeLedLayoutId);
++    const clientLayoutOverride = useStore((s) => s.clientLayoutOverride);
++    const setClientLayoutOverride = useStore((s) => s.setClientLayoutOverride);
++
++    const [expanded, setExpanded] = useState(false);
++
++    // 沒有任何排列時不顯示此切換器
++    if (ledLayouts.length === 0) return null;
++
++    // 當前生效的排列 id
++    const effectiveId = clientLayoutOverride !== undefined ? clientLayoutOverride : activeLedLayoutId;
++    const currentName =
++        clientLayoutOverride === undefined ? '跟隨後台'
++        : effectiveId === null ? '預設 UV'
++        : (ledLayouts.find(l => l.id === effectiveId)?.name ?? '排列');
++
++    return (
++        <div className="absolute top-4 left-[72px] z-40 pointer-events-auto">
++            <div className="flex items-center gap-2">
++                {/* Icon 按鈕 */}
++                <button
++                    onClick={() => setExpanded(!expanded)}
++                    title="切換 LED 排列(僅預覽,不影響存檔)"
++                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 backdrop-blur-md ${expanded ? 'bg-violet-600' : 'bg-black/60 hover:bg-violet-600'}`}
++                >
++                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h5v6H4V5zM14 4h5a1 1 0 011 1v4h-6V4zM4 12h6v7H5a1 1 0 01-1-1v-6zM14 11h6v7a1 1 0 01-1 1h-5v-8z" />
++                    </svg>
++                </button>
++
++                {/* 展開列 */}
++                {expanded && (
++                    <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md rounded-full px-2 py-1.5 animate-fade-in">
++                        <button
++                            onClick={() => setClientLayoutOverride(undefined)}
++                            className={`px-2.5 py-1 rounded-full text-[11px] whitespace-nowrap ${clientLayoutOverride === undefined ? 'bg-violet-600 text-white' : 'text-gray-300 hover:bg-white/10'}`}
++                        >跟隨後台</button>
++                        <button
++                            onClick={() => setClientLayoutOverride(null)}
++                            className={`px-2.5 py-1 rounded-full text-[11px] whitespace-nowrap ${clientLayoutOverride === null ? 'bg-violet-600 text-white' : 'text-gray-300 hover:bg-white/10'}`}
++                        >預設 UV</button>
++                        {ledLayouts.map((l) => (
++                            <button
++                                key={l.id}
++                                onClick={() => setClientLayoutOverride(l.id)}
++                                className={`px-2.5 py-1 rounded-full text-[11px] whitespace-nowrap ${clientLayoutOverride === l.id ? 'bg-violet-600 text-white' : 'text-gray-300 hover:bg-white/10'}`}
++                            >{l.name}</button>
++                        ))}
++                    </div>
++                )}
++            </div>
++        </div>
++    );
++}
+diff --git a/src/store/useStore.ts b/src/store/useStore.ts
+index a415f59..fcbec15 100644
+--- a/src/store/useStore.ts
++++ b/src/store/useStore.ts
+@@ -353,6 +353,7 @@ interface State {
+     // Cue Actions [NEW]
+     addCue: (name: string) => void;
+     updateCue: (id: string) => void;
++    renameCue: (id: string, name: string) => void;
+     removeCue: (id: string) => void;
+     applyCue: (id: string) => void;
+ 
+@@ -486,6 +487,8 @@ interface State {
+     // LED 排列系統
+     ledLayouts: LedLayout[];
+     activeLedLayoutId: string | null;
++    clientLayoutOverride: string | null | undefined; // 客戶端臨時覆蓋(runtime-only,不同步);undefined=未覆蓋跟隨後台,null=強制預設,string=指定排列
++    setClientLayoutOverride: (id: string | null | undefined) => void;
+     addLedLayout: (name: string, canvasWidth: number, canvasHeight: number) => void;
+     updateLedLayout: (id: string, patch: Partial<Omit<LedLayout, 'id'>>) => void;
+     removeLedLayout: (id: string) => void;
+@@ -540,6 +543,7 @@ export const useStore = create<State>()(
+             gdriveVideos: [],
+             ledLayouts: [],
+             activeLedLayoutId: null,
++            clientLayoutOverride: undefined,
+             objectBounds: {},
+             gdriveFolders: {},
+             materialSlots: [],
+@@ -697,6 +701,11 @@ export const useStore = create<State>()(
+                 };
+             }),
+ 
++            // 僅改名稱,不動狀態快照
++            renameCue: (id, name) => set((state) => ({
++                cues: state.cues.map(c => c.id === id ? { ...c, name } : c)
++            })),
++
+             removeCue: (id) => set((state) => ({
+                 cues: state.cues.filter(c => c.id !== id),
+                 activeCueId: state.activeCueId === id ? null : state.activeCueId
+@@ -1146,6 +1155,7 @@ export const useStore = create<State>()(
+                 activeLedLayoutId: state.activeLedLayoutId === id ? null : state.activeLedLayoutId,
+             })),
+             setActiveLedLayout: (id) => set({ activeLedLayoutId: id }),
++            setClientLayoutOverride: (id) => set({ clientLayoutOverride: id }),
+ 
+             setObjectBounds: (objectId, min, max) => set((state) => {
+                 const prev = state.objectBounds[objectId];

@@ -10,6 +10,7 @@ import { RigPanel } from '@/components/client/RigPanel';
 import { AssetLoadingOverlay } from '@/components/ui/AssetLoadingOverlay';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ClientToolbar } from '@/components/client/ClientToolbar';
+import { ClientLayoutSwitcher } from '@/components/client/ClientLayoutSwitcher';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
@@ -307,6 +308,9 @@ function SharePageContent() {
 
             {/* Client Toolbar - Side tools */}
             <ClientToolbar projectId={projectId} />
+
+            {/* LED 排列切換器(左上,上傳 icon 右側) */}
+            <ClientLayoutSwitcher />
 
             {/* Drawing Overlay */}
             <DrawingOverlay projectId={projectId} />
