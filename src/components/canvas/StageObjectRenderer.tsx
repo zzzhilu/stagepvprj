@@ -390,28 +390,28 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         }
 
         const cloned = rawTextureMap.clone();
-        
+
+        // 螢幕擷取裁切:先算「有效畫面」在原始貼圖 Y 軸的範圍(保留底部 cropRatio)。
+        // flipY=false → texture Y 原點在上;保留底部 = Y 從 (1-crop) 到 1。
+        // 排列/預設 UV 都在此有效範圍內運作(裁切是對來源畫面的前置預處理)。
+        const cropActive = cameraStreamActive && cameraStreamMode === 'screen' && effectiveCropRatio < 1;
+        const cropScale = cropActive ? effectiveCropRatio : 1;
+        const cropBase = cropActive ? (1 - effectiveCropRatio) : 0;
+
         if (activeLayout && layoutRect && layoutRect.enabled) {
-            // 排列優先(攝影機或內容皆適用):依像素矩形換算 UV,不做鏡像等額外處理
+            // 排列:依像素矩形換算 UV;Y 再映射進裁切後的有效範圍
             const uv = rectToUv(layoutRect, activeLayout.canvasWidth, activeLayout.canvasHeight);
-            cloned.repeat.set(uv.repeat[0], uv.repeat[1]);
-            cloned.offset.set(uv.offset[0], uv.offset[1]);
+            cloned.repeat.set(uv.repeat[0], uv.repeat[1] * cropScale);
+            cloned.offset.set(uv.offset[0], cropBase + uv.offset[1] * cropScale);
         } else {
-            // 無排列:吃預設 UV(攝影機與內容一致)
+            // 無排列:預設 UV,Y 套用裁切
             const w = activeTexture?.width ?? 1;
             const h = activeTexture?.height ?? 1;
             const x = activeTexture?.x ?? 0;
             const y = activeTexture?.y ?? 0;
 
-            cloned.repeat.set(w, h);
-            cloned.offset.set(x, y);
-
-            // 螢幕擷取裁切:保留底部 cropRatio 的高度(fit 寬、左下對齊、裁掉上段系統 bar)
-            // flipY=false 時 texture Y 原點在上,保留「底部」需 offset.y 下移 (1-crop)、repeat.y 縮為 crop
-            if (cameraStreamActive && cameraStreamMode === 'screen' && effectiveCropRatio < 1) {
-                cloned.repeat.set(w, h * effectiveCropRatio);
-                cloned.offset.set(x, y + (1 - effectiveCropRatio));
-            }
+            cloned.repeat.set(w, h * cropScale);
+            cloned.offset.set(x, cropBase + y * cropScale);
         }
         cloned.needsUpdate = true;
 
