@@ -10,6 +10,7 @@ import { BottomLeftPanel } from '@/components/client/BottomLeftPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ClientUploader } from '@/components/client/ClientUploader';
 import { ClientLayoutSwitcher } from '@/components/client/ClientLayoutSwitcher';
+import { ObjectHoverTooltip } from '@/components/admin/ObjectHoverTooltip';
 import { ClientToolbar } from '@/components/client/ClientToolbar';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ProjectService } from '@/lib/project-service';
@@ -345,6 +346,9 @@ function ProjectEditorContent() {
             {/* Client Uploader - Share mode only */}
             {isShareMode && <div data-ui-element><ClientUploader /></div>}
             {isShareMode && <div data-ui-element><ClientLayoutSwitcher /></div>}
+
+            {/* 後台:模型懸停名稱提示 */}
+            {!isShareMode && <ObjectHoverTooltip />}
 
             {/* 機關控制面板 */}
             <RigPanel />

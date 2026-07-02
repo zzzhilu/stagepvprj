@@ -16,7 +16,7 @@ import { LedLayoutEditor } from './LedLayoutEditor';
 import ContentInspector from './ContentInspector';
 import { RigEditor } from './RigEditor';
 import { RigIcon } from '@/components/ui/icons';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 
 interface AdminControlsProps {
@@ -153,6 +153,18 @@ export default function AdminControls({ projectName, mode = 'free-test', project
     const transformMode = useStore((state) => state.transformMode);
     const setTransformMode = useStore((state) => state.setTransformMode);
     const [expandedSections, setExpandedSections] = useState<string[]>(isVideoProgress ? ['videos'] : ['models']);
+    const selectedObjectId = useStore((state) => state.selectedObjectId);
+    const inspectorRef = useRef<HTMLDivElement>(null);
+
+    // 場景中點擊模型選中時:自動展開 inspector 區塊並捲動到它,方便直接改數值
+    useEffect(() => {
+        if (!selectedObjectId) return;
+        setExpandedSections(prev => prev.includes('inspector') ? prev : [...prev, 'inspector']);
+        // 等展開後捲動
+        requestAnimationFrame(() => {
+            inspectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+    }, [selectedObjectId]);
     const [shareToast, setShareToast] = useState(false);
     const setLoading = useStore((state) => state.setLoading);
 
@@ -420,7 +432,7 @@ export default function AdminControls({ projectName, mode = 'free-test', project
 
                 {/* Object Inspector Section */}
                 {!isVideoProgress && (
-                    <div>
+                    <div ref={inspectorRef}>
                         <button
                             onClick={() => toggleSection('inspector')}
                             className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"

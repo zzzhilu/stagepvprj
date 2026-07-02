@@ -1,0 +1,190 @@
+diff --git a/src/app/free-test/[id]/page.tsx b/src/app/free-test/[id]/page.tsx
+index 9963a4e..9f90295 100644
+--- a/src/app/free-test/[id]/page.tsx
++++ b/src/app/free-test/[id]/page.tsx
+@@ -10,6 +10,7 @@ import { BottomLeftPanel } from '@/components/client/BottomLeftPanel';
+ import { ErrorBoundary } from '@/components/ErrorBoundary';
+ import { ClientUploader } from '@/components/client/ClientUploader';
+ import { ClientLayoutSwitcher } from '@/components/client/ClientLayoutSwitcher';
++import { ObjectHoverTooltip } from '@/components/admin/ObjectHoverTooltip';
+ import { ClientToolbar } from '@/components/client/ClientToolbar';
+ import { DrawingOverlay } from '@/components/client/DrawingOverlay';
+ import { ProjectService } from '@/lib/project-service';
+@@ -346,6 +347,9 @@ function ProjectEditorContent() {
+             {isShareMode && <div data-ui-element><ClientUploader /></div>}
+             {isShareMode && <div data-ui-element><ClientLayoutSwitcher /></div>}
+ 
++            {/* 後台:模型懸停名稱提示 */}
++            {!isShareMode && <ObjectHoverTooltip />}
++
+             {/* 機關控制面板 */}
+             <RigPanel />
+ 
+diff --git a/src/components/admin/AdminControls.tsx b/src/components/admin/AdminControls.tsx
+index a9daf3b..6bc3f86 100644
+--- a/src/components/admin/AdminControls.tsx
++++ b/src/components/admin/AdminControls.tsx
+@@ -16,7 +16,7 @@ import { LedLayoutEditor } from './LedLayoutEditor';
+ import ContentInspector from './ContentInspector';
+ import { RigEditor } from './RigEditor';
+ import { RigIcon } from '@/components/ui/icons';
+-import { useState, useRef } from 'react';
++import { useState, useRef, useEffect } from 'react';
+ import { useParams } from 'next/navigation';
+ 
+ interface AdminControlsProps {
+@@ -153,6 +153,18 @@ export default function AdminControls({ projectName, mode = 'free-test', project
+     const transformMode = useStore((state) => state.transformMode);
+     const setTransformMode = useStore((state) => state.setTransformMode);
+     const [expandedSections, setExpandedSections] = useState<string[]>(isVideoProgress ? ['videos'] : ['models']);
++    const selectedObjectId = useStore((state) => state.selectedObjectId);
++    const inspectorRef = useRef<HTMLDivElement>(null);
++
++    // 場景中點擊模型選中時:自動展開 inspector 區塊並捲動到它,方便直接改數值
++    useEffect(() => {
++        if (!selectedObjectId) return;
++        setExpandedSections(prev => prev.includes('inspector') ? prev : [...prev, 'inspector']);
++        // 等展開後捲動
++        requestAnimationFrame(() => {
++            inspectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
++        });
++    }, [selectedObjectId]);
+     const [shareToast, setShareToast] = useState(false);
+     const setLoading = useStore((state) => state.setLoading);
+ 
+@@ -420,7 +432,7 @@ export default function AdminControls({ projectName, mode = 'free-test', project
+ 
+                 {/* Object Inspector Section */}
+                 {!isVideoProgress && (
+-                    <div>
++                    <div ref={inspectorRef}>
+                         <button
+                             onClick={() => toggleSection('inspector')}
+                             className="w-full flex items-center justify-between p-2 bg-gray-800 hover:bg-gray-750 rounded mb-2"
+diff --git a/src/components/admin/ObjectHoverTooltip.tsx b/src/components/admin/ObjectHoverTooltip.tsx
+new file mode 100644
+index 0000000..bbbabc5
+--- /dev/null
++++ b/src/components/admin/ObjectHoverTooltip.tsx
+@@ -0,0 +1,33 @@
++'use client';
++
++import { useEffect, useState } from 'react';
++import { useStore } from '@/store/useStore';
++
++/**
++ * 後台模型懸停名稱提示:滑鼠移到模型上時,名稱標籤跟隨滑鼠顯示。
++ * 只掛在後台(自由測試編輯模式),客戶端不顯示。
++ */
++export function ObjectHoverTooltip() {
++    const hoveredObjectName = useStore((s) => s.hoveredObjectName);
++    const [pos, setPos] = useState({ x: 0, y: 0 });
++
++    useEffect(() => {
++        if (!hoveredObjectName) return;
++        const onMove = (e: MouseEvent) => setPos({ x: e.clientX, y: e.clientY });
++        window.addEventListener('mousemove', onMove);
++        return () => window.removeEventListener('mousemove', onMove);
++    }, [hoveredObjectName]);
++
++    if (!hoveredObjectName) return null;
++
++    return (
++        <div
++            className="fixed z-[200] pointer-events-none select-none"
++            style={{ left: pos.x + 14, top: pos.y + 12 }}
++        >
++            <div className="bg-black/80 backdrop-blur-sm text-white text-xs px-2 py-1 rounded border border-white/15 shadow-lg whitespace-nowrap">
++                {hoveredObjectName}
++            </div>
++        </div>
++    );
++}
+diff --git a/src/components/canvas/SceneGraph.tsx b/src/components/canvas/SceneGraph.tsx
+index 4d4d93a..479e7a1 100644
+--- a/src/components/canvas/SceneGraph.tsx
++++ b/src/components/canvas/SceneGraph.tsx
+@@ -207,7 +207,8 @@ function NullGroup({
+                             object={obj}
+                             envMap={realtimeEnvMap}
+                             onClick={(e: ThreeEvent<MouseEvent>) => {
+-                                if (mode === 'admin' && gizmoEnabled) {
++                                // 後台隨時可點擊選中(不再要求開啟變換工具),方便快速定位模型改數值
++                                if (mode === 'admin') {
+                                     e.stopPropagation();
+                                     setSelectedObject(obj.id);
+                                 }
+@@ -242,7 +243,7 @@ function NullGroup({
+                                     object={obj}
+                                     envMap={realtimeEnvMap}
+                                     onClick={(e: ThreeEvent<MouseEvent>) => {
+-                                        if (mode === 'admin' && gizmoEnabled) {
++                                        if (mode === 'admin') {
+                                             e.stopPropagation();
+                                             setSelectedObject(obj.id);
+                                         }
+diff --git a/src/components/canvas/StageObjectRenderer.tsx b/src/components/canvas/StageObjectRenderer.tsx
+index 124a0e5..09fbe4c 100644
+--- a/src/components/canvas/StageObjectRenderer.tsx
++++ b/src/components/canvas/StageObjectRenderer.tsx
+@@ -7,6 +7,7 @@ import { globalVideoElement } from './VideoManager';
+ import { useFrame } from '@react-three/fiber';
+ import { parseGIF, decompressFrames } from 'gifuct-js';
+ import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
++import { getObjectDisplayName } from '@/lib/object-utils';
+ 
+ // Calculate lerp speed based on distance (0.5s - 1.5s)
+ function calculateLerpSpeed(distance: number): number {
+@@ -69,6 +70,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
+     const stageObjects = useStore((state) => state.stageObjects);
+     const floorPlanTextureUrl = useStore((state) => state.floorPlanTextureUrl);
+     const cameraStreamActive = useStore((state) => state.cameraStreamActive);
++    const setHoveredObjectName = useStore((state) => state.setHoveredObjectName);
+     const cameraStreamMode = useStore((state) => state.cameraStreamMode);
+     const screenCropRatio = useStore((state) => state.screenCropRatio);
+     const screenCropOverride = useStore((state) => state.screenCropOverride);
+@@ -753,7 +755,14 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
+     }
+ 
+     return (
+-        <group ref={groupRef} scale={worldTransform.scale} onClick={onClick} visible={rigVisibility(rigs, rigValues, 'object', object.id, 0) !== false}>
++        <group
++            ref={groupRef}
++            scale={worldTransform.scale}
++            onClick={onClick}
++            onPointerOver={(e) => { e.stopPropagation(); setHoveredObjectName(getObjectDisplayName(object) || object.id); }}
++            onPointerOut={() => setHoveredObjectName(null)}
++            visible={rigVisibility(rigs, rigValues, 'object', object.id, 0) !== false}
++        >
+             {meshNodes.map((node, i) => {
+                 const geometry = clonedGeometries[i];
+                 if (!geometry) return null;
+diff --git a/src/store/useStore.ts b/src/store/useStore.ts
+index 214fddb..8f12a99 100644
+--- a/src/store/useStore.ts
++++ b/src/store/useStore.ts
+@@ -301,6 +301,8 @@ interface State {
+     selectedNullId: string | null;   // Selected rig Null node for TransformControls
+     transformMode: 'translate' | 'rotate' | 'scale';
+     gizmoEnabled: boolean; // [NEW] Toggle for transform controls
++    hoveredObjectName: string | null; // 滑鼠懸停的模型名稱(runtime-only,後台 tooltip 用)
++    setHoveredObjectName: (name: string | null) => void;
+ 
+     // Drawing & Screenshot State [NEW]
+     drawingMode: boolean;
+@@ -574,6 +576,7 @@ export const useStore = create<State>()(
+             firstFrameRendered: false,
+             transformMode: 'translate',
+             gizmoEnabled: false, // [NEW] Default off
++            hoveredObjectName: null,
+ 
+             // Drawing & Screenshot defaults
+             drawingMode: false,
+@@ -778,6 +781,7 @@ export const useStore = create<State>()(
+             setSelectedLight: (id) => set({ selectedLightId: id, selectedObjectId: null, selectedNullId: null }),
+             setSelectedNull: (id) => set({ selectedNullId: id, selectedObjectId: null, selectedLightId: null }),
+             setTransformMode: (mode) => set({ transformMode: mode }),
++            setHoveredObjectName: (name) => set({ hoveredObjectName: name }),
+             setGizmoEnabled: (enabled) => set({
+                 gizmoEnabled: enabled,
+                 selectedObjectId: enabled ? null : null,

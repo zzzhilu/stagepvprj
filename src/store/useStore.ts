@@ -301,6 +301,8 @@ interface State {
     selectedNullId: string | null;   // Selected rig Null node for TransformControls
     transformMode: 'translate' | 'rotate' | 'scale';
     gizmoEnabled: boolean; // [NEW] Toggle for transform controls
+    hoveredObjectName: string | null; // 滑鼠懸停的模型名稱(runtime-only,後台 tooltip 用)
+    setHoveredObjectName: (name: string | null) => void;
 
     // Drawing & Screenshot State [NEW]
     drawingMode: boolean;
@@ -574,6 +576,7 @@ export const useStore = create<State>()(
             firstFrameRendered: false,
             transformMode: 'translate',
             gizmoEnabled: false, // [NEW] Default off
+            hoveredObjectName: null,
 
             // Drawing & Screenshot defaults
             drawingMode: false,
@@ -778,6 +781,7 @@ export const useStore = create<State>()(
             setSelectedLight: (id) => set({ selectedLightId: id, selectedObjectId: null, selectedNullId: null }),
             setSelectedNull: (id) => set({ selectedNullId: id, selectedObjectId: null, selectedLightId: null }),
             setTransformMode: (mode) => set({ transformMode: mode }),
+            setHoveredObjectName: (name) => set({ hoveredObjectName: name }),
             setGizmoEnabled: (enabled) => set({
                 gizmoEnabled: enabled,
                 selectedObjectId: enabled ? null : null,

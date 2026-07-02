@@ -7,6 +7,7 @@ import { globalVideoElement } from './VideoManager';
 import { useFrame } from '@react-three/fiber';
 import { parseGIF, decompressFrames } from 'gifuct-js';
 import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
+import { getObjectDisplayName } from '@/lib/object-utils';
 
 // Calculate lerp speed based on distance (0.5s - 1.5s)
 function calculateLerpSpeed(distance: number): number {
@@ -69,6 +70,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     const stageObjects = useStore((state) => state.stageObjects);
     const floorPlanTextureUrl = useStore((state) => state.floorPlanTextureUrl);
     const cameraStreamActive = useStore((state) => state.cameraStreamActive);
+    const setHoveredObjectName = useStore((state) => state.setHoveredObjectName);
     const cameraStreamMode = useStore((state) => state.cameraStreamMode);
     const screenCropRatio = useStore((state) => state.screenCropRatio);
     const screenCropOverride = useStore((state) => state.screenCropOverride);
@@ -753,7 +755,14 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     }
 
     return (
-        <group ref={groupRef} scale={worldTransform.scale} onClick={onClick} visible={rigVisibility(rigs, rigValues, 'object', object.id, 0) !== false}>
+        <group
+            ref={groupRef}
+            scale={worldTransform.scale}
+            onClick={onClick}
+            onPointerOver={(e) => { e.stopPropagation(); setHoveredObjectName(getObjectDisplayName(object) || object.id); }}
+            onPointerOut={() => setHoveredObjectName(null)}
+            visible={rigVisibility(rigs, rigValues, 'object', object.id, 0) !== false}
+        >
             {meshNodes.map((node, i) => {
                 const geometry = clonedGeometries[i];
                 if (!geometry) return null;

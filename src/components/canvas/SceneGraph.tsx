@@ -207,7 +207,8 @@ function NullGroup({
                             object={obj}
                             envMap={realtimeEnvMap}
                             onClick={(e: ThreeEvent<MouseEvent>) => {
-                                if (mode === 'admin' && gizmoEnabled) {
+                                // 後台隨時可點擊選中(不再要求開啟變換工具),方便快速定位模型改數值
+                                if (mode === 'admin') {
                                     e.stopPropagation();
                                     setSelectedObject(obj.id);
                                 }
@@ -242,7 +243,7 @@ function NullGroup({
                                     object={obj}
                                     envMap={realtimeEnvMap}
                                     onClick={(e: ThreeEvent<MouseEvent>) => {
-                                        if (mode === 'admin' && gizmoEnabled) {
+                                        if (mode === 'admin') {
                                             e.stopPropagation();
                                             setSelectedObject(obj.id);
                                         }
