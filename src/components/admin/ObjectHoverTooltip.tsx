@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useStore } from '@/store/useStore';
 
 /**
@@ -9,11 +9,14 @@ import { useStore } from '@/store/useStore';
  */
 export function ObjectHoverTooltip() {
     const hoveredObjectName = useStore((s) => s.hoveredObjectName);
-    const [pos, setPos] = useState({ x: 0, y: 0 });
+    const ref = useRef<HTMLDivElement>(null);
 
+    // [效能] mousemove 直接改 DOM transform,不走 setState(免每次移動 re-render)
     useEffect(() => {
         if (!hoveredObjectName) return;
-        const onMove = (e: MouseEvent) => setPos({ x: e.clientX, y: e.clientY });
+        const onMove = (e: MouseEvent) => {
+            if (ref.current) ref.current.style.transform = `translate(${e.clientX + 14}px, ${e.clientY + 12}px)`;
+        };
         window.addEventListener('mousemove', onMove);
         return () => window.removeEventListener('mousemove', onMove);
     }, [hoveredObjectName]);
@@ -22,8 +25,8 @@ export function ObjectHoverTooltip() {
 
     return (
         <div
-            className="fixed z-[200] pointer-events-none select-none"
-            style={{ left: pos.x + 14, top: pos.y + 12 }}
+            ref={ref}
+            className="fixed left-0 top-0 z-[200] pointer-events-none select-none"
         >
             <div className="bg-black/80 backdrop-blur-sm text-white text-xs px-2 py-1 rounded border border-white/15 shadow-lg whitespace-nowrap">
                 {hoveredObjectName}

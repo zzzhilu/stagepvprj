@@ -1,6 +1,6 @@
 'use client';
 
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useThree } from '@react-three/fiber';
 import { Preload } from '@react-three/drei';
 import { SceneGraph } from './SceneGraph';
 import { Suspense, useEffect, useRef, useState } from 'react';
@@ -18,6 +18,22 @@ function LoadingFallback() {
 }
 
 // Component to capture canvas reference
+// [效能重構配套] 3D 端不再訂閱 rigValues(改 useFrame getState 讀取以避免全場 re-render),
+// 此元件專責:rigValues 變化時 invalidate,確保 demand frameloop 下拖機關滑桿畫面即時更新。
+function RigInvalidator() {
+    const invalidate = useThree((state) => state.invalidate);
+    useEffect(() => {
+        let prev = useStore.getState().rigValues;
+        return useStore.subscribe((state) => {
+            if (state.rigValues !== prev) {
+                prev = state.rigValues;
+                invalidate();
+            }
+        });
+    }, [invalidate]);
+    return null;
+}
+
 function CanvasRefCapture() {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -99,6 +115,7 @@ export default function Scene() {
 
             <Suspense fallback={<LoadingFallback />}>
                 <SceneGraph />
+                <RigInvalidator />
             </Suspense>
 
             <Preload all />

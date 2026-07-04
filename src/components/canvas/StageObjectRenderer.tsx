@@ -77,7 +77,17 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     // 客戶端臨時覆蓋優先,否則用後台預設
     const effectiveCropRatio = screenCropOverride !== null ? screenCropOverride : screenCropRatio;
     const rigs = useStore((state) => state.rigs);
-    const rigValues = useStore((state) => state.rigValues);
+    // [效能重構] 不再全量訂閱 rigValues(拖任一機關滑桿會讓所有物件 re-render)。
+    // - transform 機關:useFrame 內以 getState() 讀最新值(transient update,零 re-render)
+    // - visibility 機關:訂閱「僅此物件相關值」的指紋字串,無關滑桿不觸發 re-render
+    const visFingerprint = useStore((state) => {
+        let fp = '';
+        for (const r of state.rigs) {
+            if (r.type !== 'visibility' || r.targetType !== 'object' || r.targetId !== object.id) continue;
+            fp += r.id + ':' + (state.rigValues[r.id] ?? r.defaultValue) + ';';
+        }
+        return fp;
+    });
     const [videoTexture, setVideoTexture] = useState<THREE.VideoTexture | null>(null);
 
     // Animation refs for smooth lerping
@@ -382,7 +392,10 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     // 有 active 排列時:此 LED 不在排列中(沒被加進畫布)→ 黑屏;在排列中但 enabled=false 也黑屏(相容舊資料)
     const layoutDisabled = !!activeLayout && (!layoutRect || layoutRect.enabled === false);
 
-    // Clone texture map to apply per-object property offsets/repeats and filter by targetNodeId
+    // [效能重構] clone 只在「來源/顯示與否」變化時發生一次,並 dispose 舊 clone。
+    // UV 參數(排列/裁切/預設 repeat/offset)改由下方 effect 直接 mutate——
+    // repeat/offset 是 uniform,不需要 clone 也不需要 needsUpdate(needsUpdate 會強制整張圖重新上傳 GPU)。
+    // 舊寫法把裁切比例/排列放進 clone 依賴,拖一格滑桿 = 每個 LED 重新 clone + GPU 重傳,是效能風暴。
     const textureMap = useMemo(() => {
         if (!rawTextureMap) return null;
         if (layoutDisabled) return null; // 排列中不啟用 → 不貼內容(黑屏)
@@ -390,12 +403,21 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         if (!cameraStreamActive && activeTexture?.targetNodeId && activeTexture.targetNodeId !== object.id) {
             return null;
         }
-
         const cloned = rawTextureMap.clone();
+        cloned.needsUpdate = true; // 換源時上傳一次即可
+        return cloned;
+    }, [rawTextureMap, cameraStreamActive, activeTexture?.targetNodeId, object.id, layoutDisabled]);
 
-        // 螢幕擷取裁切:先算「有效畫面」在原始貼圖 Y 軸的範圍(保留底部 cropRatio)。
-        // flipY=false → texture Y 原點在上;保留底部 = Y 從 (1-crop) 到 1。
-        // 排列/預設 UV 都在此有效範圍內運作(裁切是對來源畫面的前置預處理)。
+    // dispose 舊 clone,避免 texture 物件累積
+    useEffect(() => {
+        const t = textureMap;
+        return () => { t?.dispose(); };
+    }, [textureMap]);
+
+    // UV 參數套用:直接 mutate repeat/offset(即時生效,零 GPU 重傳)
+    useEffect(() => {
+        if (!textureMap) return;
+        // 螢幕擷取裁切:保留底部 cropRatio(flipY=false → 保留底部 = Y 從 (1-crop) 到 1)
         const cropActive = cameraStreamActive && cameraStreamMode === 'screen' && effectiveCropRatio < 1;
         const cropScale = cropActive ? effectiveCropRatio : 1;
         const cropBase = cropActive ? (1 - effectiveCropRatio) : 0;
@@ -403,22 +425,17 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         if (activeLayout && layoutRect && layoutRect.enabled) {
             // 排列:依像素矩形換算 UV;Y 再映射進裁切後的有效範圍
             const uv = rectToUv(layoutRect, activeLayout.canvasWidth, activeLayout.canvasHeight);
-            cloned.repeat.set(uv.repeat[0], uv.repeat[1] * cropScale);
-            cloned.offset.set(uv.offset[0], cropBase + uv.offset[1] * cropScale);
+            textureMap.repeat.set(uv.repeat[0], uv.repeat[1] * cropScale);
+            textureMap.offset.set(uv.offset[0], cropBase + uv.offset[1] * cropScale);
         } else {
-            // 無排列:預設 UV,Y 套用裁切
             const w = activeTexture?.width ?? 1;
             const h = activeTexture?.height ?? 1;
             const x = activeTexture?.x ?? 0;
             const y = activeTexture?.y ?? 0;
-
-            cloned.repeat.set(w, h * cropScale);
-            cloned.offset.set(x, cropBase + y * cropScale);
+            textureMap.repeat.set(w, h * cropScale);
+            textureMap.offset.set(x, cropBase + y * cropScale);
         }
-        cloned.needsUpdate = true;
-
-        return cloned;
-    }, [rawTextureMap, activeTexture, object.id, cameraStreamActive, cameraStreamMode, effectiveCropRatio, activeLayout, layoutRect, layoutDisabled]);
+    }, [textureMap, activeTexture, cameraStreamActive, cameraStreamMode, effectiveCropRatio, activeLayout, layoutRect]);
 
     // Floor plan texture
     const floorPlanTexture = useMemo(() => {
@@ -639,6 +656,13 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         [object, stageObjects]
     );
 
+    // visibility 機關結果(依指紋更新,僅相關滑桿變化才重算)
+    const objVisible = useMemo(() => {
+        const st = useStore.getState();
+        return rigVisibility(st.rigs, st.rigValues, 'object', object.id, 0) !== false;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [visFingerprint, object.id]);
+
     // 計算物件世界空間包圍盒,寫入 store 供 Null「對齊到特徵點」使用。
     const setObjectBounds = useStore((state) => state.setObjectBounds);
     useEffect(() => {
@@ -679,8 +703,9 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         const basePos = new THREE.Vector3(...worldTransform.pos);
         const baseRot = new THREE.Euler(...worldTransform.rot);
 
-        // 物件級機關:基底 transform + 偏移量
-        const rigOffset = rigDelta(rigs, rigValues, 'object', object.id, 0);
+        // 物件級機關:基底 transform + 偏移量(getState 讀最新值,不經 React)
+        const rigState = useStore.getState();
+        const rigOffset = rigDelta(rigState.rigs, rigState.rigValues, 'object', object.id, 0);
         const targetPos = new THREE.Vector3(
             basePos.x + rigOffset.pos[0],
             basePos.y + rigOffset.pos[1],
@@ -761,7 +786,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
             onClick={onClick}
             onPointerOver={(e) => { e.stopPropagation(); setHoveredObjectName(getObjectDisplayName(object) || object.id); }}
             onPointerOut={() => setHoveredObjectName(null)}
-            visible={rigVisibility(rigs, rigValues, 'object', object.id, 0) !== false}
+            visible={objVisible}
         >
             {meshNodes.map((node, i) => {
                 const geometry = clonedGeometries[i];

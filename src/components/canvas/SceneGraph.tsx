@@ -13,7 +13,7 @@ import { WalkModeController } from './WalkModeController';
 import { MeasurementScene } from '@/components/client/MeasurementOverlay';
 import { EffectComposer, Bloom, SMAA, ToneMapping, N8AO } from '@react-three/postprocessing';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
-import { useRef, useEffect, useCallback, createRef, useState } from 'react';
+import { useRef, useEffect, useCallback, createRef, useState, useMemo } from 'react';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
@@ -130,15 +130,29 @@ function NullGroup({
     const nulls = useStore((state) => state.nulls);
     const stageObjects = useStore((state) => state.stageObjects);
     const rigs = useStore((state) => state.rigs);
-    const rigValues = useStore((state) => state.rigValues);
+    // [效能重構] 不全量訂閱 rigValues——只訂「作用於此 Null 的機關值」指紋,
+    // 拖無關滑桿不會讓整棵 Null 樹 re-render。
+    const rigFingerprint = useStore((state) => {
+        let fp = '';
+        for (const r of state.rigs) {
+            if (r.targetType !== 'null' || r.targetId !== node.id) continue;
+            fp += r.id + ':' + (state.rigValues[r.id] ?? r.defaultValue) + ';';
+        }
+        return fp;
+    });
+    // delta/可見性依指紋重算(getState 取值,無關變化不觸發)
+    const { delta, nullVisible } = useMemo(() => {
+        const st = useStore.getState();
+        return {
+            delta: rigDelta(st.rigs, st.rigValues, 'null', node.id),
+            nullVisible: rigVisibility(st.rigs, st.rigValues, 'null', node.id),
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rigFingerprint, node.id]);
     const mode = useStore((state) => state.mode);
     const selectedNullId = useStore((state) => state.selectedNullId);
     const setSelectedNull = useStore((state) => state.setSelectedNull);
 
-    const delta = rigDelta(rigs, rigValues, 'null', node.id);
-
-    // 可見性機關:控制整個 Null group(含子物件)的顯示/隱藏
-    const nullVisible = rigVisibility(rigs, rigValues, 'null', node.id);
 
     const childNulls = nulls.filter(n => n.parentId === node.id);
     const allChildObjects = stageObjects.filter(o => o.parentId === node.id);
