@@ -241,10 +241,22 @@ export interface CameraView {
     camera: {
         position: [number, number, number];
         target: [number, number, number];
-        fov: number;
+        fov: number;              // 垂直 FOV(度);由 focalLength 換算而來(向下相容舊視角)
+        focalLength?: number;     // 焦距 mm(35mm full-frame 等效);導播機位的通用語言
     };
     thumbnail_url?: string;
     order: number;
+}
+
+// ===== 真實攝影機參數:焦距 ↔ FOV 換算(35mm full-frame 等效,感光元件 36×24mm)=====
+// 垂直 FOV = 2·atan(12 / f);f=24mm→53°、f=35mm→37.8°、f=50mm→27°、f=85mm→16°
+export function focalToFov(focalMm: number): number {
+    if (!Number.isFinite(focalMm) || focalMm <= 0) return 50;
+    return 2 * Math.atan(12 / focalMm) * (180 / Math.PI);
+}
+export function fovToFocal(fovDeg: number): number {
+    if (!Number.isFinite(fovDeg) || fovDeg <= 0 || fovDeg >= 180) return 35;
+    return 12 / Math.tan((fovDeg * Math.PI / 180) / 2);
 }
 
 export interface MaterialSlot {
@@ -476,6 +488,11 @@ interface State {
     // Batch setters for loading project data
     setStageObjects: (objects: StageObject[]) => void;
     setViews: (views: CameraView[]) => void;
+    renameView: (id: string, name: string) => void;
+    reorderViews: (fromIndex: number, toIndex: number) => void;
+    setViewFocal: (id: string, focalMm: number) => void;
+    showCameraModels: boolean; // 3D 場景顯示機位模型(runtime-only)
+    setShowCameraModels: (show: boolean) => void;
     setContentTextures: (textures: ContentTexture[]) => void;
     setCues: (cues: StageCue[]) => void; // [NEW]
 
@@ -544,6 +561,7 @@ export const useStore = create<State>()(
             isMobile: false,
             stageObjects: [],
             views: [],
+            showCameraModels: false,
             cues: [],
             activeCueId: null,
             r2Videos: [],
@@ -1050,7 +1068,8 @@ export const useStore = create<State>()(
                 const newView: CameraView = {
                     id: `view_${Date.now()}`,
                     name: `View ${state.views.length + 1}`,
-                    camera: data,
+                    // 撷取時順手記下等效焦距(35mm 等效),導播機位參考用
+                    camera: { ...data, focalLength: fovToFocal(data.fov) },
                     order: state.views.length + 1
                 };
                 return { views: [...state.views, newView], capturePending: false };
@@ -1120,6 +1139,26 @@ export const useStore = create<State>()(
             // Batch setters for loading project data
             setStageObjects: (objects) => set({ stageObjects: objects }),
             setViews: (views) => set({ views }),
+
+            renameView: (id, name) => set((state) => ({
+                views: state.views.map(v => v.id === id ? { ...v, name } : v)
+            })),
+            reorderViews: (fromIndex, toIndex) => set((state) => {
+                if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return {};
+                if (fromIndex >= state.views.length || toIndex >= state.views.length) return {};
+                const views = [...state.views];
+                const [moved] = views.splice(fromIndex, 1);
+                views.splice(toIndex, 0, moved);
+                // order 重新編號,保持與陣列一致
+                return { views: views.map((v, i) => ({ ...v, order: i + 1 })) };
+            }),
+            // 設定焦距並同步換算 fov(fov 為 three.js 實際使用值)
+            setViewFocal: (id, focalMm) => set((state) => ({
+                views: state.views.map(v => v.id === id
+                    ? { ...v, camera: { ...v.camera, focalLength: focalMm, fov: focalToFov(focalMm) } }
+                    : v)
+            })),
+            setShowCameraModels: (show) => set({ showCameraModels: show }),
             setContentTextures: (textures) => set({ contentTextures: textures }),
             setCues: (cues) => set({ cues }), // [NEW]
 

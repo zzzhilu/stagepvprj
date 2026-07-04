@@ -1,6 +1,6 @@
 'use client';
 
-import { useStore } from '@/store/useStore';
+import { useStore, fovToFocal } from '@/store/useStore';
 import { ModelUploader } from './ModelUploader';
 import { TextureUploader } from './TextureUploader';
 import { LightingControls } from './LightingControls';
@@ -29,6 +29,15 @@ interface AdminControlsProps {
 function ViewManager() {
     const triggerCapture = useStore((state) => state.triggerCapture);
     const views = useStore((state) => state.views);
+    const renameView = useStore((state) => state.renameView);
+    const reorderViews = useStore((state) => state.reorderViews);
+    const setViewFocal = useStore((state) => state.setViewFocal);
+    const showCameraModels = useStore((state) => state.showCameraModels);
+    const setShowCameraModels = useStore((state) => state.setShowCameraModels);
+    const [editingViewId, setEditingViewId] = useState<string | null>(null);
+    const [editingViewName, setEditingViewName] = useState('');
+    const [dragViewIndex, setDragViewIndex] = useState<number | null>(null);
+    const [overViewIndex, setOverViewIndex] = useState<number | null>(null);
     const removeView = useStore((state) => state.removeView);
     const setActiveView = useStore((state) => state.setActiveView);
     const activeViewId = useStore((state) => state.activeViewId);
@@ -67,7 +76,7 @@ function ViewManager() {
             <div className="bg-gray-800 p-3 rounded mb-4">
                 <label className="text-xs text-gray-400 block mb-1 flex justify-between">
                     <span>Field of View (FOV)</span>
-                    <span className="text-white">{Math.round(fov)}°</span>
+                    <span className="text-white">{Math.round(fov)}° ≈ {Math.round(fovToFocal(fov))}mm</span>
                 </label>
                 <input
                     type="range"
@@ -77,14 +86,30 @@ function ViewManager() {
                     onChange={(e) => setFov(Number(e.target.value))}
                     className="w-full accent-violet-500 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
                 />
+                {/* 3D 機位模型顯示開關(導播參考) */}
+                <button
+                    onClick={() => setShowCameraModels(!showCameraModels)}
+                    className={`mt-2 w-full py-1 rounded text-xs ${showCameraModels ? 'bg-violet-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}
+                >
+                    {showCameraModels ? '📷 機位模型顯示中' : '📷 顯示 3D 機位模型'}
+                </button>
             </div>
 
             <div className="space-y-2">
                 {views.map((view, index) => (
                     <div
                         key={view.id}
-                        className={`bg-gray-800 p-3 rounded flex justify-between items-center group transition-all ${activeViewId === view.id ? 'ring-2 ring-violet-500' : ''
-                            } ${deletingId === view.id ? 'bg-red-900' : ''}`}
+                        draggable
+                        onDragStart={() => setDragViewIndex(index)}
+                        onDragOver={(e) => { e.preventDefault(); setOverViewIndex(index); }}
+                        onDragEnd={() => {
+                            if (dragViewIndex !== null && overViewIndex !== null && dragViewIndex !== overViewIndex) {
+                                reorderViews(dragViewIndex, overViewIndex);
+                            }
+                            setDragViewIndex(null); setOverViewIndex(null);
+                        }}
+                        className={`bg-gray-800 p-3 rounded flex justify-between items-center group transition-all cursor-grab active:cursor-grabbing ${activeViewId === view.id ? 'ring-2 ring-violet-500' : ''
+                            } ${deletingId === view.id ? 'bg-red-900' : ''} ${overViewIndex === index && dragViewIndex !== null && dragViewIndex !== index ? 'ring-1 ring-violet-400' : ''}`}
                     >
                         <div
                             className="flex items-center gap-3 flex-1 cursor-pointer"
@@ -104,9 +129,39 @@ function ViewManager() {
                                     </div>
                                 )}
                             </div>
-                            <div>
-                                <p className="text-sm text-white">{view.name}</p>
-                                <p className="text-xs text-gray-500">視角 #{view.order}</p>
+                            <div className="min-w-0">
+                                {editingViewId === view.id ? (
+                                    <input
+                                        autoFocus
+                                        value={editingViewName}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) => setEditingViewName(e.target.value)}
+                                        onBlur={() => { if (editingViewName.trim()) renameView(view.id, editingViewName.trim()); setEditingViewId(null); }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') { if (editingViewName.trim()) renameView(view.id, editingViewName.trim()); setEditingViewId(null); }
+                                            if (e.key === 'Escape') setEditingViewId(null);
+                                        }}
+                                        className="text-sm bg-gray-900 border border-violet-500 rounded px-1.5 py-0.5 text-white focus:outline-none w-28"
+                                    />
+                                ) : (
+                                    <p
+                                        className="text-sm text-white hover:text-violet-300"
+                                        onDoubleClick={(e) => { e.stopPropagation(); setEditingViewId(view.id); setEditingViewName(view.name); }}
+                                        title="雙擊更改名稱"
+                                    >{view.name}</p>
+                                )}
+                                <div className="flex items-center gap-1 text-xs text-gray-500">
+                                    <span>#{view.order} ·</span>
+                                    <input
+                                        type="number" min={8} max={800}
+                                        value={view.camera.focalLength ? Math.round(view.camera.focalLength) : Math.round(fovToFocal(view.camera.fov))}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) => { const f = parseFloat(e.target.value); if (f > 0) setViewFocal(view.id, f); }}
+                                        className="w-12 bg-gray-900 border border-gray-700 rounded px-1 py-0 text-[11px] text-gray-300 text-center focus:border-violet-500 focus:outline-none"
+                                        title="焦距 mm(35mm 等效)"
+                                    />
+                                    <span>mm · {Math.round(view.camera.fov)}°</span>
+                                </div>
                             </div>
                         </div>
 

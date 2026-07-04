@@ -20,6 +20,7 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { PerfectRenderEnvironment } from './PerfectRenderEnvironment';
 import { ToneMappingMode } from 'postprocessing';
 import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
+import { CameraMarkers } from './CameraMarkers';
 
 /**
  * 首幀信號:資產載入完成後,實際渲染出第一幀時通知 store。
@@ -462,6 +463,9 @@ export function SceneGraph() {
         <>
             {/* CubeCamera for realtime LED reflections */}
             {cubeCameraRef.current && <primitive object={cubeCameraRef.current} />}
+
+            {/* 3D 機位模型(導播參考) */}
+            <CameraMarkers />
 
             <PerspectiveCamera
                 ref={cameraRef}
