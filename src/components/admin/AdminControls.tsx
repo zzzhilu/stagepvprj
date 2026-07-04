@@ -427,6 +427,7 @@ export default function AdminControls({ projectName, mode = 'free-test', project
                                 <TextureUploader />
                             )}
                             {/* 始終顯示 Google Drive 同步，不論在哪個模式 */}
+                            {!isVideoProgress && <ClientEditPassword />}
                             <LedLayoutEditor />
                             <GDriveVideoManager projectId={projectId} onSave={onSave} />
                         </div>
