@@ -493,6 +493,12 @@ interface State {
     setViewFocal: (id: string, focalMm: number) => void;
     showCameraModels: boolean; // 3D 場景顯示機位模型(runtime-only)
     setShowCameraModels: (show: boolean) => void;
+
+    // 客戶簡易後台:密碼雜湊(同步,主後台設定;僅存 SHA-256,無明文)+ 編輯模式(runtime)
+    clientEditPasswordHash: string | null;
+    setClientEditPasswordHash: (hash: string | null) => void;
+    clientEditMode: boolean;
+    setClientEditMode: (on: boolean) => void;
     setContentTextures: (textures: ContentTexture[]) => void;
     setCues: (cues: StageCue[]) => void; // [NEW]
 
@@ -562,6 +568,8 @@ export const useStore = create<State>()(
             stageObjects: [],
             views: [],
             showCameraModels: false,
+            clientEditPasswordHash: null,
+            clientEditMode: false,
             cues: [],
             activeCueId: null,
             r2Videos: [],
@@ -1159,6 +1167,8 @@ export const useStore = create<State>()(
                     : v)
             })),
             setShowCameraModels: (show) => set({ showCameraModels: show }),
+            setClientEditPasswordHash: (hash) => set({ clientEditPasswordHash: hash }),
+            setClientEditMode: (on) => set({ clientEditMode: on }),
             setContentTextures: (textures) => set({ contentTextures: textures }),
             setCues: (cues) => set({ cues }), // [NEW]
 

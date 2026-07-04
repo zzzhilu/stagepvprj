@@ -13,6 +13,7 @@ import { StageLightingPanel } from './StageLightingPanel';
 import { R2VideoManager } from '@/components/client/R2VideoManager';
 import { GDriveVideoManager } from './GDriveVideoManager';
 import { LedLayoutEditor } from './LedLayoutEditor';
+import { ClientEditPassword } from './ClientEditPassword';
 import ContentInspector from './ContentInspector';
 import { RigEditor } from './RigEditor';
 import { RigIcon } from '@/components/ui/icons';

@@ -13,7 +13,8 @@ import { useStore, CameraView } from '@/store/useStore';
 function CameraMarker({ view, index }: { view: CameraView; index: number }) {
     const groupRef = useRef<THREE.Group>(null);
 
-    // 朝向 target(three 相機以 -Z 為前方,lookAt 即可)
+    // 朝向 target。注意:Object3D.lookAt 使「+Z」朝向目標(只有 Camera 類是 -Z),
+    // 故下方所有幾何(鏡頭/視錐)以 +Z 為前方。
     useEffect(() => {
         groupRef.current?.lookAt(new THREE.Vector3(...view.camera.target));
     }, [view.camera.position, view.camera.target]);
@@ -25,7 +26,7 @@ function CameraMarker({ view, index }: { view: CameraView; index: number }) {
         const hw = hh * (16 / 9);
         const o = [0, 0, 0];
         const c = [
-            [-hw, hh, -L], [hw, hh, -L], [hw, -hh, -L], [-hw, -hh, -L],
+            [-hw, hh, L], [hw, hh, L], [hw, -hh, L], [-hw, -hh, L],
         ];
         // 原點到四角 + 遠端矩形
         const pts: number[] = [];
@@ -43,12 +44,12 @@ function CameraMarker({ view, index }: { view: CameraView; index: number }) {
     return (
         <group ref={groupRef} position={view.camera.position}>
             {/* 機身 */}
-            <mesh position={[0, 0, 0.25]}>
+            <mesh position={[0, 0, -0.25]}>
                 <boxGeometry args={[0.5, 0.35, 0.7]} />
                 <meshBasicMaterial color="#8b7af6" transparent opacity={0.85} toneMapped={false} />
             </mesh>
             {/* 鏡頭 */}
-            <mesh position={[0, 0, -0.2]} rotation={[Math.PI / 2, 0, 0]}>
+            <mesh position={[0, 0, 0.2]} rotation={[Math.PI / 2, 0, 0]}>
                 <cylinderGeometry args={[0.12, 0.15, 0.3, 12]} />
                 <meshBasicMaterial color="#c9c0ff" toneMapped={false} />
             </mesh>

@@ -13,9 +13,20 @@ export function BottomLeftPanel({ defaultCollapsed = false }: BottomLeftPanelPro
     const cues = useStore((state) => state.cues);
     const activeCueId = useStore((state) => state.activeCueId);
     const applyCue = useStore((state) => state.applyCue);
+    // 客戶編輯模式:cue 可雙擊改名/新增/更新機關值,視角可新增/雙擊改名
+    const clientEditMode = useStore((state) => state.clientEditMode);
+    const renameCue = useStore((state) => state.renameCue);
+    const addCue = useStore((state) => state.addCue);
+    const updateCue = useStore((state) => state.updateCue);
+    const renameView = useStore((state) => state.renameView);
+    const triggerCapture = useStore((state) => state.triggerCapture);
 
     // Initial state based on prop
     const [collapsed, setCollapsed] = useState(defaultCollapsed);
+    const [editingCueId, setEditingCueId] = useState<string | null>(null);
+    const [editingCueName, setEditingCueName] = useState('');
+    const [editingViewId, setEditingViewId] = useState<string | null>(null);
+    const [editingViewName, setEditingViewName] = useState('');
     const setBottomPanelExpanded = useStore((state) => state.setBottomPanelExpanded);
 
     // 鏡射展開狀態到 store,供 RigPanel 收合按鈕對齊定位
@@ -50,14 +61,33 @@ export function BottomLeftPanel({ defaultCollapsed = false }: BottomLeftPanelPro
                 {!collapsed && (
                     <div className="bg-black/40 backdrop-blur-md rounded-xl border border-white/10 p-3 flex flex-col gap-3 animate-fade-in">
                         {/* Cues Section */}
-                        {hasCues && (
+                        {(hasCues || clientEditMode) && (
                             <div>
                                 <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5 font-medium">Cues</div>
                                 <div className="flex flex-wrap gap-1">
                                     {cues.map((cue) => (
+                                        editingCueId === cue.id ? (
+                                            <input
+                                                key={cue.id}
+                                                autoFocus
+                                                value={editingCueName}
+                                                onChange={(e) => setEditingCueName(e.target.value)}
+                                                onBlur={() => { if (editingCueName.trim()) renameCue(cue.id, editingCueName.trim()); setEditingCueId(null); }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') { if (editingCueName.trim()) renameCue(cue.id, editingCueName.trim()); setEditingCueId(null); }
+                                                    if (e.key === 'Escape') setEditingCueId(null);
+                                                }}
+                                                className="h-8 w-20 px-2 rounded-lg text-xs bg-gray-900 border border-amber-500 text-white focus:outline-none"
+                                            />
+                                        ) : (
                                         <button
                                             key={cue.id}
                                             onClick={() => applyCue(cue.id)}
+                                            onDoubleClick={(e) => {
+                                                if (!clientEditMode) return;
+                                                e.stopPropagation();
+                                                setEditingCueId(cue.id); setEditingCueName(cue.name);
+                                            }}
                                             className={`
                                                 min-w-[32px] h-8 px-2.5 rounded-lg 
                                                 text-xs font-medium transition-all duration-200
@@ -66,17 +96,35 @@ export function BottomLeftPanel({ defaultCollapsed = false }: BottomLeftPanelPro
                                                     : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
                                                 }
                                             `}
-                                            title={`Cue ${cue.order}: ${cue.name}`}
+                                            title={clientEditMode ? `雙擊改名 · Cue ${cue.order}: ${cue.name}` : `Cue ${cue.order}: ${cue.name}`}
                                         >
                                             {cue.name}
                                         </button>
+                                        )
                                     ))}
+                                    {/* 編輯模式:新增 cue / 更新當前 cue */}
+                                    {clientEditMode && (
+                                        <>
+                                            <button
+                                                onClick={() => addCue(`Cue ${cues.length + 1}`)}
+                                                className="h-8 px-2.5 rounded-lg text-xs bg-amber-500/20 text-amber-300 border border-amber-400/30 hover:bg-amber-500/30"
+                                                title="以當前場景狀態新增 cue"
+                                            >+ 新增</button>
+                                            {activeCueId && (
+                                                <button
+                                                    onClick={() => { if (confirm('以當前機關/場景狀態覆蓋此 cue?')) updateCue(activeCueId); }}
+                                                    className="h-8 px-2.5 rounded-lg text-xs bg-amber-500/20 text-amber-300 border border-amber-400/30 hover:bg-amber-500/30"
+                                                    title="把當前機關數值與場景狀態存進選中的 cue"
+                                                >↻ 更新此 cue</button>
+                                            )}
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         )}
 
                         {/* Views Section */}
-                        {hasViews && (
+                        {(hasViews || clientEditMode) && (
                             <div>
                                 <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5 font-medium flex items-center gap-1">
                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
@@ -90,6 +138,12 @@ export function BottomLeftPanel({ defaultCollapsed = false }: BottomLeftPanelPro
                                         <button
                                             key={view.id}
                                             onClick={() => setActiveView(view.id)}
+                                            onDoubleClick={(e) => {
+                                                if (!clientEditMode) return;
+                                                e.stopPropagation();
+                                                const name = window.prompt('視角名稱', view.name);
+                                                if (name && name.trim()) renameView(view.id, name.trim());
+                                            }}
                                             className={`
                                                 relative w-12 h-12 rounded-lg overflow-hidden
                                                 transition-all duration-200
@@ -98,6 +152,7 @@ export function BottomLeftPanel({ defaultCollapsed = false }: BottomLeftPanelPro
                                                     : 'ring-1 ring-white/10 hover:ring-white/30'}
                                                 bg-gray-800 hover:bg-gray-700
                                             `}
+                                            title={clientEditMode ? `雙擊改名 · ${view.name}` : view.name}
                                         >
                                             {view.thumbnail_url ? (
                                                 <img
@@ -115,6 +170,14 @@ export function BottomLeftPanel({ defaultCollapsed = false }: BottomLeftPanelPro
                                             )}
                                         </button>
                                     ))}
+                                    {/* 編輯模式:擷取當前畫面為新視角 */}
+                                    {clientEditMode && (
+                                        <button
+                                            onClick={() => triggerCapture()}
+                                            className="w-12 h-12 rounded-lg text-lg bg-amber-500/20 text-amber-300 border border-amber-400/30 hover:bg-amber-500/30 flex items-center justify-center"
+                                            title="以當前畫面新增視角"
+                                        >+</button>
+                                    )}
                                 </div>
                             </div>
                         )}

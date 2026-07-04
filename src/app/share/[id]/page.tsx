@@ -11,6 +11,7 @@ import { AssetLoadingOverlay } from '@/components/ui/AssetLoadingOverlay';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ClientToolbar } from '@/components/client/ClientToolbar';
 import { ClientLayoutSwitcher } from '@/components/client/ClientLayoutSwitcher';
+import { ClientEditGate } from '@/components/client/ClientEditGate';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
@@ -103,6 +104,7 @@ function SharePageContent() {
             if (data.cues) setCues(data.cues);
             if (data.r2Videos) setR2Videos(data.r2Videos);
             if (data.gdriveVideos) setGDriveVideos(data.gdriveVideos);
+            if (data.clientEditPasswordHash !== undefined) useStore.setState({ clientEditPasswordHash: data.clientEditPasswordHash });
             if (data.gdriveFolders) setAllGDriveFolders(data.gdriveFolders);
 
             // Restore lighting settings from project (if saved)
@@ -311,6 +313,9 @@ function SharePageContent() {
 
             {/* LED 排列切換器(左上,上傳 icon 右側) */}
             <ClientLayoutSwitcher />
+
+            {/* 客戶編輯入口(右上齒輪) */}
+            <ClientEditGate projectId={projectId} />
 
             {/* Drawing Overlay */}
             <DrawingOverlay projectId={projectId} />

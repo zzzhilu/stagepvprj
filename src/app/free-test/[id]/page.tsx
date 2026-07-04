@@ -10,6 +10,7 @@ import { BottomLeftPanel } from '@/components/client/BottomLeftPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ClientUploader } from '@/components/client/ClientUploader';
 import { ClientLayoutSwitcher } from '@/components/client/ClientLayoutSwitcher';
+import { ClientEditGate } from '@/components/client/ClientEditGate';
 import { ObjectHoverTooltip } from '@/components/admin/ObjectHoverTooltip';
 import { ClientToolbar } from '@/components/client/ClientToolbar';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
@@ -127,6 +128,7 @@ function ProjectEditorContent() {
     const setGDriveVideos = useStore(state => state.setGDriveVideos);
     const ledLayouts = useStore(state => state.ledLayouts);
     const screenCropRatio = useStore(state => state.screenCropRatio);
+    const clientEditPasswordHash = useStore(state => state.clientEditPasswordHash);
     const activeLedLayoutId = useStore(state => state.activeLedLayoutId);
     const setAllGDriveFolders = useStore(state => state.setAllGDriveFolders);
     const setFloorPlanTexture = useStore(state => state.setFloorPlanTexture);
@@ -215,6 +217,7 @@ function ProjectEditorContent() {
                 if (data.gdriveVideos) setGDriveVideos(data.gdriveVideos);
                 if (data.ledLayouts) useStore.setState({ ledLayouts: data.ledLayouts, activeLedLayoutId: data.activeLedLayoutId ?? null });
                 if (typeof data.screenCropRatio === 'number') useStore.setState({ screenCropRatio: data.screenCropRatio });
+                if (data.clientEditPasswordHash !== undefined) useStore.setState({ clientEditPasswordHash: data.clientEditPasswordHash });
                 if (data.gdriveFolders) setAllGDriveFolders(data.gdriveFolders);
                 if (data.floorPlanTextureUrl !== undefined) setFloorPlanTexture(data.floorPlanTextureUrl);
                 // Restore lighting settings from project (if saved)
@@ -267,6 +270,7 @@ function ProjectEditorContent() {
                     ledLayouts,
                     activeLedLayoutId,
                     screenCropRatio,
+                    clientEditPasswordHash,
                     gdriveFolders,
                     floorPlanTextureUrl,
                     // Lighting settings
@@ -294,7 +298,7 @@ function ProjectEditorContent() {
         }, 2000); // Debounce 2 seconds
 
         return () => clearTimeout(timeoutId);
-    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, ledLayouts, activeLedLayoutId, screenCropRatio, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, nulls, rigs, isAuthenticated, isShareMode, isLoading, projectId]);
+    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, ledLayouts, activeLedLayoutId, screenCropRatio, clientEditPasswordHash, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, nulls, rigs, isAuthenticated, isShareMode, isLoading, projectId]);
 
     // Show loading while checking auth
     if (isChecking) {
@@ -346,6 +350,7 @@ function ProjectEditorContent() {
             {/* Client Uploader - Share mode only */}
             {isShareMode && <div data-ui-element><ClientUploader /></div>}
             {isShareMode && <div data-ui-element><ClientLayoutSwitcher /></div>}
+            {isShareMode && <div data-ui-element><ClientEditGate projectId={projectId} /></div>}
 
             {/* 後台:模型懸停名稱提示 */}
             {!isShareMode && <ObjectHoverTooltip />}
