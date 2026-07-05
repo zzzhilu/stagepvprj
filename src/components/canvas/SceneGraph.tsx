@@ -730,7 +730,7 @@ export function SceneGraph() {
                     />
                     <SMAA />
                 </EffectComposer>
-            ) : (
+            ) : bloomIntensity > 0 ? (
                 <EffectComposer multisampling={0}>
                     <Bloom
                         intensity={bloomIntensity}
@@ -742,7 +742,7 @@ export function SceneGraph() {
                     />
                     <SMAA />
                 </EffectComposer>
-            )}
+            ) : null}
         </>
     );
 }

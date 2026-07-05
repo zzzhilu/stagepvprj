@@ -1,0 +1,157 @@
+diff --git a/src/components/canvas/Scene.tsx b/src/components/canvas/Scene.tsx
+index cc11c58..5610d6b 100644
+--- a/src/components/canvas/Scene.tsx
++++ b/src/components/canvas/Scene.tsx
+@@ -90,7 +90,7 @@ export default function Scene() {
+ 
+     // Use 'always' frameloop when video is playing, recording, Gizmo, Perfect Render, walk mode, or paper figures exist
+     const hasPaperFigures = paperFigures.length > 0;
+-    const frameloop = (isVideoActive && videoPlaying) || isRecordingMode || gizmoEnabled || perfectRenderEnabled || paperFigureMode || hasPaperFigures || walkMode ? 'always' : 'demand';
++    const frameloop = (isVideoActive && videoPlaying) || isRecordingMode || gizmoEnabled || perfectRenderEnabled || paperFigureMode || walkMode ? 'always' : 'demand'; // [效能] hasPaperFigures 移出:紙片人無逐幀動畫,demand 下照常顯示,避免永久 60fps
+ 
+     // 行動裝置畫質降載開關:只在「手機/平板」生效,桌機維持完整畫質。
+     // 裝置類型一個 session 內不變,故只在掛載時判定一次(Scene 為 ssr:false,僅 client 執行)。
+diff --git a/src/components/canvas/SceneGraph.tsx b/src/components/canvas/SceneGraph.tsx
+index c253f4c..f20254d 100644
+--- a/src/components/canvas/SceneGraph.tsx
++++ b/src/components/canvas/SceneGraph.tsx
+@@ -730,7 +730,7 @@ export function SceneGraph() {
+                     />
+                     <SMAA />
+                 </EffectComposer>
+-            ) : (
++            ) : bloomIntensity > 0 ? (
+                 <EffectComposer multisampling={0}>
+                     <Bloom
+                         intensity={bloomIntensity}
+@@ -742,7 +742,7 @@ export function SceneGraph() {
+                     />
+                     <SMAA />
+                 </EffectComposer>
+-            )}
++            ) : null}
+         </>
+     );
+ }
+diff --git a/src/components/canvas/StageObjectRenderer.tsx b/src/components/canvas/StageObjectRenderer.tsx
+index 04948a2..7bbd81a 100644
+--- a/src/components/canvas/StageObjectRenderer.tsx
++++ b/src/components/canvas/StageObjectRenderer.tsx
+@@ -9,6 +9,14 @@ import { parseGIF, decompressFrames } from 'gifuct-js';
+ import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
+ import { getObjectDisplayName } from '@/lib/object-utils';
+ 
++// [效能] useFrame 每幀重用的臨時物件(單執行緒,跨實例共享安全);消除每幀 new 造成的 GC 卡頓
++const _tmpBasePos = new THREE.Vector3();
++const _tmpBaseRot = new THREE.Euler();
++const _tmpTargetPos = new THREE.Vector3();
++const _tmpTargetRot = new THREE.Euler();
++const _tmpCurQuat = new THREE.Quaternion();
++const _tmpTgtQuat = new THREE.Quaternion();
++
+ // Calculate lerp speed based on distance (0.5s - 1.5s)
+ function calculateLerpSpeed(distance: number): number {
+     const minDuration = 0.5;
+@@ -656,6 +664,12 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
+         [object, stageObjects]
+     );
+ 
++    // 此物件是否有任何 transform 機關(多數物件沒有 → useFrame 快路徑跳過 rigDelta)
++    const hasObjectRig = useMemo(
++        () => rigs.some(r => r.targetType === 'object' && r.targetId === object.id && r.type !== 'visibility'),
++        [rigs, object.id]
++    );
++
+     // visibility 機關結果(依指紋更新,僅相關滑桿變化才重算)
+     const objVisible = useMemo(() => {
+         const st = useStore.getState();
+@@ -700,48 +714,61 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
+     useFrame((_, delta) => {
+         if (!groupRef.current) return;
+ 
+-        const basePos = new THREE.Vector3(...worldTransform.pos);
+-        const baseRot = new THREE.Euler(...worldTransform.rot);
+-
+-        // 物件級機關:基底 transform + 偏移量(getState 讀最新值,不經 React)
+-        const rigState = useStore.getState();
+-        const rigOffset = rigDelta(rigState.rigs, rigState.rigValues, 'object', object.id, 0);
+-        const targetPos = new THREE.Vector3(
+-            basePos.x + rigOffset.pos[0],
+-            basePos.y + rigOffset.pos[1],
+-            basePos.z + rigOffset.pos[2]
+-        );
+-        const targetRot = new THREE.Euler(
+-            baseRot.x + rigOffset.rot[0],
+-            baseRot.y + rigOffset.rot[1],
+-            baseRot.z + rigOffset.rot[2]
+-        );
++        // [效能] 模組級臨時物件重用(見檔案頂部 _tmp*),每幀零分配,消除 GC 間歇卡頓。
++        _tmpBasePos.set(worldTransform.pos[0], worldTransform.pos[1], worldTransform.pos[2]);
++        _tmpBaseRot.set(worldTransform.rot[0], worldTransform.rot[1], worldTransform.rot[2]);
++
++        // 物件級機關:多數物件沒有機關 → 快路徑跳過 rigDelta(避免每幀分配)
++        if (hasObjectRig) {
++            const rigState = useStore.getState();
++            const rigOffset = rigDelta(rigState.rigs, rigState.rigValues, 'object', object.id, 0);
++            _tmpTargetPos.set(
++                _tmpBasePos.x + rigOffset.pos[0],
++                _tmpBasePos.y + rigOffset.pos[1],
++                _tmpBasePos.z + rigOffset.pos[2]
++            );
++            _tmpTargetRot.set(
++                _tmpBaseRot.x + rigOffset.rot[0],
++                _tmpBaseRot.y + rigOffset.rot[1],
++                _tmpBaseRot.z + rigOffset.rot[2]
++            );
++        } else {
++            _tmpTargetPos.copy(_tmpBasePos);
++            _tmpTargetRot.copy(_tmpBaseRot);
++        }
+ 
+         // Initialize on first frame
+         if (!isInitialized.current) {
+-            currentPos.current.copy(targetPos);
+-            currentRot.current.copy(targetRot);
+-            groupRef.current.position.copy(targetPos);
+-            groupRef.current.rotation.copy(targetRot);
++            currentPos.current.copy(_tmpTargetPos);
++            currentRot.current.copy(_tmpTargetRot);
++            groupRef.current.position.copy(_tmpTargetPos);
++            groupRef.current.rotation.copy(_tmpTargetRot);
+             isInitialized.current = true;
+             return;
+         }
+ 
++        // [效能] 收斂跳過:已到位的物件不再每幀算 lerp/slerp
++        const distSq = currentPos.current.distanceToSquared(_tmpTargetPos);
++        const rotDiff = Math.abs(currentRot.current.x - _tmpTargetRot.x)
++            + Math.abs(currentRot.current.y - _tmpTargetRot.y)
++            + Math.abs(currentRot.current.z - _tmpTargetRot.z);
++        if (distSq < 1e-8 && rotDiff < 1e-6) return;
++
+         // Calculate distance for speed adjustment
+-        const distance = currentPos.current.distanceTo(targetPos);
++        const distance = Math.sqrt(distSq);
+         const speed = calculateLerpSpeed(distance);
+         const lerpFactor = Math.min(1, speed * delta * 5);
+ 
+         // Lerp position
+-        currentPos.current.lerp(targetPos, lerpFactor);
++        currentPos.current.lerp(_tmpTargetPos, lerpFactor);
+         groupRef.current.position.copy(currentPos.current);
+ 
+-        // Slerp rotation (using quaternion)
+-        const currentQuat = new THREE.Quaternion().setFromEuler(currentRot.current);
+-        const targetQuat = new THREE.Quaternion().setFromEuler(targetRot);
+-        currentQuat.slerp(targetQuat, lerpFactor);
+-        groupRef.current.quaternion.copy(currentQuat);
+-        currentRot.current.setFromQuaternion(currentQuat);
++        // Slerp rotation (quaternion,重用臨時物件)
++        _tmpCurQuat.setFromEuler(currentRot.current);
++        _tmpTgtQuat.setFromEuler(_tmpTargetRot);
++        _tmpCurQuat.slerp(_tmpTgtQuat, lerpFactor);
++        groupRef.current.quaternion.copy(_tmpCurQuat);
++        currentRot.current.setFromQuaternion(_tmpCurQuat);
+     });
+ 
+     // Back-face black material for emissive objects (LED screens show black on back)

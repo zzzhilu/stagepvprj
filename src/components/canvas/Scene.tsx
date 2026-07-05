@@ -90,7 +90,7 @@ export default function Scene() {
 
     // Use 'always' frameloop when video is playing, recording, Gizmo, Perfect Render, walk mode, or paper figures exist
     const hasPaperFigures = paperFigures.length > 0;
-    const frameloop = (isVideoActive && videoPlaying) || isRecordingMode || gizmoEnabled || perfectRenderEnabled || paperFigureMode || hasPaperFigures || walkMode ? 'always' : 'demand';
+    const frameloop = (isVideoActive && videoPlaying) || isRecordingMode || gizmoEnabled || perfectRenderEnabled || paperFigureMode || walkMode ? 'always' : 'demand'; // [效能] hasPaperFigures 移出:紙片人無逐幀動畫,demand 下照常顯示,避免永久 60fps
 
     // 行動裝置畫質降載開關:只在「手機/平板」生效,桌機維持完整畫質。
     // 裝置類型一個 session 內不變,故只在掛載時判定一次(Scene 為 ssr:false,僅 client 執行)。
