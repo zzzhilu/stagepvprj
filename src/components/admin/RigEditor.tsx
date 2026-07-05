@@ -334,6 +334,9 @@ function decodeTarget(key: string): Pick<RigControl, 'targetType' | 'targetId' |
 }
 
 function RigsSection() {
+    // 雙擊數值直接鍵入(超界自動鎖 min/max)
+    const [editingValueId, setEditingValueId] = useState<string | null>(null);
+    const [editingValueText, setEditingValueText] = useState('');
     const nulls = useStore((s) => s.nulls);
     const stageObjects = useStore((s) => s.stageObjects);
     const rigs = useStore((s) => s.rigs);
@@ -714,9 +717,36 @@ function RigsSection() {
                                     className="flex-1"
                                     style={{ accentColor: `rgba(${rgb}, 0.9)` }}
                                 />
-                                <span className="text-xs w-16 text-right flex-shrink-0 font-mono" style={{ color: `rgba(${rgb}, 1)` }}>
-                                    {value.toFixed(rig.type === 'translation' ? 2 : 0)}{unit(rig.type)}
-                                </span>
+                                {editingValueId === rig.id ? (
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={editingValueText}
+                                        onChange={(e) => setEditingValueText(e.target.value)}
+                                        onFocus={(e) => e.target.select()}
+                                        onBlur={() => {
+                                            const v = parseFloat(editingValueText);
+                                            if (Number.isFinite(v)) setRigValue(rig.id, Math.min(Math.max(v, rig.min), rig.max));
+                                            setEditingValueId(null);
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                            if (e.key === 'Escape') setEditingValueId(null);
+                                        }}
+                                        className="w-16 text-xs font-mono bg-gray-900 border rounded px-1 py-0 text-right flex-shrink-0 focus:outline-none"
+                                        style={{ color: `rgba(${rgb}, 1)`, borderColor: `rgba(${rgb}, 0.6)` }}
+                                    />
+                                ) : (
+                                    <span
+                                        className="text-xs w-16 text-right flex-shrink-0 font-mono cursor-text"
+                                        style={{ color: `rgba(${rgb}, 1)` }}
+                                        onDoubleClick={() => { setEditingValueId(rig.id); setEditingValueText(String(value)); }}
+                                        title="雙擊輸入數值"
+                                    >
+                                        {value.toFixed(rig.type === 'translation' ? 2 : 0)}{unit(rig.type)}
+                                    </span>
+                                )}
                             </div>
                         )}
 

@@ -27,6 +27,9 @@ export function RigPanel() {
     const bottomPanelExpanded = useStore((s) => s.bottomPanelExpanded);
 
     const [collapsed, setCollapsed] = useState(false);
+    // 雙擊數值直接鍵入(Enter/失焦提交,超界自動鎖到 min/max)
+    const [editingValueId, setEditingValueId] = useState<string | null>(null);
+    const [editingValueText, setEditingValueText] = useState('');
 
     // 過濾掉目標已不存在的機關(舊專案殘留資料防護)
     const validRigs = rigs.filter(rig =>
@@ -142,9 +145,34 @@ export function RigPanel() {
                                             </div>
                                             <div className="flex items-center gap-1.5 flex-shrink-0">
                                                 {!isVis && (
-                                                    <span className="text-xs text-gray-300 font-mono">
-                                                        {value.toFixed(rig.type === 'translation' ? 2 : 0)}{unit}
-                                                    </span>
+                                                    editingValueId === rig.id ? (
+                                                        <input
+                                                            autoFocus
+                                                            type="text"
+                                                            inputMode="decimal"
+                                                            value={editingValueText}
+                                                            onChange={(e) => setEditingValueText(e.target.value)}
+                                                            onFocus={(e) => e.target.select()}
+                                                            onBlur={() => {
+                                                                const v = parseFloat(editingValueText);
+                                                                if (Number.isFinite(v)) setRigValue(rig.id, Math.min(Math.max(v, rig.min), rig.max));
+                                                                setEditingValueId(null);
+                                                            }}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                                                if (e.key === 'Escape') setEditingValueId(null);
+                                                            }}
+                                                            className="w-14 text-xs font-mono bg-gray-900 border border-white/30 rounded px-1 py-0 text-right text-white focus:outline-none"
+                                                        />
+                                                    ) : (
+                                                        <span
+                                                            className="text-xs text-gray-300 font-mono cursor-text"
+                                                            onDoubleClick={() => { setEditingValueId(rig.id); setEditingValueText(String(value)); }}
+                                                            title="雙擊輸入數值"
+                                                        >
+                                                            {value.toFixed(rig.type === 'translation' ? 2 : 0)}{unit}
+                                                        </span>
+                                                    )
                                                 )}
                                                 {!isDefault && (
                                                     <button
