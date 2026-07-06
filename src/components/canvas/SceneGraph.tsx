@@ -374,12 +374,12 @@ export function SceneGraph() {
             return;
         }
 
-        const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(256, {
+        const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(128, { // 128:反射柔糊已足夠,像素/PMREM 成本降 4 倍
             format: THREE.RGBAFormat,
             generateMipmaps: true,
             minFilter: THREE.LinearMipmapLinearFilter,
         });
-        const cubeCamera = new THREE.CubeCamera(0.1, 2000, cubeRenderTarget); // far 涵蓋大型場館(至 500m)
+        const cubeCamera = new THREE.CubeCamera(0.1, 300, cubeRenderTarget); // far 300:反射貼圖中遠景不可辨,大 far 只會爆炸性增加 6 面渲染成本
         cubeCamera.position.set(0, 1, 0); // Position at stage level
         cubeCameraRef.current = cubeCamera;
         setRealtimeEnvMap(cubeRenderTarget.texture);
@@ -431,7 +431,7 @@ export function SceneGraph() {
         // CubeCamera update for realtime LED reflections (every 3 frames)
         if (cubeCameraRef.current && perfectRenderEnabled) {
             frameCounter.current++;
-            if (frameCounter.current % 3 === 0) {
+            if (frameCounter.current % 12 === 0) { // 每 12 幀:反射延遲 ~0.2s 無感,CubeCamera 成本降 4 倍
                 cubeCameraRef.current.update(gl, scene);
             }
             // Parallax 包圍盒自動計算(每 60 幀,零訂閱):venues 物件聯集,適配 50m~500m 場館
