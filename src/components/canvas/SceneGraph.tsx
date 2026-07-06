@@ -11,7 +11,7 @@ import { VideoTimelineController } from './VideoTimelineController';
 import { StageLightRenderer, StageLightRendererHandle } from './StageLightRenderer';
 import { WalkModeController } from './WalkModeController';
 import { MeasurementScene } from '@/components/client/MeasurementOverlay';
-import { EffectComposer, Bloom, SMAA, ToneMapping, N8AO } from '@react-three/postprocessing';
+import { EffectComposer, Bloom, SMAA, ToneMapping, N8AO, Vignette } from '@react-three/postprocessing';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
 import { useRef, useEffect, useCallback, createRef, useState, useMemo } from 'react';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -21,6 +21,7 @@ import { PerfectRenderEnvironment } from './PerfectRenderEnvironment';
 import { ToneMappingMode } from 'postprocessing';
 import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
 import { CameraMarkers } from './CameraMarkers';
+import { setParallaxBox, setParallaxEnabled } from '@/lib/parallax-envmap';
 
 /**
  * 首幀信號:資產載入完成後,實際渲染出第一幀時通知 store。
@@ -368,6 +369,7 @@ export function SceneGraph() {
                 cubeCameraRef.current.renderTarget.dispose();
                 cubeCameraRef.current = null;
                 setRealtimeEnvMap(null);
+                setParallaxEnabled(false);
             }
             return;
         }
@@ -377,10 +379,11 @@ export function SceneGraph() {
             generateMipmaps: true,
             minFilter: THREE.LinearMipmapLinearFilter,
         });
-        const cubeCamera = new THREE.CubeCamera(0.1, 100, cubeRenderTarget);
+        const cubeCamera = new THREE.CubeCamera(0.1, 2000, cubeRenderTarget); // far 涵蓋大型場館(至 500m)
         cubeCamera.position.set(0, 1, 0); // Position at stage level
         cubeCameraRef.current = cubeCamera;
         setRealtimeEnvMap(cubeRenderTarget.texture);
+        setParallaxEnabled(true); // 反射 parallax 校正隨 perfect render 啟用
 
         return () => {
             cubeRenderTarget.dispose();
@@ -430,6 +433,22 @@ export function SceneGraph() {
             frameCounter.current++;
             if (frameCounter.current % 3 === 0) {
                 cubeCameraRef.current.update(gl, scene);
+            }
+            // Parallax 包圍盒自動計算(每 60 幀,零訂閱):venues 物件聯集,適配 50m~500m 場館
+            if (frameCounter.current % 60 === 1) {
+                const st = useStore.getState();
+                const ids = st.stageObjects.filter(o => o.type === 'venues').map(o => o.id);
+                const useIds = ids.length > 0 ? ids : st.stageObjects.map(o => o.id);
+                let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+                for (const id of useIds) {
+                    const b = st.objectBounds[id];
+                    if (!b) continue;
+                    minX = Math.min(minX, b.min[0]); minY = Math.min(minY, b.min[1]); minZ = Math.min(minZ, b.min[2]);
+                    maxX = Math.max(maxX, b.max[0]); maxY = Math.max(maxY, b.max[1]); maxZ = Math.max(maxZ, b.max[2]);
+                }
+                if (Number.isFinite(minX) && maxX > minX) {
+                    setParallaxBox([minX, minY, minZ], [maxX, maxY, maxZ], [0, 1, 0]);
+                }
             }
         }
 
@@ -729,6 +748,8 @@ export function SceneGraph() {
                         resolutionY={1024}
                     />
                     <SMAA />
+                    {/* 電影感暗角(僅完美渲染;無噪點,保持清晰) */}
+                    <Vignette offset={0.28} darkness={0.55} eskil={false} />
                 </EffectComposer>
             ) : bloomIntensity > 0 ? (
                 <EffectComposer multisampling={0}>

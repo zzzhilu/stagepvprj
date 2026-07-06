@@ -8,6 +8,7 @@ import { useFrame } from '@react-three/fiber';
 import { parseGIF, decompressFrames } from 'gifuct-js';
 import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
 import { getObjectDisplayName } from '@/lib/object-utils';
+import { applyParallaxEnvMap } from '@/lib/parallax-envmap';
 
 // [效能] useFrame 每幀重用的臨時物件(單執行緒,跨實例共享安全);消除每幀 new 造成的 GC 卡頓
 const _tmpBasePos = new THREE.Vector3();
@@ -612,6 +613,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         if (mat.envMap !== envMap) {
             mat.envMap = envMap;
             mat.envMapIntensity = 1.5;
+            applyParallaxEnvMap(mat); // parallax 校正:反射位置貼合場館包圍盒
             mat.needsUpdate = true;
         }
     }, [material, envMap, perfectRenderEnabled, object.material_id, object.type, renderMode]);
