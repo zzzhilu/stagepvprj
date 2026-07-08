@@ -23,6 +23,13 @@ import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
 import { CameraMarkers } from './CameraMarkers';
 import { setParallaxBox, setParallaxEnabled } from '@/lib/parallax-envmap';
 
+// 精簡模式:LED 永遠保留 + 後台指定 keepIds;其餘不渲染(直接卸載,省 draw call/材質/useFrame)
+function liteVisible(obj: { id: string; type: string }, liteMode: boolean, keepIds: string[]): boolean {
+    if (!liteMode) return true;
+    if (obj.type === 'static_LED' || obj.type === 'moving_LED') return true;
+    return keepIds.includes(obj.id);
+}
+
 /**
  * 首幀信號:資產載入完成後,實際渲染出第一幀時通知 store。
  * 載入進行中會把旗標歸零,確保旗標語意 = 「資產完成後的首幀」。
@@ -157,7 +164,9 @@ function NullGroup({
 
 
     const childNulls = nulls.filter(n => n.parentId === node.id);
-    const allChildObjects = stageObjects.filter(o => o.parentId === node.id);
+    const liteMode = useStore((state) => state.liteMode);
+    const liteModeKeepIds = useStore((state) => state.liteModeKeepIds);
+    const allChildObjects = stageObjects.filter(o => o.parentId === node.id && liteVisible(o, liteMode, liteModeKeepIds));
     const childObjects = allChildObjects.filter(o => !o.rigMirror);
     const mirroredObjects = allChildObjects.filter(o => o.rigMirror);
 
@@ -307,6 +316,8 @@ export function SceneGraph() {
     const lightTransformRef = useRef<any>(null);
     const stageLightRendererRef = useRef<StageLightRendererHandle>(null);
     const objectRefsRef = useRef<Map<string, { current: THREE.Group | null }>>(new Map());
+    const liteModeTop = useStore((state) => state.liteMode);
+    const liteKeepIdsTop = useStore((state) => state.liteModeKeepIds);
     const nullRefsRef = useRef<Map<string, { current: THREE.Group | null }>>(new Map());
     const nullTransformRef = useRef<any>(null);
     const activeViewId = useStore((state) => state.activeViewId);
@@ -581,7 +592,7 @@ export function SceneGraph() {
 
             {/* 未掛載到任何 Null 的物件(含 parent 已被刪除的孤兒) */}
             {stageObjects
-                .filter(obj => !obj.parentId || !nulls.some(n => n.id === obj.parentId))
+                .filter(obj => (!obj.parentId || !nulls.some(n => n.id === obj.parentId)) && liteVisible(obj, liteModeTop, liteKeepIdsTop))
                 .map((obj) => {
                     const objRef = objectRefsRef.current.get(obj.id);
                     const Renderer = obj.model_path === '__box__'

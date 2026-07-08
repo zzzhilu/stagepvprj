@@ -16,7 +16,8 @@ export interface ProjectState {
     gdriveVideos?: any[]; // GDrive videos
     ledLayouts?: any[]; // LED 排列
     screenCropRatio?: number;
-    clientEditPasswordHash?: string | null; // 客戶編輯密碼雜湊 // 螢幕擷取裁切比例
+    clientEditPasswordHash?: string | null;
+    liteModeKeepIds?: string[]; // 精簡模式保留模型 // 客戶編輯密碼雜湊 // 螢幕擷取裁切比例
     activeLedLayoutId?: string | null;
     gdriveFolders?: Record<string, string>; // GDrive folders mapping
     floorPlanTextureUrl?: string | null;

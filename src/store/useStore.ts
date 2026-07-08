@@ -499,6 +499,12 @@ interface State {
     setClientEditPasswordHash: (hash: string | null) => void;
     clientEditMode: boolean;
     setClientEditMode: (on: boolean) => void;
+
+    // 精簡預覽模式:客戶端一鍵只渲染 LED + 後台指定保留的模型,鎖 60fps(弱電腦友善)
+    liteMode: boolean;                 // runtime-only(客戶端開關)
+    setLiteMode: (on: boolean) => void;
+    liteModeKeepIds: string[];         // 後台指定精簡模式仍保留的模型 id(同步)
+    toggleLiteModeKeep: (id: string) => void;
     setContentTextures: (textures: ContentTexture[]) => void;
     setCues: (cues: StageCue[]) => void; // [NEW]
 
@@ -570,6 +576,8 @@ export const useStore = create<State>()(
             showCameraModels: false,
             clientEditPasswordHash: null,
             clientEditMode: false,
+            liteMode: false,
+            liteModeKeepIds: [],
             cues: [],
             activeCueId: null,
             r2Videos: [],
@@ -1169,6 +1177,12 @@ export const useStore = create<State>()(
             setShowCameraModels: (show) => set({ showCameraModels: show }),
             setClientEditPasswordHash: (hash) => set({ clientEditPasswordHash: hash }),
             setClientEditMode: (on) => set({ clientEditMode: on }),
+            setLiteMode: (on) => set({ liteMode: on }),
+            toggleLiteModeKeep: (id) => set((state) => ({
+                liteModeKeepIds: state.liteModeKeepIds.includes(id)
+                    ? state.liteModeKeepIds.filter(x => x !== id)
+                    : [...state.liteModeKeepIds, id]
+            })),
             setContentTextures: (textures) => set({ contentTextures: textures }),
             setCues: (cues) => set({ cues }), // [NEW]
 

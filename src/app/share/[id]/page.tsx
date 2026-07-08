@@ -105,6 +105,7 @@ function SharePageContent() {
             if (data.r2Videos) setR2Videos(data.r2Videos);
             if (data.gdriveVideos) setGDriveVideos(data.gdriveVideos);
             if (data.clientEditPasswordHash !== undefined) useStore.setState({ clientEditPasswordHash: data.clientEditPasswordHash });
+            if (data.liteModeKeepIds) useStore.setState({ liteModeKeepIds: data.liteModeKeepIds });
             if (data.gdriveFolders) setAllGDriveFolders(data.gdriveFolders);
 
             // Restore lighting settings from project (if saved)

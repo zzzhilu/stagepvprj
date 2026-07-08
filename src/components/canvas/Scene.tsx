@@ -20,6 +20,19 @@ function LoadingFallback() {
 // Component to capture canvas reference
 // [效能重構配套] 3D 端不再訂閱 rigValues(改 useFrame getState 讀取以避免全場 re-render),
 // 此元件專責:rigValues 變化時 invalidate,確保 demand frameloop 下拖機關滑桿畫面即時更新。
+// 精簡模式 60fps 鎖幀:frameloop 維持 demand,由此驅動器以固定 60Hz invalidate——
+// 穩定 60fps 且高刷新率螢幕(144Hz)不會超跑浪費。
+function LiteModeDriver() {
+    const invalidate = useThree((state) => state.invalidate);
+    const liteMode = useStore((state) => state.liteMode);
+    useEffect(() => {
+        if (!liteMode) return;
+        const id = setInterval(() => invalidate(), 1000 / 60);
+        return () => clearInterval(id);
+    }, [liteMode, invalidate]);
+    return null;
+}
+
 function RigInvalidator() {
     const invalidate = useThree((state) => state.invalidate);
     useEffect(() => {
@@ -91,7 +104,8 @@ export default function Scene() {
 
     // Use 'always' frameloop when video is playing, recording, Gizmo, Perfect Render, walk mode, or paper figures exist
     const hasPaperFigures = paperFigures.length > 0;
-    const frameloop = (isVideoActive && videoPlaying) || cameraStreamActive || isRecordingMode || gizmoEnabled || perfectRenderEnabled || paperFigureMode || walkMode ? 'always' : 'demand'; // 攝影機/螢幕直播需逐幀更新 // [效能] hasPaperFigures 移出:紙片人無逐幀動畫,demand 下照常顯示,避免永久 60fps
+    const liteMode = useStore((state) => state.liteMode);
+    const frameloop = liteMode ? 'demand' : ((isVideoActive && videoPlaying) || cameraStreamActive || isRecordingMode || gizmoEnabled || perfectRenderEnabled || paperFigureMode || walkMode ? 'always' : 'demand'); // 精簡模式鎖 60fps(LiteModeDriver 驅動) // 攝影機/螢幕直播需逐幀更新 // [效能] hasPaperFigures 移出:紙片人無逐幀動畫,demand 下照常顯示,避免永久 60fps
 
     // 行動裝置畫質降載開關:只在「手機/平板」生效,桌機維持完整畫質。
     // 裝置類型一個 session 內不變,故只在掛載時判定一次(Scene 為 ssr:false,僅 client 執行)。
@@ -117,6 +131,7 @@ export default function Scene() {
             <Suspense fallback={<LoadingFallback />}>
                 <SceneGraph />
                 <RigInvalidator />
+                <LiteModeDriver />
             </Suspense>
 
             <Preload all />

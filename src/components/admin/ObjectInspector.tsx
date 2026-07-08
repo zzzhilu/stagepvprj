@@ -74,6 +74,8 @@ function LinkToParentDropdown({
 }
 
 export function ObjectInspector() {
+    const liteModeKeepIds = useStore((state) => state.liteModeKeepIds);
+    const toggleLiteModeKeep = useStore((state) => state.toggleLiteModeKeep);
     const stageObjects = useStore((state) => state.stageObjects);
     const selectedObjectId = useStore((state) => state.selectedObjectId);
     const setSelectedObject = useStore((state) => state.setSelectedObject);
@@ -112,6 +114,15 @@ export function ObjectInspector() {
                         >
                             <div className="flex items-center justify-between">
                                 <span className="font-medium">{getObjectName(obj)}</span>
+                                {(obj.type === 'static_LED' || obj.type === 'moving_LED') ? (
+                                    <span className="text-[10px] text-yellow-400/60" title="LED 在精簡模式永遠保留">⚡LED</span>
+                                ) : (
+                                    <span
+                                        onClick={(e) => { e.stopPropagation(); toggleLiteModeKeep(obj.id); }}
+                                        className={`text-[10px] cursor-pointer px-1 rounded ${liteModeKeepIds.includes(obj.id) ? 'text-yellow-400 bg-yellow-500/15' : 'text-gray-600 hover:text-gray-400'}`}
+                                        title="精簡模式保留此模型(客戶端 ⚡ 開啟時仍渲染)"
+                                    >⚡</span>
+                                )}
                                 {obj.parentId && (
                                     <span className="text-[10px] opacity-60 flex items-center gap-0.5"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg> 已連結</span>
                                 )}

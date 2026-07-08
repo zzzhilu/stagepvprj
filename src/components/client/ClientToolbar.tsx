@@ -25,6 +25,8 @@ export function ClientToolbar({ projectId, isAdmin = false }: ClientToolbarProps
     const setPerfectRenderEnabled = useStore(s => s.setPerfectRenderEnabled);
     const setBloomIntensity = useStore(s => s.setBloomIntensity);
     const walkMode = useStore(s => s.walkMode);
+    const liteMode = useStore(s => s.liteMode);
+    const setLiteMode = useStore(s => s.setLiteMode);
     const setWalkMode = useStore(s => s.setWalkMode);
     const measureMode = useStore(s => s.measureMode);
     const setMeasureMode = useStore(s => s.setMeasureMode);
@@ -406,6 +408,20 @@ export function ClientToolbar({ projectId, isAdmin = false }: ClientToolbarProps
                     >
                         <svg className={`w-5 h-5 ${perfectRenderEnabled ? 'text-amber-400' : 'text-white/80 group-hover:text-white'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                        </svg>
+                    </button>
+
+                    {/* 精簡渲染:只渲染 LED+指定模型,鎖 60fps */}
+                    <button
+                        onClick={() => setLiteMode(!liteMode)}
+                        className={`group w-10 h-10 rounded-lg flex items-center justify-center transition-all active:scale-90 ${liteMode
+                            ? 'bg-yellow-500/25 ring-1 ring-yellow-400/50 shadow-lg shadow-yellow-500/20'
+                            : 'hover:bg-white/15'
+                            }`}
+                        title={liteMode ? '關閉精簡渲染' : '開啟精簡渲染'}
+                    >
+                        <svg className={`w-5 h-5 ${liteMode ? 'text-yellow-400' : 'text-white/80 group-hover:text-white'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
                     </button>
                 </div>
