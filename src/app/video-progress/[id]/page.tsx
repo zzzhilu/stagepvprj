@@ -10,6 +10,8 @@ import { BottomLeftPanel } from '@/components/client/BottomLeftPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ClientToolbar } from '@/components/client/ClientToolbar';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
+import { ClientEditGate } from '@/components/client/ClientEditGate';
+import { ClientGDrivePanel } from '@/components/client/ClientGDrivePanel';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
 
@@ -195,6 +197,7 @@ export default function VideoProgressEditorPage() {
                 if (data.r2Videos) setR2Videos(data.r2Videos);
                 if (data.videoFolders) setVideoFolders(data.videoFolders);
                 if (data.gdriveVideos) setGDriveVideos(data.gdriveVideos);
+                if (data.clientEditPasswordHash !== undefined) useStore.setState({ clientEditPasswordHash: data.clientEditPasswordHash });
                 if (data.ledLayouts) useStore.setState({ ledLayouts: data.ledLayouts, activeLedLayoutId: data.activeLedLayoutId ?? null });
                 if (data.gdriveFolders) setAllGDriveFolders(data.gdriveFolders);
                 if (data.floorPlanTextureUrl !== undefined) setFloorPlanTexture(data.floorPlanTextureUrl);
@@ -340,6 +343,10 @@ export default function VideoProgressEditorPage() {
 
             {/* Client Controls */}
             <ClientControls />
+
+            {/* 客戶編輯模式:右上齒輪(第二層密碼)+ 雲端資料夾連結面板 */}
+            <ClientEditGate projectId={projectId} />
+            <ClientGDrivePanel projectId={projectId} />
 
             {/* Video Controls */}
             <VideoControls />
