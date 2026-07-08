@@ -11,7 +11,6 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ClientToolbar } from '@/components/client/ClientToolbar';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ClientEditGate } from '@/components/client/ClientEditGate';
-import { ClientGDrivePanel } from '@/components/client/ClientGDrivePanel';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
 
@@ -344,9 +343,8 @@ export default function VideoProgressEditorPage() {
             {/* Client Controls */}
             <ClientControls />
 
-            {/* 客戶編輯模式:右上齒輪(第二層密碼)+ 雲端資料夾連結面板 */}
+            {/* 客戶編輯模式:右上齒輪(第二層密碼) */}
             <ClientEditGate projectId={projectId} />
-            <ClientGDrivePanel projectId={projectId} />
 
             {/* Video Controls */}
             <VideoControls />

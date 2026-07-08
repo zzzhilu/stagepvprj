@@ -12,6 +12,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ClientToolbar } from '@/components/client/ClientToolbar';
 import { ClientLayoutSwitcher } from '@/components/client/ClientLayoutSwitcher';
 import { ClientEditGate } from '@/components/client/ClientEditGate';
+import { ClientGDrivePanel } from '@/components/client/ClientGDrivePanel';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
@@ -317,6 +318,7 @@ function SharePageContent() {
 
             {/* 客戶編輯入口(右上齒輪) */}
             <ClientEditGate projectId={projectId} />
+            <ClientGDrivePanel projectId={projectId} />
 
             {/* Drawing Overlay */}
             <DrawingOverlay projectId={projectId} />

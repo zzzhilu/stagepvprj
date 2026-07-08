@@ -1,0 +1,43 @@
+diff --git a/src/app/share/[id]/page.tsx b/src/app/share/[id]/page.tsx
+index c356b3f..d60ae8f 100644
+--- a/src/app/share/[id]/page.tsx
++++ b/src/app/share/[id]/page.tsx
+@@ -12,6 +12,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
+ import { ClientToolbar } from '@/components/client/ClientToolbar';
+ import { ClientLayoutSwitcher } from '@/components/client/ClientLayoutSwitcher';
+ import { ClientEditGate } from '@/components/client/ClientEditGate';
++import { ClientGDrivePanel } from '@/components/client/ClientGDrivePanel';
+ import { DrawingOverlay } from '@/components/client/DrawingOverlay';
+ import { ProjectService } from '@/lib/project-service';
+ import { useStore } from '@/store/useStore';
+@@ -317,6 +318,7 @@ function SharePageContent() {
+ 
+             {/* 客戶編輯入口(右上齒輪) */}
+             <ClientEditGate projectId={projectId} />
++            <ClientGDrivePanel projectId={projectId} />
+ 
+             {/* Drawing Overlay */}
+             <DrawingOverlay projectId={projectId} />
+diff --git a/src/app/video-progress/[id]/page.tsx b/src/app/video-progress/[id]/page.tsx
+index f1ac84c..0ab469a 100644
+--- a/src/app/video-progress/[id]/page.tsx
++++ b/src/app/video-progress/[id]/page.tsx
+@@ -11,7 +11,6 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
+ import { ClientToolbar } from '@/components/client/ClientToolbar';
+ import { DrawingOverlay } from '@/components/client/DrawingOverlay';
+ import { ClientEditGate } from '@/components/client/ClientEditGate';
+-import { ClientGDrivePanel } from '@/components/client/ClientGDrivePanel';
+ import { ProjectService } from '@/lib/project-service';
+ import { useStore } from '@/store/useStore';
+ 
+@@ -344,9 +343,8 @@ export default function VideoProgressEditorPage() {
+             {/* Client Controls */}
+             <ClientControls />
+ 
+-            {/* 客戶編輯模式:右上齒輪(第二層密碼)+ 雲端資料夾連結面板 */}
++            {/* 客戶編輯模式:右上齒輪(第二層密碼) */}
+             <ClientEditGate projectId={projectId} />
+-            <ClientGDrivePanel projectId={projectId} />
+ 
+             {/* Video Controls */}
+             <VideoControls />
