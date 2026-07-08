@@ -1,0 +1,51 @@
+diff --git a/src/components/client/ClientGDrivePanel.tsx b/src/components/client/ClientGDrivePanel.tsx
+index bd0bd58..b3d6b3b 100644
+--- a/src/components/client/ClientGDrivePanel.tsx
++++ b/src/components/client/ClientGDrivePanel.tsx
+@@ -17,6 +17,8 @@ export function ClientGDrivePanel({ projectId }: { projectId: string }) {
+     const [message, setMessage] = useState('');
+     const [copied, setCopied] = useState(false);
+ 
++    const [open, setOpen] = useState(false);
++
+     if (!clientEditMode) return null;
+ 
+     const folderId = parseDriveFolderUrl(url);
+@@ -49,10 +51,24 @@ export function ClientGDrivePanel({ projectId }: { projectId: string }) {
+     };
+ 
+     return (
+-        <div className="fixed bottom-20 left-6 z-[90] pointer-events-auto" data-ui-element>
+-            <div className="bg-black/75 backdrop-blur-md border border-white/10 rounded-xl p-4 w-80 shadow-xl space-y-3">
+-                <div className="text-xs font-bold text-white flex items-center gap-1.5">
++        <>
++            {/* 觸發按鈕:右上編輯區下方,雲朵圖示 */}
++            <button
++                onClick={() => setOpen(true)}
++                data-ui-element
++                className="fixed top-16 right-4 z-[95] pointer-events-auto flex items-center gap-1.5 bg-cyan-600/90 hover:bg-cyan-500 text-white text-xs font-medium px-3 py-1.5 rounded-full backdrop-blur-md shadow-lg"
++                title="連結我的雲端資料夾"
++            >
++                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg>
++                連結雲端
++            </button>
++
++            {!open ? null : (
++            <div className="fixed inset-0 z-[9998] bg-black/50 flex items-center justify-center p-4 pointer-events-auto" data-ui-element onClick={() => setOpen(false)}>
++            <div className="bg-gray-900/95 backdrop-blur-md border border-white/10 rounded-xl p-4 w-80 shadow-xl space-y-3" onClick={(e) => e.stopPropagation()}>
++                <div className="text-xs font-bold text-white flex items-center justify-between">
+                     <span>📁 連結我的雲端資料夾</span>
++                    <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-white text-sm">✕</button>
+                 </div>
+ 
+                 {/* 提醒:加入服務帳號為檢視者 */}
+@@ -97,6 +113,8 @@ export function ClientGDrivePanel({ projectId }: { projectId: string }) {
+                     <p className={`text-[10px] ${status === 'done' ? 'text-green-400' : 'text-red-400'}`}>{message}</p>
+                 )}
+             </div>
+-        </div>
++            </div>
++            )}
++        </>
+     );
+ }
