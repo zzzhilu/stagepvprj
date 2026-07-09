@@ -13,6 +13,7 @@ import { ClientToolbar } from '@/components/client/ClientToolbar';
 import { ClientLayoutSwitcher } from '@/components/client/ClientLayoutSwitcher';
 import { ClientEditGate } from '@/components/client/ClientEditGate';
 import { ClientGDrivePanel } from '@/components/client/ClientGDrivePanel';
+import { LayoutAutoSwitcher } from '@/components/client/LayoutAutoSwitcher';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
@@ -100,37 +101,36 @@ function SharePageContent() {
             setProjectName(data.name || '未命名專案');
 
             // Load project state into store
-            if (data.stageObjects) setStageObjects(data.stageObjects);
-            if (data.views) setViews(data.views);
-            if (data.cues) setCues(data.cues);
-            if (data.r2Videos) setR2Videos(data.r2Videos);
-            if (data.gdriveVideos) setGDriveVideos(data.gdriveVideos);
-            if (data.clientEditPasswordHash !== undefined) useStore.setState({ clientEditPasswordHash: data.clientEditPasswordHash });
-            if (data.liteModeKeepIds) useStore.setState({ liteModeKeepIds: data.liteModeKeepIds });
-            if (data.gdriveFolders) setAllGDriveFolders(data.gdriveFolders);
-
-            // Restore lighting settings from project (if saved)
-            if (data.ambientIntensity !== undefined) setAmbientIntensity(data.ambientIntensity);
-            if (data.directionalIntensity !== undefined) setDirectionalIntensity(data.directionalIntensity);
-            if (data.bloomIntensity !== undefined) setBloomIntensity(data.bloomIntensity);
-            if (data.bloomThreshold !== undefined) setBloomThreshold(data.bloomThreshold);
-            // Restore perfect render settings
-            if (data.perfectRenderEnabled !== undefined) setPerfectRenderEnabled(data.perfectRenderEnabled);
-            if (data.envPreset !== undefined) setEnvPreset(data.envPreset);
-            if (data.envIntensity !== undefined) setEnvIntensity(data.envIntensity);
-            if (data.contactShadow !== undefined) setContactShadow(data.contactShadow);
-            if (data.toneMapping !== undefined) setToneMapping(data.toneMapping);
-            if (data.spotLights !== undefined) useStore.setState({ spotLights: data.spotLights });
-
-            // 機關系統:還原定義,當前值從各機關的 defaultValue 開始
+            // [效能] 專案還原合併為單次 setState:原本 20+ 次分散 setter 每次都觸發
+            // 全訂閱者重渲染,初始化期主執行緒阻塞的主因之一。所有 setter 均為純 set,合併安全。
             useStore.setState({
+                ...(data.stageObjects ? { stageObjects: data.stageObjects } : {}),
+                ...(data.views ? { views: data.views } : {}),
+                ...(data.cues ? { cues: data.cues } : {}),
+                ...(data.r2Videos ? { r2Videos: data.r2Videos } : {}),
+                ...(data.gdriveVideos ? { gdriveVideos: data.gdriveVideos } : {}),
+                ...(data.clientEditPasswordHash !== undefined ? { clientEditPasswordHash: data.clientEditPasswordHash } : {}),
+                ...(data.liteModeKeepIds ? { liteModeKeepIds: data.liteModeKeepIds } : {}),
+                ...(data.gdriveFolders ? { gdriveFolders: data.gdriveFolders } : {}),
+                ...(data.ledLayouts ? { ledLayouts: data.ledLayouts, activeLedLayoutId: data.activeLedLayoutId ?? null } : {}),
+                ...(data.ambientIntensity !== undefined ? { ambientIntensity: data.ambientIntensity } : {}),
+                ...(data.directionalIntensity !== undefined ? { directionalIntensity: data.directionalIntensity } : {}),
+                ...(data.bloomIntensity !== undefined ? { bloomIntensity: data.bloomIntensity } : {}),
+                ...(data.bloomThreshold !== undefined ? { bloomThreshold: data.bloomThreshold } : {}),
+                ...(data.perfectRenderEnabled !== undefined ? { perfectRenderEnabled: data.perfectRenderEnabled } : {}),
+                ...(data.envPreset !== undefined ? { envPreset: data.envPreset } : {}),
+                ...(data.envIntensity !== undefined ? { envIntensity: data.envIntensity } : {}),
+                ...(data.contactShadow !== undefined ? { contactShadow: data.contactShadow } : {}),
+                ...(data.toneMapping !== undefined ? { toneMapping: data.toneMapping } : {}),
+                ...(data.spotLights !== undefined ? { spotLights: data.spotLights } : {}),
+                ...(data.reflectionMirror !== undefined ? { reflectionMirror: data.reflectionMirror } : {}),
+                ...(data.reflectionBlur !== undefined ? { reflectionBlur: data.reflectionBlur } : {}),
+                ...(data.reflectionMetalness !== undefined ? { reflectionMetalness: data.reflectionMetalness } : {}),
+                // 機關系統:還原定義,當前值從 defaultValue 開始
                 nulls: data.nulls || [],
                 rigs: data.rigs || [],
                 rigValues: {},
             });
-            if (data.reflectionMirror !== undefined) setReflectionMirror(data.reflectionMirror);
-            if (data.reflectionBlur !== undefined) setReflectionBlur(data.reflectionBlur);
-            if (data.reflectionMetalness !== undefined) setReflectionMetalness(data.reflectionMetalness);
 
             // Find the specified video
             if (videoId) {
@@ -142,7 +142,8 @@ function SharePageContent() {
                     if (video) isR2 = true;
                 }
                 if (!video && data.gdriveVideos) {
-                    video = data.gdriveVideos.find((v: any) => v.id === videoId);
+                    // 相容新(driveFileId)舊(隨機 id)兩種連結格式
+                    video = data.gdriveVideos.find((v: any) => v.id === videoId || v.driveFileId === videoId);
                 }
 
                 if (!video) {
@@ -258,7 +259,7 @@ function SharePageContent() {
             const allVideos = getAllVideos();
 
             const targetCueId = cueId ||
-                (videoId && allVideos.find((v: { id: string; cueId?: string }) => v.id === videoId)?.cueId) ||
+                (videoId && allVideos.find((v: { id: string; cueId?: string; driveFileId?: string }) => v.id === videoId || (v as any).driveFileId === videoId)?.cueId) ||
                 (!videoId && allVideos[0]?.cueId);
             if (targetCueId && data.cues?.length) {
                 // Small delay to ensure store is hydrated
@@ -319,6 +320,8 @@ function SharePageContent() {
             {/* 客戶編輯入口(右上齒輪) */}
             <ClientEditGate projectId={projectId} />
             <ClientGDrivePanel projectId={projectId} />
+            {/* 檔名自動切換 UV 排列 */}
+            <LayoutAutoSwitcher />
 
             {/* Drawing Overlay */}
             <DrawingOverlay projectId={projectId} />

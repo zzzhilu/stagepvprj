@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { draco } from '@gltf-transform/functions';
+import { draco, textureCompress } from '@gltf-transform/functions';
 import { rateLimit } from '@/lib/ratelimit';
 
 export async function POST(request: NextRequest) {
@@ -74,6 +74,17 @@ export async function POST(request: NextRequest) {
 
         // Read the GLB file
         const document = await io.readBinary(new Uint8Array(arrayBuffer));
+
+        // [效能] 貼圖轉 WebP(q90 視覺無感,傳輸量大減)。sharp 不可用或轉換失敗時
+        // 跳過僅做 Draco(前端另有原檔 fallback,上傳不會因此失敗)。
+        try {
+            const sharp = (await import('sharp')).default;
+            await document.transform(
+                textureCompress({ encoder: sharp, targetFormat: 'webp', quality: 90 })
+            );
+        } catch (texErr) {
+            console.warn('[compress-glb] WebP texture compress unavailable, Draco only:', texErr);
+        }
 
         // Apply Draco compression
         await document.transform(

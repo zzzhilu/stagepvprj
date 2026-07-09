@@ -11,6 +11,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ClientUploader } from '@/components/client/ClientUploader';
 import { ClientLayoutSwitcher } from '@/components/client/ClientLayoutSwitcher';
 import { ClientEditGate } from '@/components/client/ClientEditGate';
+import { LayoutAutoSwitcher } from '@/components/client/LayoutAutoSwitcher';
 import { ObjectHoverTooltip } from '@/components/admin/ObjectHoverTooltip';
 import { ClientToolbar } from '@/components/client/ClientToolbar';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
@@ -207,38 +208,37 @@ function ProjectEditorContent() {
             if (data) {
                 // Load project state into store
                 if (data.name) setCurrentProjectName(data.name);
-                if (data.stageObjects) setStageObjects(data.stageObjects);
-                if (data.views) setViews(data.views);
-                if (data.contentTextures) setContentTextures(data.contentTextures);
-                if (data.activeViewId) setActiveView(data.activeViewId);
-                if (data.activeContentId) setActiveContent(data.activeContentId);
-                if (data.cues) setCues(data.cues); // [NEW]
-                if (data.r2Videos) setR2Videos(data.r2Videos);
-                if (data.videoFolders) setVideoFolders(data.videoFolders);
-                if (data.gdriveVideos) setGDriveVideos(data.gdriveVideos);
-                if (data.ledLayouts) useStore.setState({ ledLayouts: data.ledLayouts, activeLedLayoutId: data.activeLedLayoutId ?? null });
-                if (typeof data.screenCropRatio === 'number') useStore.setState({ screenCropRatio: data.screenCropRatio });
-                if (data.clientEditPasswordHash !== undefined) useStore.setState({ clientEditPasswordHash: data.clientEditPasswordHash });
-                if (data.liteModeKeepIds) useStore.setState({ liteModeKeepIds: data.liteModeKeepIds });
-                if (data.gdriveFolders) setAllGDriveFolders(data.gdriveFolders);
-                if (data.floorPlanTextureUrl !== undefined) setFloorPlanTexture(data.floorPlanTextureUrl);
-                // Restore lighting settings from project (if saved)
-                if (data.ambientIntensity !== undefined) setAmbientIntensity(data.ambientIntensity);
-                if (data.directionalIntensity !== undefined) setDirectionalIntensity(data.directionalIntensity);
-                if (data.bloomIntensity !== undefined) setBloomIntensity(data.bloomIntensity);
-                if (data.bloomThreshold !== undefined) setBloomThreshold(data.bloomThreshold);
-                // Restore perfect render settings
-                if (data.perfectRenderEnabled !== undefined) setPerfectRenderEnabled(data.perfectRenderEnabled);
-                if (data.envPreset !== undefined) setEnvPreset(data.envPreset);
-                if (data.envIntensity !== undefined) setEnvIntensity(data.envIntensity);
-                if (data.contactShadow !== undefined) setContactShadow(data.contactShadow);
-                if (data.toneMapping !== undefined) setToneMapping(data.toneMapping);
-                if (data.spotLights !== undefined) useStore.setState({ spotLights: data.spotLights });
-                if (data.reflectionMirror !== undefined) setReflectionMirror(data.reflectionMirror);
-                if (data.reflectionBlur !== undefined) setReflectionBlur(data.reflectionBlur);
-                if (data.reflectionMetalness !== undefined) setReflectionMetalness(data.reflectionMetalness);
-                // Restore Rigs/Nulls
+                // [效能] 專案還原合併為單次 setState(原本 25+ 次分散 setter,初始化重渲染風暴主因)
                 useStore.setState({
+                    ...(data.stageObjects ? { stageObjects: data.stageObjects } : {}),
+                    ...(data.views ? { views: data.views } : {}),
+                    ...(data.contentTextures ? { contentTextures: data.contentTextures } : {}),
+                    ...(data.activeViewId ? { activeViewId: data.activeViewId } : {}),
+                    ...(data.activeContentId ? { activeContentId: data.activeContentId } : {}),
+                    ...(data.cues ? { cues: data.cues } : {}),
+                    ...(data.r2Videos ? { r2Videos: data.r2Videos } : {}),
+                    ...(data.videoFolders ? { videoFolders: data.videoFolders } : {}),
+                    ...(data.gdriveVideos ? { gdriveVideos: data.gdriveVideos } : {}),
+                    ...(data.ledLayouts ? { ledLayouts: data.ledLayouts, activeLedLayoutId: data.activeLedLayoutId ?? null } : {}),
+                    ...(typeof data.screenCropRatio === 'number' ? { screenCropRatio: data.screenCropRatio } : {}),
+                    ...(data.clientEditPasswordHash !== undefined ? { clientEditPasswordHash: data.clientEditPasswordHash } : {}),
+                    ...(data.liteModeKeepIds ? { liteModeKeepIds: data.liteModeKeepIds } : {}),
+                    ...(data.gdriveFolders ? { gdriveFolders: data.gdriveFolders } : {}),
+                    ...(data.floorPlanTextureUrl !== undefined ? { floorPlanTextureUrl: data.floorPlanTextureUrl } : {}),
+                    ...(data.ambientIntensity !== undefined ? { ambientIntensity: data.ambientIntensity } : {}),
+                    ...(data.directionalIntensity !== undefined ? { directionalIntensity: data.directionalIntensity } : {}),
+                    ...(data.bloomIntensity !== undefined ? { bloomIntensity: data.bloomIntensity } : {}),
+                    ...(data.bloomThreshold !== undefined ? { bloomThreshold: data.bloomThreshold } : {}),
+                    ...(data.perfectRenderEnabled !== undefined ? { perfectRenderEnabled: data.perfectRenderEnabled } : {}),
+                    ...(data.envPreset !== undefined ? { envPreset: data.envPreset } : {}),
+                    ...(data.envIntensity !== undefined ? { envIntensity: data.envIntensity } : {}),
+                    ...(data.contactShadow !== undefined ? { contactShadow: data.contactShadow } : {}),
+                    ...(data.toneMapping !== undefined ? { toneMapping: data.toneMapping } : {}),
+                    ...(data.spotLights !== undefined ? { spotLights: data.spotLights } : {}),
+                    ...(data.reflectionMirror !== undefined ? { reflectionMirror: data.reflectionMirror } : {}),
+                    ...(data.reflectionBlur !== undefined ? { reflectionBlur: data.reflectionBlur } : {}),
+                    ...(data.reflectionMetalness !== undefined ? { reflectionMetalness: data.reflectionMetalness } : {}),
+                    // 機關系統:還原定義,當前值從 defaultValue 開始
                     nulls: data.nulls || [],
                     rigs: data.rigs || [],
                     rigValues: {},
@@ -354,6 +354,7 @@ function ProjectEditorContent() {
             {isShareMode && <div data-ui-element><ClientUploader /></div>}
             {isShareMode && <div data-ui-element><ClientLayoutSwitcher /></div>}
             {isShareMode && <div data-ui-element><ClientEditGate projectId={projectId} /></div>}
+            {isShareMode && <LayoutAutoSwitcher />}
 
             {/* 後台:模型懸停名稱提示 */}
             {!isShareMode && <ObjectHoverTooltip />}

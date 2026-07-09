@@ -154,7 +154,9 @@ export function GDriveVideoManager({ projectId, onSave }: { projectId: string; o
     };
 
     const handleShare = (video: any) => {
-        const shareUrl = `${window.location.origin}/share/${projectId}?video=${video.id}`;
+        // 用 driveFileId(Google Drive 永久檔案 ID)作為連結參數:
+        // 重新同步/更換資料夾後隨機 id 會變,但 driveFileId 不變 → 連結永久有效
+        const shareUrl = `${window.location.origin}/share/${projectId}?video=${video.driveFileId || video.id}`;
         navigator.clipboard.writeText(shareUrl);
         setCopiedId(video.id);
         setTimeout(() => setCopiedId(null), 2000);
