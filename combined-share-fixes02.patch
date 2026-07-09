@@ -1,0 +1,495 @@
+diff --git a/package.json b/package.json
+index f613570..000d68e 100644
+--- a/package.json
++++ b/package.json
+@@ -34,6 +34,7 @@
+     "postprocessing": "^6.38.2",
+     "react": "19.2.3",
+     "react-dom": "19.2.3",
++    "sharp": "^0.34.5",
+     "three": "^0.182.0",
+     "zustand": "^5.0.9"
+   },
+diff --git a/src/app/api/compress-glb/route.ts b/src/app/api/compress-glb/route.ts
+index 5ff4899..bb76214 100644
+--- a/src/app/api/compress-glb/route.ts
++++ b/src/app/api/compress-glb/route.ts
+@@ -1,7 +1,7 @@
+ import { NextRequest, NextResponse } from 'next/server';
+ import { NodeIO } from '@gltf-transform/core';
+ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
+-import { draco } from '@gltf-transform/functions';
++import { draco, textureCompress } from '@gltf-transform/functions';
+ import { rateLimit } from '@/lib/ratelimit';
+ 
+ export async function POST(request: NextRequest) {
+@@ -75,6 +75,17 @@ export async function POST(request: NextRequest) {
+         // Read the GLB file
+         const document = await io.readBinary(new Uint8Array(arrayBuffer));
+ 
++        // [效能] 貼圖轉 WebP(q90 視覺無感,傳輸量大減)。sharp 不可用或轉換失敗時
++        // 跳過僅做 Draco(前端另有原檔 fallback,上傳不會因此失敗)。
++        try {
++            const sharp = (await import('sharp')).default;
++            await document.transform(
++                textureCompress({ encoder: sharp, targetFormat: 'webp', quality: 90 })
++            );
++        } catch (texErr) {
++            console.warn('[compress-glb] WebP texture compress unavailable, Draco only:', texErr);
++        }
++
+         // Apply Draco compression
+         await document.transform(
+             draco({
+diff --git a/src/app/api/drive/direct-url/[fileId]/route.ts b/src/app/api/drive/direct-url/[fileId]/route.ts
+index 08e1be0..08b7d18 100644
+--- a/src/app/api/drive/direct-url/[fileId]/route.ts
++++ b/src/app/api/drive/direct-url/[fileId]/route.ts
+@@ -30,6 +30,7 @@ export async function GET(
+       metadata = await drive.files.get({
+         fileId,
+         fields: 'id, name, mimeType, size, webContentLink',
++        supportsAllDrives: true, // Shared Drive 支援
+       });
+     } catch (e: any) {
+       console.error('[Direct URL] File not found:', fileId, e.message);
+diff --git a/src/app/api/drive/proxy/route.ts b/src/app/api/drive/proxy/route.ts
+index e2868de..054878a 100644
+--- a/src/app/api/drive/proxy/route.ts
++++ b/src/app/api/drive/proxy/route.ts
+@@ -25,7 +25,7 @@ export async function GET(request: Request) {
+     }
+     
+     const res = await drive.files.get(
+-      { fileId, alt: 'media' },
++      { fileId, alt: 'media', supportsAllDrives: true }, // Shared Drive 支援
+       { responseType: 'stream', headers }
+     );
+ 
+diff --git a/src/app/api/drive/stream/[fileId]/route.ts b/src/app/api/drive/stream/[fileId]/route.ts
+index ec6067b..dba176b 100644
+--- a/src/app/api/drive/stream/[fileId]/route.ts
++++ b/src/app/api/drive/stream/[fileId]/route.ts
+@@ -34,6 +34,7 @@ export async function GET(
+         const metadataRes = await drive.files.get({
+           fileId,
+           fields: 'size, mimeType',
++            supportsAllDrives: true, // Shared Drive 支援
+         });
+         const rawMime = metadataRes.data.mimeType || 'video/mp4';
+         meta = {
+@@ -61,7 +62,7 @@ export async function GET(
+         const chunkSize = end - start + 1;
+ 
+         const rangeRes = await drive.files.get(
+-          { fileId, alt: 'media' },
++          { fileId, alt: 'media', supportsAllDrives: true },
+           {
+             responseType: 'stream',
+             headers: { Range: `bytes=${start}-${end}` },
+@@ -94,7 +95,7 @@ export async function GET(
+ 
+     // --- 3. Full file request (no Range) ---
+     const fullRes = await drive.files.get(
+-      { fileId, alt: 'media' },
++      { fileId, alt: 'media', supportsAllDrives: true },
+       { responseType: 'stream' }
+     );
+ 
+diff --git a/src/app/api/drive/sync/route.ts b/src/app/api/drive/sync/route.ts
+index a0ed242..494abda 100644
+--- a/src/app/api/drive/sync/route.ts
++++ b/src/app/api/drive/sync/route.ts
+@@ -25,7 +25,8 @@ export async function GET(request: Request) {
+     // Get Folder details
+     const folderRes = await drive.files.get({
+         fileId: folderId,
+-        fields: 'id, name, createdTime'
++        fields: 'id, name, createdTime',
++        supportsAllDrives: true, // Workspace 共用雲端硬碟(Shared Drive)必要
+     });
+     
+     const folder = {
+@@ -40,6 +41,9 @@ export async function GET(request: Request) {
+       fields: 'files(id, name, thumbnailLink, createdTime, size)',
+       spaces: 'drive',
+       pageSize: 100,
++      // Workspace 共用雲端硬碟(Shared Drive)支援:缺這兩個參數會讀不到共用雲端內的檔案
++      supportsAllDrives: true,
++      includeItemsFromAllDrives: true,
+     });
+ 
+     const files = res.data.files || [];
+diff --git a/src/app/free-test/[id]/page.tsx b/src/app/free-test/[id]/page.tsx
+index 6b3601f..d5b5412 100644
+--- a/src/app/free-test/[id]/page.tsx
++++ b/src/app/free-test/[id]/page.tsx
+@@ -11,6 +11,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
+ import { ClientUploader } from '@/components/client/ClientUploader';
+ import { ClientLayoutSwitcher } from '@/components/client/ClientLayoutSwitcher';
+ import { ClientEditGate } from '@/components/client/ClientEditGate';
++import { LayoutAutoSwitcher } from '@/components/client/LayoutAutoSwitcher';
+ import { ObjectHoverTooltip } from '@/components/admin/ObjectHoverTooltip';
+ import { ClientToolbar } from '@/components/client/ClientToolbar';
+ import { DrawingOverlay } from '@/components/client/DrawingOverlay';
+@@ -207,38 +208,37 @@ function ProjectEditorContent() {
+             if (data) {
+                 // Load project state into store
+                 if (data.name) setCurrentProjectName(data.name);
+-                if (data.stageObjects) setStageObjects(data.stageObjects);
+-                if (data.views) setViews(data.views);
+-                if (data.contentTextures) setContentTextures(data.contentTextures);
+-                if (data.activeViewId) setActiveView(data.activeViewId);
+-                if (data.activeContentId) setActiveContent(data.activeContentId);
+-                if (data.cues) setCues(data.cues); // [NEW]
+-                if (data.r2Videos) setR2Videos(data.r2Videos);
+-                if (data.videoFolders) setVideoFolders(data.videoFolders);
+-                if (data.gdriveVideos) setGDriveVideos(data.gdriveVideos);
+-                if (data.ledLayouts) useStore.setState({ ledLayouts: data.ledLayouts, activeLedLayoutId: data.activeLedLayoutId ?? null });
+-                if (typeof data.screenCropRatio === 'number') useStore.setState({ screenCropRatio: data.screenCropRatio });
+-                if (data.clientEditPasswordHash !== undefined) useStore.setState({ clientEditPasswordHash: data.clientEditPasswordHash });
+-                if (data.liteModeKeepIds) useStore.setState({ liteModeKeepIds: data.liteModeKeepIds });
+-                if (data.gdriveFolders) setAllGDriveFolders(data.gdriveFolders);
+-                if (data.floorPlanTextureUrl !== undefined) setFloorPlanTexture(data.floorPlanTextureUrl);
+-                // Restore lighting settings from project (if saved)
+-                if (data.ambientIntensity !== undefined) setAmbientIntensity(data.ambientIntensity);
+-                if (data.directionalIntensity !== undefined) setDirectionalIntensity(data.directionalIntensity);
+-                if (data.bloomIntensity !== undefined) setBloomIntensity(data.bloomIntensity);
+-                if (data.bloomThreshold !== undefined) setBloomThreshold(data.bloomThreshold);
+-                // Restore perfect render settings
+-                if (data.perfectRenderEnabled !== undefined) setPerfectRenderEnabled(data.perfectRenderEnabled);
+-                if (data.envPreset !== undefined) setEnvPreset(data.envPreset);
+-                if (data.envIntensity !== undefined) setEnvIntensity(data.envIntensity);
+-                if (data.contactShadow !== undefined) setContactShadow(data.contactShadow);
+-                if (data.toneMapping !== undefined) setToneMapping(data.toneMapping);
+-                if (data.spotLights !== undefined) useStore.setState({ spotLights: data.spotLights });
+-                if (data.reflectionMirror !== undefined) setReflectionMirror(data.reflectionMirror);
+-                if (data.reflectionBlur !== undefined) setReflectionBlur(data.reflectionBlur);
+-                if (data.reflectionMetalness !== undefined) setReflectionMetalness(data.reflectionMetalness);
+-                // Restore Rigs/Nulls
++                // [效能] 專案還原合併為單次 setState(原本 25+ 次分散 setter,初始化重渲染風暴主因)
+                 useStore.setState({
++                    ...(data.stageObjects ? { stageObjects: data.stageObjects } : {}),
++                    ...(data.views ? { views: data.views } : {}),
++                    ...(data.contentTextures ? { contentTextures: data.contentTextures } : {}),
++                    ...(data.activeViewId ? { activeViewId: data.activeViewId } : {}),
++                    ...(data.activeContentId ? { activeContentId: data.activeContentId } : {}),
++                    ...(data.cues ? { cues: data.cues } : {}),
++                    ...(data.r2Videos ? { r2Videos: data.r2Videos } : {}),
++                    ...(data.videoFolders ? { videoFolders: data.videoFolders } : {}),
++                    ...(data.gdriveVideos ? { gdriveVideos: data.gdriveVideos } : {}),
++                    ...(data.ledLayouts ? { ledLayouts: data.ledLayouts, activeLedLayoutId: data.activeLedLayoutId ?? null } : {}),
++                    ...(typeof data.screenCropRatio === 'number' ? { screenCropRatio: data.screenCropRatio } : {}),
++                    ...(data.clientEditPasswordHash !== undefined ? { clientEditPasswordHash: data.clientEditPasswordHash } : {}),
++                    ...(data.liteModeKeepIds ? { liteModeKeepIds: data.liteModeKeepIds } : {}),
++                    ...(data.gdriveFolders ? { gdriveFolders: data.gdriveFolders } : {}),
++                    ...(data.floorPlanTextureUrl !== undefined ? { floorPlanTextureUrl: data.floorPlanTextureUrl } : {}),
++                    ...(data.ambientIntensity !== undefined ? { ambientIntensity: data.ambientIntensity } : {}),
++                    ...(data.directionalIntensity !== undefined ? { directionalIntensity: data.directionalIntensity } : {}),
++                    ...(data.bloomIntensity !== undefined ? { bloomIntensity: data.bloomIntensity } : {}),
++                    ...(data.bloomThreshold !== undefined ? { bloomThreshold: data.bloomThreshold } : {}),
++                    ...(data.perfectRenderEnabled !== undefined ? { perfectRenderEnabled: data.perfectRenderEnabled } : {}),
++                    ...(data.envPreset !== undefined ? { envPreset: data.envPreset } : {}),
++                    ...(data.envIntensity !== undefined ? { envIntensity: data.envIntensity } : {}),
++                    ...(data.contactShadow !== undefined ? { contactShadow: data.contactShadow } : {}),
++                    ...(data.toneMapping !== undefined ? { toneMapping: data.toneMapping } : {}),
++                    ...(data.spotLights !== undefined ? { spotLights: data.spotLights } : {}),
++                    ...(data.reflectionMirror !== undefined ? { reflectionMirror: data.reflectionMirror } : {}),
++                    ...(data.reflectionBlur !== undefined ? { reflectionBlur: data.reflectionBlur } : {}),
++                    ...(data.reflectionMetalness !== undefined ? { reflectionMetalness: data.reflectionMetalness } : {}),
++                    // 機關系統:還原定義,當前值從 defaultValue 開始
+                     nulls: data.nulls || [],
+                     rigs: data.rigs || [],
+                     rigValues: {},
+@@ -354,6 +354,7 @@ function ProjectEditorContent() {
+             {isShareMode && <div data-ui-element><ClientUploader /></div>}
+             {isShareMode && <div data-ui-element><ClientLayoutSwitcher /></div>}
+             {isShareMode && <div data-ui-element><ClientEditGate projectId={projectId} /></div>}
++            {isShareMode && <LayoutAutoSwitcher />}
+ 
+             {/* 後台:模型懸停名稱提示 */}
+             {!isShareMode && <ObjectHoverTooltip />}
+diff --git a/src/app/share/[id]/page.tsx b/src/app/share/[id]/page.tsx
+index d60ae8f..3ea56e4 100644
+--- a/src/app/share/[id]/page.tsx
++++ b/src/app/share/[id]/page.tsx
+@@ -13,6 +13,7 @@ import { ClientToolbar } from '@/components/client/ClientToolbar';
+ import { ClientLayoutSwitcher } from '@/components/client/ClientLayoutSwitcher';
+ import { ClientEditGate } from '@/components/client/ClientEditGate';
+ import { ClientGDrivePanel } from '@/components/client/ClientGDrivePanel';
++import { LayoutAutoSwitcher } from '@/components/client/LayoutAutoSwitcher';
+ import { DrawingOverlay } from '@/components/client/DrawingOverlay';
+ import { ProjectService } from '@/lib/project-service';
+ import { useStore } from '@/store/useStore';
+@@ -100,37 +101,36 @@ function SharePageContent() {
+             setProjectName(data.name || '未命名專案');
+ 
+             // Load project state into store
+-            if (data.stageObjects) setStageObjects(data.stageObjects);
+-            if (data.views) setViews(data.views);
+-            if (data.cues) setCues(data.cues);
+-            if (data.r2Videos) setR2Videos(data.r2Videos);
+-            if (data.gdriveVideos) setGDriveVideos(data.gdriveVideos);
+-            if (data.clientEditPasswordHash !== undefined) useStore.setState({ clientEditPasswordHash: data.clientEditPasswordHash });
+-            if (data.liteModeKeepIds) useStore.setState({ liteModeKeepIds: data.liteModeKeepIds });
+-            if (data.gdriveFolders) setAllGDriveFolders(data.gdriveFolders);
+-
+-            // Restore lighting settings from project (if saved)
+-            if (data.ambientIntensity !== undefined) setAmbientIntensity(data.ambientIntensity);
+-            if (data.directionalIntensity !== undefined) setDirectionalIntensity(data.directionalIntensity);
+-            if (data.bloomIntensity !== undefined) setBloomIntensity(data.bloomIntensity);
+-            if (data.bloomThreshold !== undefined) setBloomThreshold(data.bloomThreshold);
+-            // Restore perfect render settings
+-            if (data.perfectRenderEnabled !== undefined) setPerfectRenderEnabled(data.perfectRenderEnabled);
+-            if (data.envPreset !== undefined) setEnvPreset(data.envPreset);
+-            if (data.envIntensity !== undefined) setEnvIntensity(data.envIntensity);
+-            if (data.contactShadow !== undefined) setContactShadow(data.contactShadow);
+-            if (data.toneMapping !== undefined) setToneMapping(data.toneMapping);
+-            if (data.spotLights !== undefined) useStore.setState({ spotLights: data.spotLights });
+-
+-            // 機關系統:還原定義,當前值從各機關的 defaultValue 開始
++            // [效能] 專案還原合併為單次 setState:原本 20+ 次分散 setter 每次都觸發
++            // 全訂閱者重渲染,初始化期主執行緒阻塞的主因之一。所有 setter 均為純 set,合併安全。
+             useStore.setState({
++                ...(data.stageObjects ? { stageObjects: data.stageObjects } : {}),
++                ...(data.views ? { views: data.views } : {}),
++                ...(data.cues ? { cues: data.cues } : {}),
++                ...(data.r2Videos ? { r2Videos: data.r2Videos } : {}),
++                ...(data.gdriveVideos ? { gdriveVideos: data.gdriveVideos } : {}),
++                ...(data.clientEditPasswordHash !== undefined ? { clientEditPasswordHash: data.clientEditPasswordHash } : {}),
++                ...(data.liteModeKeepIds ? { liteModeKeepIds: data.liteModeKeepIds } : {}),
++                ...(data.gdriveFolders ? { gdriveFolders: data.gdriveFolders } : {}),
++                ...(data.ledLayouts ? { ledLayouts: data.ledLayouts, activeLedLayoutId: data.activeLedLayoutId ?? null } : {}),
++                ...(data.ambientIntensity !== undefined ? { ambientIntensity: data.ambientIntensity } : {}),
++                ...(data.directionalIntensity !== undefined ? { directionalIntensity: data.directionalIntensity } : {}),
++                ...(data.bloomIntensity !== undefined ? { bloomIntensity: data.bloomIntensity } : {}),
++                ...(data.bloomThreshold !== undefined ? { bloomThreshold: data.bloomThreshold } : {}),
++                ...(data.perfectRenderEnabled !== undefined ? { perfectRenderEnabled: data.perfectRenderEnabled } : {}),
++                ...(data.envPreset !== undefined ? { envPreset: data.envPreset } : {}),
++                ...(data.envIntensity !== undefined ? { envIntensity: data.envIntensity } : {}),
++                ...(data.contactShadow !== undefined ? { contactShadow: data.contactShadow } : {}),
++                ...(data.toneMapping !== undefined ? { toneMapping: data.toneMapping } : {}),
++                ...(data.spotLights !== undefined ? { spotLights: data.spotLights } : {}),
++                ...(data.reflectionMirror !== undefined ? { reflectionMirror: data.reflectionMirror } : {}),
++                ...(data.reflectionBlur !== undefined ? { reflectionBlur: data.reflectionBlur } : {}),
++                ...(data.reflectionMetalness !== undefined ? { reflectionMetalness: data.reflectionMetalness } : {}),
++                // 機關系統:還原定義,當前值從 defaultValue 開始
+                 nulls: data.nulls || [],
+                 rigs: data.rigs || [],
+                 rigValues: {},
+             });
+-            if (data.reflectionMirror !== undefined) setReflectionMirror(data.reflectionMirror);
+-            if (data.reflectionBlur !== undefined) setReflectionBlur(data.reflectionBlur);
+-            if (data.reflectionMetalness !== undefined) setReflectionMetalness(data.reflectionMetalness);
+ 
+             // Find the specified video
+             if (videoId) {
+@@ -142,7 +142,8 @@ function SharePageContent() {
+                     if (video) isR2 = true;
+                 }
+                 if (!video && data.gdriveVideos) {
+-                    video = data.gdriveVideos.find((v: any) => v.id === videoId);
++                    // 相容新(driveFileId)舊(隨機 id)兩種連結格式
++                    video = data.gdriveVideos.find((v: any) => v.id === videoId || v.driveFileId === videoId);
+                 }
+ 
+                 if (!video) {
+@@ -258,7 +259,7 @@ function SharePageContent() {
+             const allVideos = getAllVideos();
+ 
+             const targetCueId = cueId ||
+-                (videoId && allVideos.find((v: { id: string; cueId?: string }) => v.id === videoId)?.cueId) ||
++                (videoId && allVideos.find((v: { id: string; cueId?: string; driveFileId?: string }) => v.id === videoId || (v as any).driveFileId === videoId)?.cueId) ||
+                 (!videoId && allVideos[0]?.cueId);
+             if (targetCueId && data.cues?.length) {
+                 // Small delay to ensure store is hydrated
+@@ -319,6 +320,8 @@ function SharePageContent() {
+             {/* 客戶編輯入口(右上齒輪) */}
+             <ClientEditGate projectId={projectId} />
+             <ClientGDrivePanel projectId={projectId} />
++            {/* 檔名自動切換 UV 排列 */}
++            <LayoutAutoSwitcher />
+ 
+             {/* Drawing Overlay */}
+             <DrawingOverlay projectId={projectId} />
+diff --git a/src/components/admin/GDriveVideoManager.tsx b/src/components/admin/GDriveVideoManager.tsx
+index c760be5..cf200ec 100644
+--- a/src/components/admin/GDriveVideoManager.tsx
++++ b/src/components/admin/GDriveVideoManager.tsx
+@@ -15,6 +15,7 @@ export function GDriveVideoManager({ projectId, onSave }: { projectId: string; o
+     const gdriveVideos = useStore(state => state.gdriveVideos);
+     const setGDriveVideos = useStore(state => state.setGDriveVideos);
+     const cues = useStore((state) => state.cues);
++    const ledLayouts = useStore(state => state.ledLayouts);
+     const contentTextures = useStore((state) => state.contentTextures);
+     const addContentTexture = useStore((state) => state.addContentTexture);
+     const setActiveContent = useStore((state) => state.setActiveContent);
+@@ -153,8 +154,18 @@ export function GDriveVideoManager({ projectId, onSave }: { projectId: string; o
+         if (onSave) onSave();
+     };
+ 
++    // 手動指定影片的 UV 排列(覆蓋檔名自動偵測;''=自動、'__default__'=強制預設 UV)
++    const updateLayoutId = (videoId: string, layoutId: string | undefined) => {
++        const updated = gdriveVideos.map((v: any) =>
++            v.id === videoId ? { ...v, layoutId } : v
++        );
++        setGDriveVideos(updated);
++    };
++
+     const handleShare = (video: any) => {
+-        const shareUrl = `${window.location.origin}/share/${projectId}?video=${video.id}`;
++        // 用 driveFileId(Google Drive 永久檔案 ID)作為連結參數:
++        // 重新同步/更換資料夾後隨機 id 會變,但 driveFileId 不變 → 連結永久有效
++        const shareUrl = `${window.location.origin}/share/${projectId}?video=${video.driveFileId || video.id}`;
+         navigator.clipboard.writeText(shareUrl);
+         setCopiedId(video.id);
+         setTimeout(() => setCopiedId(null), 2000);
+@@ -315,6 +326,23 @@ export function GDriveVideoManager({ projectId, onSave }: { projectId: string; o
+                                             ))}
+                                         </select>
+                                     )}
++                                    {ledLayouts.length > 0 && (
++                                        <select
++                                            value={vid.layoutId || ''}
++                                            onChange={(e) => updateLayoutId(vid.id, e.target.value || undefined)}
++                                            className="bg-gray-700/80 border border-gray-600 text-gray-300 text-xs rounded-md px-2 py-1 appearance-none cursor-pointer hover:border-cyan-500/50 focus:border-cyan-500 focus:outline-none transition-colors max-w-[110px] truncate"
++                                            title="播放時套用的 UV 排列(覆蓋檔名自動偵測)"
++                                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239ca3af' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', paddingRight: '20px' }}
++                                        >
++                                            <option value="">UV: 自動(檔名)</option>
++                                            <option value="__default__">UV: 預設</option>
++                                            {ledLayouts.map((l: any) => (
++                                                <option key={l.id} value={l.id}>
++                                                    UV: {l.name}
++                                                </option>
++                                            ))}
++                                        </select>
++                                    )}
+                                 </div>
+                                 <div className="flex items-center gap-1 flex-shrink-0">
+                                     <button onClick={() => handlePlay(vid)} className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors" title="播放">
+diff --git a/src/components/client/LayoutAutoSwitcher.tsx b/src/components/client/LayoutAutoSwitcher.tsx
+new file mode 100644
+index 0000000..7875f94
+--- /dev/null
++++ b/src/components/client/LayoutAutoSwitcher.tsx
+@@ -0,0 +1,50 @@
++'use client';
++
++import { useEffect } from 'react';
++import { useStore } from '@/store/useStore';
++
++/**
++ * 影片檔名自動切換 UV 排列(與 cue 檔名自動匹配同一心智模型)。
++ * 播放內容切換時,以檔名匹配排列名稱:
++ * - 檔名含 `_排列名_`、以 `_排列名` 結尾、以 `排列名_` 開頭(去副檔名、不分大小寫)→ 自動套用該排列
++ * - 都沒命中 → 強制預設 UV(模型原始 UV),客戶不需手動切換
++ * 長名稱優先匹配,避免 P1 誤中 P10。手動切換仍可覆蓋(直到播放下一支)。
++ */
++function matchLayoutByFilename(filename: string, layouts: { id: string; name: string }[]): string | null {
++    const base = filename.toLowerCase().replace(/\.[^.]+$/, '');
++    const sorted = [...layouts].filter(l => l.name?.trim()).sort((a, b) => b.name.length - a.name.length);
++    for (const l of sorted) {
++        const n = l.name.toLowerCase().trim();
++        if (base === n || base.includes(`_${n}_`) || base.endsWith(`_${n}`) || base.startsWith(`${n}_`)) {
++            return l.id;
++        }
++    }
++    return null;
++}
++
++export function LayoutAutoSwitcher() {
++    const activeContentId = useStore((s) => s.activeContentId);
++    const setClientLayoutOverride = useStore((s) => s.setClientLayoutOverride);
++
++    useEffect(() => {
++        if (!activeContentId) return;
++        // getState 讀取,觸發時機僅由「播放內容切換」控制
++        const st = useStore.getState();
++        if (st.ledLayouts.length === 0) return; // 專案沒有排列 → 不干預
++
++        // 優先級 1:後台手動指定(覆蓋檔名偵測,用於修正客戶命名錯誤)
++        const gv = st.gdriveVideos.find((v: any) => v.id === activeContentId);
++        if (gv?.layoutId) {
++            setClientLayoutOverride(gv.layoutId === '__default__' ? null : gv.layoutId);
++            return;
++        }
++
++        // 優先級 2:檔名自動偵測;未命中 → 強制預設 UV(null)
++        const tex = st.contentTextures.find((t) => t.id === activeContentId);
++        if (!tex?.name) return;
++        const matched = matchLayoutByFilename(tex.name, st.ledLayouts);
++        setClientLayoutOverride(matched ?? null);
++    }, [activeContentId, setClientLayoutOverride]);
++
++    return null;
++}
+diff --git a/src/components/client/VideoControls.tsx b/src/components/client/VideoControls.tsx
+index 34eee00..0d58305 100644
+--- a/src/components/client/VideoControls.tsx
++++ b/src/components/client/VideoControls.tsx
+@@ -16,6 +16,7 @@ export function VideoControls() {
+     const activeContentId = useStore((state) => state.activeContentId);
+     const videoPlaying = useStore((state) => state.videoPlaying);
+     const videoVolume = useStore((state) => state.videoVolume);
++    const [audioIssue, setAudioIssue] = useState(false);
+     const videoCurrentTime = useStore((state) => state.videoCurrentTime);
+     const videoDuration = useStore((state) => state.videoDuration);
+     const setVideoPlaying = useStore((state) => state.setVideoPlaying);
+@@ -272,6 +273,22 @@ export function VideoControls() {
+     }, [clearCollapseTimer]);
+ 
+     // Hide completely if no videos exist
++    // 音軌格式偵測:播放 3 秒後若瀏覽器解不出任何音頻(常見:PCM/AC-3 音軌的 MP4)→ 提示檔案格式問題
++    useEffect(() => {
++        setAudioIssue(false);
++        const v = globalVideoElement as any;
++        if (!v || videoVolume === 0) return;
++        const timer = setTimeout(() => {
++            if (!v || v.paused || v.muted) return;
++            const decoded = v.webkitAudioDecodedByteCount;
++            const hasAudioFF = v.mozHasAudio;
++            if ((typeof decoded === 'number' && decoded === 0) || hasAudioFF === false) setAudioIssue(true);
++        }, 3000);
++        return () => clearTimeout(timer);
++        // eslint-disable-next-line react-hooks/exhaustive-deps
++    }, [videoVolume, (globalVideoElement as any)?.src]);
++
++
+     if (!hasVideo) return null;
+ 
+     const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+@@ -366,6 +383,14 @@ export function VideoControls() {
+ 
+     // --- Full controls when expanded ---
+     return (
++        <>
++        {audioIssue && (
++            <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[95] pointer-events-none">
++                <div className="bg-amber-900/85 backdrop-blur border border-amber-500/40 text-amber-100 text-[11px] px-3 py-1.5 rounded-full shadow-lg">
++                    🔇 此影片無聲音輸出:可能不含音軌,或音軌格式(如 PCM)不被瀏覽器支援 — 請以 AAC 音軌重新輸出
++                </div>
++            </div>
++        )}
+         <div
+             className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-sm p-4 z-50 pointer-events-auto rounded-xl border border-emerald-500/30 w-[600px] max-w-[90vw] transition-all duration-[800ms] ease-[cubic-bezier(0.4,0,0.2,1)] shadow-lg shadow-emerald-500/10"
+             onMouseEnter={clearCollapseTimer}
+@@ -545,5 +570,6 @@ export function VideoControls() {
+                 </div>
+             </div>
+         </div>
++        </>
+     );
+ }
+diff --git a/src/store/useStore.ts b/src/store/useStore.ts
+index 33b1f2c..711a63b 100644
+--- a/src/store/useStore.ts
++++ b/src/store/useStore.ts
+@@ -222,6 +222,7 @@ export interface GDriveVideo {
+     uploadedAt: number;
+     folderId?: string;
+     cueId?: string;
++    layoutId?: string; // 手動指定 UV 排列('__default__'=強制預設;未設=檔名自動偵測)
+     cuePoint?: number | null;
+     size?: string;
+     timelineCues?: VideoTimelineCue[];

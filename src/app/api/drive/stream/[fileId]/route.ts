@@ -34,6 +34,7 @@ export async function GET(
         const metadataRes = await drive.files.get({
           fileId,
           fields: 'size, mimeType',
+            supportsAllDrives: true, // Shared Drive 支援
         });
         const rawMime = metadataRes.data.mimeType || 'video/mp4';
         meta = {
@@ -61,7 +62,7 @@ export async function GET(
         const chunkSize = end - start + 1;
 
         const rangeRes = await drive.files.get(
-          { fileId, alt: 'media' },
+          { fileId, alt: 'media', supportsAllDrives: true },
           {
             responseType: 'stream',
             headers: { Range: `bytes=${start}-${end}` },
@@ -94,7 +95,7 @@ export async function GET(
 
     // --- 3. Full file request (no Range) ---
     const fullRes = await drive.files.get(
-      { fileId, alt: 'media' },
+      { fileId, alt: 'media', supportsAllDrives: true },
       { responseType: 'stream' }
     );
 

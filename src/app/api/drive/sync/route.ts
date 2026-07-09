@@ -25,7 +25,8 @@ export async function GET(request: Request) {
     // Get Folder details
     const folderRes = await drive.files.get({
         fileId: folderId,
-        fields: 'id, name, createdTime'
+        fields: 'id, name, createdTime',
+        supportsAllDrives: true, // Workspace 共用雲端硬碟(Shared Drive)必要
     });
     
     const folder = {
@@ -40,6 +41,9 @@ export async function GET(request: Request) {
       fields: 'files(id, name, thumbnailLink, createdTime, size)',
       spaces: 'drive',
       pageSize: 100,
+      // Workspace 共用雲端硬碟(Shared Drive)支援:缺這兩個參數會讀不到共用雲端內的檔案
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
     });
 
     const files = res.data.files || [];

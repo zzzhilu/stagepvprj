@@ -16,6 +16,7 @@ export function VideoControls() {
     const activeContentId = useStore((state) => state.activeContentId);
     const videoPlaying = useStore((state) => state.videoPlaying);
     const videoVolume = useStore((state) => state.videoVolume);
+    const [audioIssue, setAudioIssue] = useState(false);
     const videoCurrentTime = useStore((state) => state.videoCurrentTime);
     const videoDuration = useStore((state) => state.videoDuration);
     const setVideoPlaying = useStore((state) => state.setVideoPlaying);
@@ -272,6 +273,22 @@ export function VideoControls() {
     }, [clearCollapseTimer]);
 
     // Hide completely if no videos exist
+    // 音軌格式偵測:播放 3 秒後若瀏覽器解不出任何音頻(常見:PCM/AC-3 音軌的 MP4)→ 提示檔案格式問題
+    useEffect(() => {
+        setAudioIssue(false);
+        const v = globalVideoElement as any;
+        if (!v || videoVolume === 0) return;
+        const timer = setTimeout(() => {
+            if (!v || v.paused || v.muted) return;
+            const decoded = v.webkitAudioDecodedByteCount;
+            const hasAudioFF = v.mozHasAudio;
+            if ((typeof decoded === 'number' && decoded === 0) || hasAudioFF === false) setAudioIssue(true);
+        }, 3000);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [videoVolume, (globalVideoElement as any)?.src]);
+
+
     if (!hasVideo) return null;
 
     const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -366,6 +383,14 @@ export function VideoControls() {
 
     // --- Full controls when expanded ---
     return (
+        <>
+        {audioIssue && (
+            <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[95] pointer-events-none">
+                <div className="bg-amber-900/85 backdrop-blur border border-amber-500/40 text-amber-100 text-[11px] px-3 py-1.5 rounded-full shadow-lg">
+                    🔇 此影片無聲音輸出:可能不含音軌,或音軌格式(如 PCM)不被瀏覽器支援 — 請以 AAC 音軌重新輸出
+                </div>
+            </div>
+        )}
         <div
             className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-sm p-4 z-50 pointer-events-auto rounded-xl border border-emerald-500/30 w-[600px] max-w-[90vw] transition-all duration-[800ms] ease-[cubic-bezier(0.4,0,0.2,1)] shadow-lg shadow-emerald-500/10"
             onMouseEnter={clearCollapseTimer}
@@ -545,5 +570,6 @@ export function VideoControls() {
                 </div>
             </div>
         </div>
+        </>
     );
 }

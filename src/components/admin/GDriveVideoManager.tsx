@@ -15,6 +15,7 @@ export function GDriveVideoManager({ projectId, onSave }: { projectId: string; o
     const gdriveVideos = useStore(state => state.gdriveVideos);
     const setGDriveVideos = useStore(state => state.setGDriveVideos);
     const cues = useStore((state) => state.cues);
+    const ledLayouts = useStore(state => state.ledLayouts);
     const contentTextures = useStore((state) => state.contentTextures);
     const addContentTexture = useStore((state) => state.addContentTexture);
     const setActiveContent = useStore((state) => state.setActiveContent);
@@ -151,6 +152,14 @@ export function GDriveVideoManager({ projectId, onSave }: { projectId: string; o
         );
         setGDriveVideos(updated);
         if (onSave) onSave();
+    };
+
+    // 手動指定影片的 UV 排列(覆蓋檔名自動偵測;''=自動、'__default__'=強制預設 UV)
+    const updateLayoutId = (videoId: string, layoutId: string | undefined) => {
+        const updated = gdriveVideos.map((v: any) =>
+            v.id === videoId ? { ...v, layoutId } : v
+        );
+        setGDriveVideos(updated);
     };
 
     const handleShare = (video: any) => {
@@ -313,6 +322,23 @@ export function GDriveVideoManager({ projectId, onSave }: { projectId: string; o
                                             {cues.map((cue) => (
                                                 <option key={cue.id} value={cue.id}>
                                                     Cue: {cue.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                    {ledLayouts.length > 0 && (
+                                        <select
+                                            value={vid.layoutId || ''}
+                                            onChange={(e) => updateLayoutId(vid.id, e.target.value || undefined)}
+                                            className="bg-gray-700/80 border border-gray-600 text-gray-300 text-xs rounded-md px-2 py-1 appearance-none cursor-pointer hover:border-cyan-500/50 focus:border-cyan-500 focus:outline-none transition-colors max-w-[110px] truncate"
+                                            title="播放時套用的 UV 排列(覆蓋檔名自動偵測)"
+                                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239ca3af' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center', paddingRight: '20px' }}
+                                        >
+                                            <option value="">UV: 自動(檔名)</option>
+                                            <option value="__default__">UV: 預設</option>
+                                            {ledLayouts.map((l: any) => (
+                                                <option key={l.id} value={l.id}>
+                                                    UV: {l.name}
                                                 </option>
                                             ))}
                                         </select>

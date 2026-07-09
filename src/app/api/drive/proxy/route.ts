@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     }
     
     const res = await drive.files.get(
-      { fileId, alt: 'media' },
+      { fileId, alt: 'media', supportsAllDrives: true }, // Shared Drive 支援
       { responseType: 'stream', headers }
     );
 

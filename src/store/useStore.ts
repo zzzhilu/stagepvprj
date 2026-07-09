@@ -222,6 +222,7 @@ export interface GDriveVideo {
     uploadedAt: number;
     folderId?: string;
     cueId?: string;
+    layoutId?: string; // 手動指定 UV 排列('__default__'=強制預設;未設=檔名自動偵測)
     cuePoint?: number | null;
     size?: string;
     timelineCues?: VideoTimelineCue[];

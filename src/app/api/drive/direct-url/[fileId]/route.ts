@@ -30,6 +30,7 @@ export async function GET(
       metadata = await drive.files.get({
         fileId,
         fields: 'id, name, mimeType, size, webContentLink',
+        supportsAllDrives: true, // Shared Drive 支援
       });
     } catch (e: any) {
       console.error('[Direct URL] File not found:', fileId, e.message);

@@ -31,10 +31,18 @@ export function LayoutAutoSwitcher() {
         // getState 讀取,觸發時機僅由「播放內容切換」控制
         const st = useStore.getState();
         if (st.ledLayouts.length === 0) return; // 專案沒有排列 → 不干預
+
+        // 優先級 1:後台手動指定(覆蓋檔名偵測,用於修正客戶命名錯誤)
+        const gv = st.gdriveVideos.find((v: any) => v.id === activeContentId);
+        if (gv?.layoutId) {
+            setClientLayoutOverride(gv.layoutId === '__default__' ? null : gv.layoutId);
+            return;
+        }
+
+        // 優先級 2:檔名自動偵測;未命中 → 強制預設 UV(null)
         const tex = st.contentTextures.find((t) => t.id === activeContentId);
         if (!tex?.name) return;
         const matched = matchLayoutByFilename(tex.name, st.ledLayouts);
-        // 命中 → 套該排列;未命中 → 強制預設 UV(null)
         setClientLayoutOverride(matched ?? null);
     }, [activeContentId, setClientLayoutOverride]);
 
