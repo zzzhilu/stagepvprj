@@ -139,12 +139,14 @@ async function getFileMeta(
   }
 
   const res = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=size,mimeType`,
+    // supportsAllDrives=true:Workspace 共用雲端硬碟(Shared Drive)的檔案必要,否則回 404
+    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=size,mimeType&supportsAllDrives=true`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
 
   if (!res.ok) {
-    throw new Error(`Metadata fetch failed: ${res.status}`);
+    const body = await res.text().catch(() => '');
+    throw new Error(`Metadata fetch failed: ${res.status} ${body.slice(0, 200)}`);
   }
 
   const data = (await res.json()) as { mimeType?: string; size?: string };
@@ -191,7 +193,7 @@ async function handleStream(fileId: string, request: Request, env: Env): Promise
       const chunkSize = end - start + 1;
 
       const driveRes = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -223,7 +225,7 @@ async function handleStream(fileId: string, request: Request, env: Env): Promise
 
   // --- Full file request ---
   const driveRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`,
     {
       headers: { Authorization: `Bearer ${accessToken}` },
     }

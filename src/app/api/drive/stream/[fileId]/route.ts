@@ -43,13 +43,22 @@ export async function GET(
           ts: Date.now(),
         };
         metaCache.set(fileId, meta);
-      } catch (e) {
-        console.error("Failed to get metadata for", fileId, e);
-        return new NextResponse("File not found or access denied", { status: 404 });
+      } catch (e: any) {
+        // 回傳真實錯誤以利診斷(Shared Drive 權限、檔案不存在、配額等)
+        const gErr = e?.errors?.[0] || {};
+        const detail = `${e?.code || ''} ${gErr.reason || ''} ${e?.message || ''}`.trim();
+        console.error("[drive/stream] metadata failed", fileId, detail, e?.response?.data);
+        return new NextResponse(`Drive metadata error: ${detail || 'unknown'}`, {
+          status: e?.code === 404 ? 404 : 403,
+        });
       }
     }
 
     const { mimeType, size: fileSize } = meta;
+    if (!fileSize) {
+      // Shared Drive 某些檔案 metadata 不含 size → 無法做 Range 分段,退回完整串流
+      console.warn('[drive/stream] no size in metadata (Shared Drive?), full stream fallback', fileId);
+    }
 
     // --- 2. Handle Range requests for video seeking ---
     const rangeHeader = request.headers.get('range');
