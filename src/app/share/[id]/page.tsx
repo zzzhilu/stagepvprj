@@ -123,6 +123,8 @@ function SharePageContent() {
                 ...(data.contactShadow !== undefined ? { contactShadow: data.contactShadow } : {}),
                 ...(data.toneMapping !== undefined ? { toneMapping: data.toneMapping } : {}),
                 ...(data.spotLights !== undefined ? { spotLights: data.spotLights } : {}),
+                ...(data.perfectLightScale !== undefined ? { perfectLightScale: data.perfectLightScale } : {}),
+                ...(data.ledSpillIntensity !== undefined ? { ledSpillIntensity: data.ledSpillIntensity } : {}),
                 ...(data.reflectionMirror !== undefined ? { reflectionMirror: data.reflectionMirror } : {}),
                 ...(data.reflectionBlur !== undefined ? { reflectionBlur: data.reflectionBlur } : {}),
                 ...(data.reflectionMetalness !== undefined ? { reflectionMetalness: data.reflectionMetalness } : {}),

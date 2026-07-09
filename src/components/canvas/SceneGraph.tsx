@@ -22,8 +22,135 @@ import { ToneMappingMode } from 'postprocessing';
 import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
 import { CameraMarkers } from './CameraMarkers';
 import { setParallaxBox, setParallaxEnabled } from '@/lib/parallax-envmap';
+import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
+import { REFLECT_LAYER } from '@/lib/reflect-layer';
+import { LedSpillLight } from './LedSpillLight';
 
 // 精簡模式:LED 永遠保留 + 後台指定 keepIds;其餘不渲染(直接卸載,省 draw call/材質/useFrame)
+/**
+ * 平面反射器(舞台地面)。只反射 LED 素材:
+ * 反射用的虛擬相機 layers 只設 REFLECT_LAYER,而僅 LED mesh 被加入該層,
+ * 因此桁架/舞台/場館完全不參與反射渲染 —— 又快又乾淨(無法線暴露、無遞迴過曝)。
+ * 全場僅建立一個(多個反射面會互相反射)。
+ */
+function PlanarReflectorPlane() {
+    const perfectRenderEnabled = useStore((s) => s.perfectRenderEnabled);
+    const renderMode = useStore((s) => s.renderMode);
+    const stageObjects = useStore((s) => s.stageObjects);
+    const objectBounds = useStore((s) => s.objectBounds);
+    const reflectionMirror = useStore((s) => s.reflectionMirror);
+    const reflectionBlur = useStore((s) => s.reflectionBlur);
+
+    const target = stageObjects.find((o) => o.planarReflector);
+    const b = target ? objectBounds[target.id] : undefined;
+    // 反射僅在完美渲染 + beauty 模式生效(普通模式零成本:不建立 Reflector、不做額外渲染)
+    const active = perfectRenderEnabled && renderMode === 'beauty' && !!target && !!b;
+
+    // 診斷:標記了卻沒有包圍盒(例如 Box primitive 尚未量測)→ 提示而非靜默失敗
+    useEffect(() => {
+        if (perfectRenderEnabled && target && !b) {
+            console.warn('[PlanarReflector] 已標記物件但尚無包圍盒資料,反射平面無法建立:', target.id);
+        }
+    }, [perfectRenderEnabled, target, b]);
+
+    // 手動參數優先;未設定時以包圍盒推算(頂面中心)作為起始值
+    const cfg = target?.reflectorConfig ?? (b ? {
+        w: Math.max(0.1, b.max[0] - b.min[0]),
+        d: Math.max(0.1, b.max[2] - b.min[2]),
+        x: (b.max[0] + b.min[0]) / 2,
+        y: b.min[1] + 0.005, // 底面:舞台面通常在包圍盒底部(取頂面會讓平面浮在半空)
+        z: (b.max[2] + b.min[2]) / 2,
+    } : null);
+
+    const reflector = useMemo(() => {
+        if (!active || !cfg) return null;
+        const w = Math.max(0.1, cfg.w);
+        const d = Math.max(0.1, cfg.d);
+        const geo = new THREE.PlaneGeometry(w, d);
+        const TEX = 1024;
+        const r = new Reflector(geo, {
+            textureWidth: TEX,
+            textureHeight: TEX,
+            color: 0x7f7f7f, // 中性:blendOverlay 遇純黑會把反射乘成 0
+            multisample: 0,  // 關閉 MSAA:與 mipmap 生成衝突(且反射本就要模糊,不需抗鋸齒)
+        });
+        // 關鍵:反射相機只看 LED 圖層
+        r.camera.layers.set(REFLECT_LAYER);
+
+        // 開啟 mipmap:模糊改用硬體三線性 mip 插值(等同 roughness 的模糊原理),
+        // 連續平滑、無多重取樣造成的分層重影。three 渲染到 target 後會自動更新 mipmap。
+        const rt = r.getRenderTarget();
+        rt.texture.generateMipmaps = true;
+        rt.texture.minFilter = THREE.LinearMipmapLinearFilter;
+        rt.texture.magFilter = THREE.LinearFilter;
+        rt.texture.needsUpdate = true;
+
+        // 注入可調模糊:在投影取樣處做 13 點高斯近似(螢幕空間偏移需乘 vUv.w 保持透視一致)
+        const mat = r.material as THREE.ShaderMaterial;
+        mat.uniforms.uBlur = { value: 0 };
+        mat.uniforms.uTexel = { value: new THREE.Vector2(1 / TEX, 1 / TEX) };
+        mat.fragmentShader = mat.fragmentShader
+            .replace(
+                'uniform sampler2D tDiffuse;',
+                `uniform sampler2D tDiffuse;
+uniform float uBlur;
+uniform float uStrength;
+uniform vec2 uTexel;
+// mip-based 模糊:LOD bias 讓硬體做三線性插值(與 roughness 同原理),
+// 再以 4 個微小偏移取樣消除 mip 層之間的接縫,得到連續柔化。
+vec4 blurProj( sampler2D tex, vec4 uv, float lod ) {
+	if ( lod < 0.01 ) return texture2DProj( tex, uv );
+	vec2 o = uTexel * uv.w * lod * 0.75;
+	vec4 sum = texture2DProj( tex, uv, lod ) * 0.4;
+	sum += texture2DProj( tex, uv + vec4( o.x, o.y, 0.0, 0.0 ), lod ) * 0.15;
+	sum += texture2DProj( tex, uv + vec4( -o.x, o.y, 0.0, 0.0 ), lod ) * 0.15;
+	sum += texture2DProj( tex, uv + vec4( o.x, -o.y, 0.0, 0.0 ), lod ) * 0.15;
+	sum += texture2DProj( tex, uv + vec4( -o.x, -o.y, 0.0, 0.0 ), lod ) * 0.15;
+	return sum;
+}`
+            )
+            .replace(
+                'vec4 base = texture2DProj( tDiffuse, vUv );',
+                'vec4 base = blurProj( tDiffuse, vUv, uBlur );'
+            )
+            .replace(
+                'gl_FragColor = vec4( blendOverlay( base.rgb, color ), 1.0 );',
+                'gl_FragColor = vec4( base.rgb * uStrength, 1.0 );'
+            );
+        mat.uniforms.uStrength = { value: 1 };
+        // 加算混合:LED 反射光疊加在地板材質上(而非蓋一層黑板)
+        mat.transparent = true;
+        mat.blending = THREE.AdditiveBlending;
+        mat.depthWrite = false;
+        mat.needsUpdate = true;
+        r.rotation.x = -Math.PI / 2;
+        r.position.set(cfg.x, cfg.y, cfg.z);
+        return r;
+    }, [active, cfg?.w, cfg?.d, cfg?.x, cfg?.y, cfg?.z]);
+
+    // 反射強度/模糊:以材質 opacity 與 blur uniform 近似(Reflector 為自訂 shader)
+    // 滑桿即時更新 uniform(不重建 reflector)
+    useEffect(() => {
+        if (!reflector) return;
+        const mat = reflector.material as THREE.ShaderMaterial;
+        if (mat.uniforms.uStrength) mat.uniforms.uStrength.value = reflectionMirror; // 鏡面強度
+        if (mat.uniforms.uBlur) mat.uniforms.uBlur.value = reflectionBlur * 0.3; // 滑桿 0–20 → mip LOD 0–6
+    }, [reflector, reflectionMirror, reflectionBlur]);
+
+    // 卸載時釋放資源(僅在 reflector 實例更換時)
+    useEffect(() => {
+        if (!reflector) return;
+        return () => {
+            reflector.geometry.dispose();
+            (reflector.material as THREE.Material).dispose();
+            reflector.dispose?.();
+        };
+    }, [reflector]);
+
+    if (!reflector) return null;
+    return <primitive object={reflector} />;
+}
+
 function liteVisible(obj: { id: string; type: string }, liteMode: boolean, keepIds: string[]): boolean {
     if (!liteMode) return true;
     if (obj.type === 'static_LED' || obj.type === 'moving_LED') return true;
@@ -307,6 +434,10 @@ export function SceneGraph() {
 
     // Perfect Render Mode state
     const perfectRenderEnabled = useStore((state) => state.perfectRenderEnabled);
+    const perfectLightScale = useStore((state) => state.perfectLightScale);
+    // 反射更新頻率自適應用:內容變化中(影片播放/攝影機直播)才需要高頻更新
+    const videoPlayingRT = useStore((state) => state.videoPlaying);
+    const cameraStreamActiveRT = useStore((state) => state.cameraStreamActive);
 
     const controlsRef = useRef<OrbitControlsImpl>(null);
     const cubeCameraRef = useRef<THREE.CubeCamera>(null);
@@ -442,7 +573,13 @@ export function SceneGraph() {
         // CubeCamera update for realtime LED reflections (every 3 frames)
         if (cubeCameraRef.current && perfectRenderEnabled) {
             frameCounter.current++;
-            if (frameCounter.current % 12 === 0) { // 每 12 幀:反射延遲 ~0.2s 無感,CubeCamera 成本降 4 倍
+            // [反射即時性] 自適應更新頻率:
+            //   內容變化中(影片播放/攝影機直播)→ 每 2 幀(約 30Hz,LED 影片反射跟得上畫面)
+            //   靜止畫面 → 每 30 幀(場景沒變,不需重算;省下的預算給播放時用)
+            // far=300 + res 128 已把單次成本壓低,故播放時可負擔高頻更新。
+            const contentLive = videoPlayingRT || cameraStreamActiveRT;
+            const interval = contentLive ? 4 : 30; // 4 幀(15Hz):每次 update 含 PMREM 重算,成本比預估高
+            if (frameCounter.current % interval === 0) {
                 cubeCameraRef.current.update(gl, scene);
             }
             // Parallax 包圍盒自動計算(每 60 幀,零訂閱):venues 物件聯集,適配 50m~500m 場館
@@ -495,6 +632,8 @@ export function SceneGraph() {
             {cubeCameraRef.current && <primitive object={cubeCameraRef.current} />}
 
             {/* 3D 機位模型(導播參考) */}
+            <PlanarReflectorPlane />
+            <LedSpillLight />
             <CameraMarkers />
 
             <PerspectiveCamera
@@ -546,14 +685,15 @@ export function SceneGraph() {
             <MeasurementScene />
 
             {/* Enhanced lighting for better model visibility */}
-            <ambientLight intensity={ambientIntensity} />
+            {/* 完美渲染另有環境光 IBL,直接光按補償係數降低,避免同一組數值在兩模式亮度落差 */}
+            <ambientLight intensity={ambientIntensity * (perfectRenderEnabled ? perfectLightScale : 1)} />
             <directionalLight
                 position={[
                     20 * Math.cos(mainLightElevation * Math.PI / 180) * Math.sin(mainLightAzimuth * Math.PI / 180),
                     20 * Math.sin(mainLightElevation * Math.PI / 180),
                     20 * Math.cos(mainLightElevation * Math.PI / 180) * Math.cos(mainLightAzimuth * Math.PI / 180)
                 ]}
-                intensity={directionalIntensity}
+                intensity={directionalIntensity * (perfectRenderEnabled ? perfectLightScale : 1)}
                 castShadow={perfectRenderEnabled}
                 shadow-mapSize-width={2048}
                 shadow-mapSize-height={2048}
@@ -565,7 +705,7 @@ export function SceneGraph() {
                 shadow-camera-far={60}
                 shadow-bias={-0.001}
             />
-            <directionalLight position={[-10, 10, -5]} intensity={directionalIntensity * 0.4} />
+            <directionalLight position={[-10, 10, -5]} intensity={directionalIntensity * 0.4 * (perfectRenderEnabled ? perfectLightScale : 1)} />
             <hemisphereLight intensity={0.4} groundColor="#444" />
 
             {/* Perfect Render Environment - HDR, SpotLights, ContactShadows */}

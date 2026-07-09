@@ -9,6 +9,7 @@ import { parseGIF, decompressFrames } from 'gifuct-js';
 import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
 import { getObjectDisplayName } from '@/lib/object-utils';
 import { applyParallaxEnvMap } from '@/lib/parallax-envmap';
+import { REFLECT_LAYER } from '@/lib/reflect-layer';
 
 // [效能] useFrame 每幀重用的臨時物件(單執行緒,跨實例共享安全);消除每幀 new 造成的 GC 卡頓
 const _tmpBasePos = new THREE.Vector3();
@@ -606,7 +607,15 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
     // Apply realtime envMap to non-emissive materials for LED reflection
     useEffect(() => {
         if (!material || !envMap || !perfectRenderEnabled) return;
-        if (object.material_id === 'emissive' || object.type === 'floor_plan') return;
+        // LED / 投影幕等自發光面板不套環境反射(避免鏡面高光疊在畫面上)
+        if (
+            object.material_id === 'emissive' ||
+            object.material_id === 'emissiveMesh' ||
+            object.material_id === 'projectionScreen' ||
+            object.type === 'static_LED' ||
+            object.type === 'moving_LED' ||
+            object.type === 'floor_plan'
+        ) return;
         if (renderMode !== 'beauty') return;
 
         const mat = material as THREE.MeshStandardMaterial;
@@ -634,6 +643,19 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         applyMaterialOverrides(material as THREE.MeshStandardMaterial, def, object.materialOverrides);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [material, overridesJson, object.material_id, object.type]);
+
+    // LED 物件加入反射圖層(層 0 保留給主相機,層 REFLECT_LAYER 供反射相機挑選)
+    const isLedType = object.type === 'static_LED' || object.type === 'moving_LED';
+    useEffect(() => {
+        const g = groupRef.current;
+        if (!g) return;
+        g.traverse((o) => {
+            if ((o as THREE.Mesh).isMesh) {
+                if (isLedType) o.layers.enable(REFLECT_LAYER);
+                else o.layers.disable(REFLECT_LAYER);
+            }
+        });
+    }, [isLedType, gltfData]);
 
     const nodes = gltfData?.nodes ?? {};
 

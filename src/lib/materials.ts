@@ -507,7 +507,7 @@ export const MATERIAL_LIBRARY: Record<MaterialId, MaterialDefinition> = {
         id: 'emissive',
         name: '自發光',
         color: '#ffffff',
-        roughness: 0.9,
+        roughness: 1.0, // LED 面板:無鏡面高光
         metalness: 0.0,
         emissive: '#ffaa00',
         emissiveIntensity: 1.0
@@ -525,7 +525,7 @@ export const MATERIAL_LIBRARY: Record<MaterialId, MaterialDefinition> = {
         id: 'emissiveMesh',
         name: '網格LED (透視)',
         color: '#ffffff',
-        roughness: 0.9,
+        roughness: 1.0, // LED 面板:無鏡面高光
         metalness: 0.0,
         emissive: '#ffaa00',
         emissiveIntensity: 1.0,
@@ -831,9 +831,12 @@ export function createPerfectMaterial(materialId: MaterialId): THREE.MeshPhysica
             break;
         }
 
-        case 'emissive': {
-            // 自發光 - 保持原樣
-            params.envMapIntensity = 0.5;
+        case 'emissive':
+        case 'emissiveMesh': {
+            // LED 自發光面板:不吃環境反射(不該有鏡面高光),粗糙度拉滿消除鏡面項
+            params.envMapIntensity = 0;
+            params.roughness = 1.0;
+            params.metalness = 0.0;
             break;
         }
 

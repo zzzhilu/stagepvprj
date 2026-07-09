@@ -1,0 +1,639 @@
+diff --git a/src/app/free-test/[id]/page.tsx b/src/app/free-test/[id]/page.tsx
+index d5b5412..c337f57 100644
+--- a/src/app/free-test/[id]/page.tsx
++++ b/src/app/free-test/[id]/page.tsx
+@@ -172,6 +172,8 @@ function ProjectEditorContent() {
+     const contactShadow = useStore(state => state.contactShadow);
+     const toneMapping = useStore(state => state.toneMapping);
+     const spotLights = useStore(state => state.spotLights);
++    const perfectLightScale = useStore(state => state.perfectLightScale);
++    const ledSpillIntensity = useStore(state => state.ledSpillIntensity);
+     const reflectionMirror = useStore(state => state.reflectionMirror);
+     const reflectionBlur = useStore(state => state.reflectionBlur);
+     const reflectionMetalness = useStore(state => state.reflectionMetalness);
+@@ -235,6 +237,8 @@ function ProjectEditorContent() {
+                     ...(data.contactShadow !== undefined ? { contactShadow: data.contactShadow } : {}),
+                     ...(data.toneMapping !== undefined ? { toneMapping: data.toneMapping } : {}),
+                     ...(data.spotLights !== undefined ? { spotLights: data.spotLights } : {}),
++                    ...(data.perfectLightScale !== undefined ? { perfectLightScale: data.perfectLightScale } : {}),
++                    ...(data.ledSpillIntensity !== undefined ? { ledSpillIntensity: data.ledSpillIntensity } : {}),
+                     ...(data.reflectionMirror !== undefined ? { reflectionMirror: data.reflectionMirror } : {}),
+                     ...(data.reflectionBlur !== undefined ? { reflectionBlur: data.reflectionBlur } : {}),
+                     ...(data.reflectionMetalness !== undefined ? { reflectionMetalness: data.reflectionMetalness } : {}),
+@@ -288,6 +292,8 @@ function ProjectEditorContent() {
+                     contactShadow,
+                     toneMapping,
+                     spotLights,
++                    perfectLightScale,
++                    ledSpillIntensity,
+                     reflectionMirror,
+                     reflectionBlur,
+                     reflectionMetalness,
+@@ -301,7 +307,7 @@ function ProjectEditorContent() {
+         }, 2000); // Debounce 2 seconds
+ 
+         return () => clearTimeout(timeoutId);
+-    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, ledLayouts, activeLedLayoutId, screenCropRatio, clientEditPasswordHash, liteModeKeepIds, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, nulls, rigs, isAuthenticated, isShareMode, isLoading, projectId]);
++    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, ledLayouts, activeLedLayoutId, screenCropRatio, clientEditPasswordHash, liteModeKeepIds, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, perfectLightScale, ledSpillIntensity, reflectionMirror, reflectionBlur, reflectionMetalness, nulls, rigs, isAuthenticated, isShareMode, isLoading, projectId]);
+ 
+     // Show loading while checking auth
+     if (isChecking) {
+diff --git a/src/app/share/[id]/page.tsx b/src/app/share/[id]/page.tsx
+index 3ea56e4..5f2fa0a 100644
+--- a/src/app/share/[id]/page.tsx
++++ b/src/app/share/[id]/page.tsx
+@@ -123,6 +123,8 @@ function SharePageContent() {
+                 ...(data.contactShadow !== undefined ? { contactShadow: data.contactShadow } : {}),
+                 ...(data.toneMapping !== undefined ? { toneMapping: data.toneMapping } : {}),
+                 ...(data.spotLights !== undefined ? { spotLights: data.spotLights } : {}),
++                ...(data.perfectLightScale !== undefined ? { perfectLightScale: data.perfectLightScale } : {}),
++                ...(data.ledSpillIntensity !== undefined ? { ledSpillIntensity: data.ledSpillIntensity } : {}),
+                 ...(data.reflectionMirror !== undefined ? { reflectionMirror: data.reflectionMirror } : {}),
+                 ...(data.reflectionBlur !== undefined ? { reflectionBlur: data.reflectionBlur } : {}),
+                 ...(data.reflectionMetalness !== undefined ? { reflectionMetalness: data.reflectionMetalness } : {}),
+diff --git a/src/components/admin/ObjectInspector.tsx b/src/components/admin/ObjectInspector.tsx
+index e5c1d0a..f09681a 100644
+--- a/src/components/admin/ObjectInspector.tsx
++++ b/src/components/admin/ObjectInspector.tsx
+@@ -74,6 +74,7 @@ function LinkToParentDropdown({
+ }
+ 
+ export function ObjectInspector() {
++    const objectBounds = useStore((state) => state.objectBounds);
+     const liteModeKeepIds = useStore((state) => state.liteModeKeepIds);
+     const toggleLiteModeKeep = useStore((state) => state.toggleLiteModeKeep);
+     const stageObjects = useStore((state) => state.stageObjects);
+@@ -117,11 +118,18 @@ export function ObjectInspector() {
+                                 {(obj.type === 'static_LED' || obj.type === 'moving_LED') ? (
+                                     <span className="text-[10px] text-yellow-400/60" title="LED 在精簡模式永遠保留">⚡LED</span>
+                                 ) : (
+-                                    <span
+-                                        onClick={(e) => { e.stopPropagation(); toggleLiteModeKeep(obj.id); }}
+-                                        className={`text-[10px] cursor-pointer px-1 rounded ${liteModeKeepIds.includes(obj.id) ? 'text-yellow-400 bg-yellow-500/15' : 'text-gray-600 hover:text-gray-400'}`}
+-                                        title="精簡模式保留此模型(客戶端 ⚡ 開啟時仍渲染)"
+-                                    >⚡</span>
++                                    <span className="flex items-center gap-1">
++                                        <span
++                                            onClick={(e) => { e.stopPropagation(); updateObject(obj.id, { planarReflector: !obj.planarReflector }); }}
++                                            className={`text-[10px] cursor-pointer px-1 rounded ${obj.planarReflector ? 'text-cyan-300 bg-cyan-500/15' : 'text-gray-600 hover:text-gray-400'}`}
++                                            title="平面反射:此物件做鏡面反射(適用舞台地面等平面;僅完美渲染生效)"
++                                        >🪞</span>
++                                        <span
++                                            onClick={(e) => { e.stopPropagation(); toggleLiteModeKeep(obj.id); }}
++                                            className={`text-[10px] cursor-pointer px-1 rounded ${liteModeKeepIds.includes(obj.id) ? 'text-yellow-400 bg-yellow-500/15' : 'text-gray-600 hover:text-gray-400'}`}
++                                            title="精簡模式保留此模型(客戶端 ⚡ 開啟時仍渲染)"
++                                        >⚡</span>
++                                    </span>
+                                 )}
+                                 {obj.parentId && (
+                                     <span className="text-[10px] opacity-60 flex items-center gap-0.5"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg> 已連結</span>
+@@ -133,6 +141,51 @@ export function ObjectInspector() {
+             </div>
+ 
+             {/* Selected Object Details */}
++            {selectedObject?.planarReflector && (
++                <div className="border-t border-gray-700 pt-3 space-y-2">
++                    <div className="flex items-center justify-between">
++                        <h4 className="text-xs font-bold text-cyan-300">🪞 反射平面(公尺)</h4>
++                        <button
++                            onClick={() => {
++                                const b = objectBounds[selectedObject.id];
++                                if (!b) return;
++                                updateObject(selectedObject.id, { reflectorConfig: {
++                                    w: Math.max(0.1, b.max[0] - b.min[0]),
++                                    d: Math.max(0.1, b.max[2] - b.min[2]),
++                                    x: (b.max[0] + b.min[0]) / 2,
++                                    y: b.min[1] + 0.005,
++                                    z: (b.max[2] + b.min[2]) / 2,
++                                } });
++                            }}
++                            className="text-[10px] px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200"
++                            title="以物件包圍盒填入(高度取底面)"
++                        >自動填入</button>
++                    </div>
++                    <div className="grid grid-cols-5 gap-1">
++                        {(['w', 'd', 'x', 'y', 'z'] as const).map((k) => {
++                            const cfg = selectedObject.reflectorConfig ?? { w: 10, d: 10, x: 0, y: 0, z: 0 };
++                            return (
++                                <label key={k} className="flex flex-col gap-0.5">
++                                    <span className="text-[9px] text-gray-500 text-center">{k === 'w' ? '寬' : k === 'd' ? '深' : k.toUpperCase()}</span>
++                                    <input
++                                        type="number"
++                                        step={0.1}
++                                        value={cfg[k]}
++                                        onChange={(e) => {
++                                            const v = parseFloat(e.target.value);
++                                            if (!Number.isFinite(v)) return;
++                                            updateObject(selectedObject.id, { reflectorConfig: { ...cfg, [k]: v } });
++                                        }}
++                                        className="w-full bg-gray-900 border border-gray-600 rounded px-1 py-0.5 text-[10px] text-white text-center focus:border-cyan-500 focus:outline-none"
++                                    />
++                                </label>
++                            );
++                        })}
++                    </div>
++                    <p className="text-[9px] text-gray-500">Y = 舞台面高度。反射只顯示 LED 內容,加算疊在地板上。</p>
++                </div>
++            )}
++
+             {selectedObject && selectedObject.instances[0] && (
+                 <>
+                     <div className="border-t border-gray-700 pt-3 space-y-3">
+diff --git a/src/components/admin/ReflectionControls.tsx b/src/components/admin/ReflectionControls.tsx
+index df42a82..38a7408 100644
+--- a/src/components/admin/ReflectionControls.tsx
++++ b/src/components/admin/ReflectionControls.tsx
+@@ -128,6 +128,10 @@ function SpotLightPanel({ index }: { index: number }) {
+ 
+ export function ReflectionControls() {
+     const perfectRenderEnabled = useStore((state) => state.perfectRenderEnabled);
++    const perfectLightScale = useStore((state) => state.perfectLightScale);
++    const setPerfectLightScale = useStore((state) => state.setPerfectLightScale);
++    const ledSpillIntensity = useStore((state) => state.ledSpillIntensity);
++    const setLedSpillIntensity = useStore((state) => state.setLedSpillIntensity);
+     const reflectionMirror = useStore((state) => state.reflectionMirror);
+     const reflectionBlur = useStore((state) => state.reflectionBlur);
+     const reflectionMetalness = useStore((state) => state.reflectionMetalness);
+@@ -178,6 +182,8 @@ export function ReflectionControls() {
+             {/* === 地板反射 === */}
+             <div className="space-y-2 pt-2 border-t border-gray-800">
+                 <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">地板反射</span>
++                <SliderRow label="完美渲染 亮度補償" value={perfectLightScale} min={0} max={1.5} step={0.05} onChange={setPerfectLightScale} />
++                <SliderRow label="LED 溢光" value={ledSpillIntensity} min={0} max={3} step={0.1} onChange={setLedSpillIntensity} />
+                 <SliderRow label="鏡面強度" value={reflectionMirror} min={0} max={1} step={0.05} onChange={setReflectionMirror} />
+                 <SliderRow label="模糊程度" value={reflectionBlur} min={0} max={20} step={1} onChange={setReflectionBlur} />
+                 <SliderRow label="金屬感" value={reflectionMetalness} min={0} max={1} step={0.05} onChange={setReflectionMetalness} />
+diff --git a/src/components/canvas/LedSpillLight.tsx b/src/components/canvas/LedSpillLight.tsx
+new file mode 100644
+index 0000000..450a2f8
+--- /dev/null
++++ b/src/components/canvas/LedSpillLight.tsx
+@@ -0,0 +1,109 @@
++'use client';
++
++import { useRef, useMemo } from 'react';
++import { useFrame } from '@react-three/fiber';
++import * as THREE from 'three';
++import { useStore } from '@/store/useStore';
++import { globalVideoElement } from './VideoManager';
++
++/**
++ * LED 溢光(spill / ambilight)。
++ *
++ * 顏色來自把播放中的 LED 內容縮繪到 1×1 canvas 取平均色。
++ *
++ * 光源選擇:刻意「不」用 RectAreaLight —— 面光源有矩形邊界,會在地面留下一條筆直切線,
++ * 而真實 LED 多為不規則造型。改用:
++ *   1) 平行光(directional):給方向感(光從 LED 方向來),無衰減邊界、無切線
++ *   2) 半球光(hemisphere):全域環境染色,讓遠處桁架也吃到 LED 顏色
++ * 兩者皆無幾何邊界,任何 LED 造型都成立。
++ *
++ * 成本:每 10 幀一次 1×1 drawImage,無額外場景渲染。僅完美渲染下啟用。
++ */
++export function LedSpillLight() {
++    const perfectRenderEnabled = useStore((s) => s.perfectRenderEnabled);
++    const ledSpillIntensity = useStore((s) => s.ledSpillIntensity);
++    const stageObjects = useStore((s) => s.stageObjects);
++    const objectBounds = useStore((s) => s.objectBounds);
++
++    const dirRef = useRef<THREE.DirectionalLight>(null);
++    const hemiRef = useRef<THREE.HemisphereLight>(null);
++    const frameCount = useRef(0);
++    const currentColor = useRef(new THREE.Color(0, 0, 0));
++    const targetColor = useRef(new THREE.Color(0, 0, 0));
++
++    const sampler = useMemo(() => {
++        if (typeof document === 'undefined') return null;
++        const c = document.createElement('canvas');
++        c.width = 1; c.height = 1;
++        return { ctx: c.getContext('2d', { willReadFrequently: true }) };
++    }, []);
++
++    // 平行光的來向:LED 群體中心(只取方向,不取距離 → 無邊界)
++    const lightPos = useMemo(() => {
++        const leds = stageObjects.filter(o => o.type === 'static_LED' || o.type === 'moving_LED');
++        const box = new THREE.Box3();
++        let has = false;
++        for (const led of leds) {
++            const b = objectBounds[led.id];
++            if (!b) continue;
++            box.expandByPoint(new THREE.Vector3(...b.min));
++            box.expandByPoint(new THREE.Vector3(...b.max));
++            has = true;
++        }
++        if (!has) return new THREE.Vector3(0, 8, -20);
++        const c = new THREE.Vector3();
++        box.getCenter(c);
++        return c;
++    }, [stageObjects, objectBounds]);
++
++    const spillActive = perfectRenderEnabled && ledSpillIntensity > 0;
++
++    useFrame(() => {
++        if (!spillActive || !sampler?.ctx) return;
++
++        frameCount.current++;
++        if (frameCount.current % 10 === 0) {
++            const v = globalVideoElement;
++            if (v && v.readyState >= 2 && v.videoWidth > 0) {
++                try {
++                    sampler.ctx.drawImage(v, 0, 0, 1, 1);
++                    const d = sampler.ctx.getImageData(0, 0, 1, 1).data;
++                    targetColor.current.setRGB(d[0] / 255, d[1] / 255, d[2] / 255);
++                } catch {
++                    targetColor.current.setRGB(0, 0, 0);
++                }
++            } else {
++                targetColor.current.setRGB(0, 0, 0);
++            }
++        }
++
++        currentColor.current.lerp(targetColor.current, 0.08);
++        const lum = currentColor.current.r * 0.299 + currentColor.current.g * 0.587 + currentColor.current.b * 0.114;
++
++        if (dirRef.current) {
++            dirRef.current.color.copy(currentColor.current);
++            dirRef.current.intensity = ledSpillIntensity * lum * 1.2;
++        }
++        if (hemiRef.current) {
++            hemiRef.current.color.copy(currentColor.current);
++            hemiRef.current.intensity = ledSpillIntensity * lum * 0.6;
++        }
++    });
++
++    // 溢光僅在完美渲染下生效(普通/精簡模式零成本:不掛燈、不取樣)
++    if (!spillActive) return null;
++
++    return (
++        <>
++            {/* 方向感:光自 LED 方向而來。平行光無距離衰減、無邊界 → 不會有切線 */}
++            <directionalLight
++                ref={dirRef}
++                position={[lightPos.x, lightPos.y, lightPos.z]}
++                intensity={0}
++                castShadow={false}
++            />
++            {/* 全域環境染色:遠處桁架也吃到 LED 顏色 */}
++            <hemisphereLight ref={hemiRef} intensity={0} groundColor="#000000" />
++        </>
++    );
++}
+diff --git a/src/components/canvas/SceneGraph.tsx b/src/components/canvas/SceneGraph.tsx
+index e236bc0..06d6527 100644
+--- a/src/components/canvas/SceneGraph.tsx
++++ b/src/components/canvas/SceneGraph.tsx
+@@ -22,8 +22,135 @@ import { ToneMappingMode } from 'postprocessing';
+ import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
+ import { CameraMarkers } from './CameraMarkers';
+ import { setParallaxBox, setParallaxEnabled } from '@/lib/parallax-envmap';
++import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
++import { REFLECT_LAYER } from '@/lib/reflect-layer';
++import { LedSpillLight } from './LedSpillLight';
+ 
+ // 精簡模式:LED 永遠保留 + 後台指定 keepIds;其餘不渲染(直接卸載,省 draw call/材質/useFrame)
++/**
++ * 平面反射器(舞台地面)。只反射 LED 素材:
++ * 反射用的虛擬相機 layers 只設 REFLECT_LAYER,而僅 LED mesh 被加入該層,
++ * 因此桁架/舞台/場館完全不參與反射渲染 —— 又快又乾淨(無法線暴露、無遞迴過曝)。
++ * 全場僅建立一個(多個反射面會互相反射)。
++ */
++function PlanarReflectorPlane() {
++    const perfectRenderEnabled = useStore((s) => s.perfectRenderEnabled);
++    const renderMode = useStore((s) => s.renderMode);
++    const stageObjects = useStore((s) => s.stageObjects);
++    const objectBounds = useStore((s) => s.objectBounds);
++    const reflectionMirror = useStore((s) => s.reflectionMirror);
++    const reflectionBlur = useStore((s) => s.reflectionBlur);
++
++    const target = stageObjects.find((o) => o.planarReflector);
++    const b = target ? objectBounds[target.id] : undefined;
++    // 反射僅在完美渲染 + beauty 模式生效(普通模式零成本:不建立 Reflector、不做額外渲染)
++    const active = perfectRenderEnabled && renderMode === 'beauty' && !!target && !!b;
++
++    // 診斷:標記了卻沒有包圍盒(例如 Box primitive 尚未量測)→ 提示而非靜默失敗
++    useEffect(() => {
++        if (perfectRenderEnabled && target && !b) {
++            console.warn('[PlanarReflector] 已標記物件但尚無包圍盒資料,反射平面無法建立:', target.id);
++        }
++    }, [perfectRenderEnabled, target, b]);
++
++    // 手動參數優先;未設定時以包圍盒推算(頂面中心)作為起始值
++    const cfg = target?.reflectorConfig ?? (b ? {
++        w: Math.max(0.1, b.max[0] - b.min[0]),
++        d: Math.max(0.1, b.max[2] - b.min[2]),
++        x: (b.max[0] + b.min[0]) / 2,
++        y: b.min[1] + 0.005, // 底面:舞台面通常在包圍盒底部(取頂面會讓平面浮在半空)
++        z: (b.max[2] + b.min[2]) / 2,
++    } : null);
++
++    const reflector = useMemo(() => {
++        if (!active || !cfg) return null;
++        const w = Math.max(0.1, cfg.w);
++        const d = Math.max(0.1, cfg.d);
++        const geo = new THREE.PlaneGeometry(w, d);
++        const TEX = 1024;
++        const r = new Reflector(geo, {
++            textureWidth: TEX,
++            textureHeight: TEX,
++            color: 0x7f7f7f, // 中性:blendOverlay 遇純黑會把反射乘成 0
++            multisample: 0,  // 關閉 MSAA:與 mipmap 生成衝突(且反射本就要模糊,不需抗鋸齒)
++        });
++        // 關鍵:反射相機只看 LED 圖層
++        r.camera.layers.set(REFLECT_LAYER);
++
++        // 開啟 mipmap:模糊改用硬體三線性 mip 插值(等同 roughness 的模糊原理),
++        // 連續平滑、無多重取樣造成的分層重影。three 渲染到 target 後會自動更新 mipmap。
++        const rt = r.getRenderTarget();
++        rt.texture.generateMipmaps = true;
++        rt.texture.minFilter = THREE.LinearMipmapLinearFilter;
++        rt.texture.magFilter = THREE.LinearFilter;
++        rt.texture.needsUpdate = true;
++
++        // 注入可調模糊:在投影取樣處做 13 點高斯近似(螢幕空間偏移需乘 vUv.w 保持透視一致)
++        const mat = r.material as THREE.ShaderMaterial;
++        mat.uniforms.uBlur = { value: 0 };
++        mat.uniforms.uTexel = { value: new THREE.Vector2(1 / TEX, 1 / TEX) };
++        mat.fragmentShader = mat.fragmentShader
++            .replace(
++                'uniform sampler2D tDiffuse;',
++                `uniform sampler2D tDiffuse;
++uniform float uBlur;
++uniform float uStrength;
++uniform vec2 uTexel;
++// mip-based 模糊:LOD bias 讓硬體做三線性插值(與 roughness 同原理),
++// 再以 4 個微小偏移取樣消除 mip 層之間的接縫,得到連續柔化。
++vec4 blurProj( sampler2D tex, vec4 uv, float lod ) {
++	if ( lod < 0.01 ) return texture2DProj( tex, uv );
++	vec2 o = uTexel * uv.w * lod * 0.75;
++	vec4 sum = texture2DProj( tex, uv, lod ) * 0.4;
++	sum += texture2DProj( tex, uv + vec4( o.x, o.y, 0.0, 0.0 ), lod ) * 0.15;
++	sum += texture2DProj( tex, uv + vec4( -o.x, o.y, 0.0, 0.0 ), lod ) * 0.15;
++	sum += texture2DProj( tex, uv + vec4( o.x, -o.y, 0.0, 0.0 ), lod ) * 0.15;
++	sum += texture2DProj( tex, uv + vec4( -o.x, -o.y, 0.0, 0.0 ), lod ) * 0.15;
++	return sum;
++}`
++            )
++            .replace(
++                'vec4 base = texture2DProj( tDiffuse, vUv );',
++                'vec4 base = blurProj( tDiffuse, vUv, uBlur );'
++            )
++            .replace(
++                'gl_FragColor = vec4( blendOverlay( base.rgb, color ), 1.0 );',
++                'gl_FragColor = vec4( base.rgb * uStrength, 1.0 );'
++            );
++        mat.uniforms.uStrength = { value: 1 };
++        // 加算混合:LED 反射光疊加在地板材質上(而非蓋一層黑板)
++        mat.transparent = true;
++        mat.blending = THREE.AdditiveBlending;
++        mat.depthWrite = false;
++        mat.needsUpdate = true;
++        r.rotation.x = -Math.PI / 2;
++        r.position.set(cfg.x, cfg.y, cfg.z);
++        return r;
++    }, [active, cfg?.w, cfg?.d, cfg?.x, cfg?.y, cfg?.z]);
++
++    // 反射強度/模糊:以材質 opacity 與 blur uniform 近似(Reflector 為自訂 shader)
++    // 滑桿即時更新 uniform(不重建 reflector)
++    useEffect(() => {
++        if (!reflector) return;
++        const mat = reflector.material as THREE.ShaderMaterial;
++        if (mat.uniforms.uStrength) mat.uniforms.uStrength.value = reflectionMirror; // 鏡面強度
++        if (mat.uniforms.uBlur) mat.uniforms.uBlur.value = reflectionBlur * 0.3; // 滑桿 0–20 → mip LOD 0–6
++    }, [reflector, reflectionMirror, reflectionBlur]);
++
++    // 卸載時釋放資源(僅在 reflector 實例更換時)
++    useEffect(() => {
++        if (!reflector) return;
++        return () => {
++            reflector.geometry.dispose();
++            (reflector.material as THREE.Material).dispose();
++            reflector.dispose?.();
++        };
++    }, [reflector]);
++
++    if (!reflector) return null;
++    return <primitive object={reflector} />;
++}
++
+ function liteVisible(obj: { id: string; type: string }, liteMode: boolean, keepIds: string[]): boolean {
+     if (!liteMode) return true;
+     if (obj.type === 'static_LED' || obj.type === 'moving_LED') return true;
+@@ -307,6 +434,10 @@ export function SceneGraph() {
+ 
+     // Perfect Render Mode state
+     const perfectRenderEnabled = useStore((state) => state.perfectRenderEnabled);
++    const perfectLightScale = useStore((state) => state.perfectLightScale);
++    // 反射更新頻率自適應用:內容變化中(影片播放/攝影機直播)才需要高頻更新
++    const videoPlayingRT = useStore((state) => state.videoPlaying);
++    const cameraStreamActiveRT = useStore((state) => state.cameraStreamActive);
+ 
+     const controlsRef = useRef<OrbitControlsImpl>(null);
+     const cubeCameraRef = useRef<THREE.CubeCamera>(null);
+@@ -442,7 +573,13 @@ export function SceneGraph() {
+         // CubeCamera update for realtime LED reflections (every 3 frames)
+         if (cubeCameraRef.current && perfectRenderEnabled) {
+             frameCounter.current++;
+-            if (frameCounter.current % 12 === 0) { // 每 12 幀:反射延遲 ~0.2s 無感,CubeCamera 成本降 4 倍
++            // [反射即時性] 自適應更新頻率:
++            //   內容變化中(影片播放/攝影機直播)→ 每 2 幀(約 30Hz,LED 影片反射跟得上畫面)
++            //   靜止畫面 → 每 30 幀(場景沒變,不需重算;省下的預算給播放時用)
++            // far=300 + res 128 已把單次成本壓低,故播放時可負擔高頻更新。
++            const contentLive = videoPlayingRT || cameraStreamActiveRT;
++            const interval = contentLive ? 4 : 30; // 4 幀(15Hz):每次 update 含 PMREM 重算,成本比預估高
++            if (frameCounter.current % interval === 0) {
+                 cubeCameraRef.current.update(gl, scene);
+             }
+             // Parallax 包圍盒自動計算(每 60 幀,零訂閱):venues 物件聯集,適配 50m~500m 場館
+@@ -495,6 +632,8 @@ export function SceneGraph() {
+             {cubeCameraRef.current && <primitive object={cubeCameraRef.current} />}
+ 
+             {/* 3D 機位模型(導播參考) */}
++            <PlanarReflectorPlane />
++            <LedSpillLight />
+             <CameraMarkers />
+ 
+             <PerspectiveCamera
+@@ -546,14 +685,15 @@ export function SceneGraph() {
+             <MeasurementScene />
+ 
+             {/* Enhanced lighting for better model visibility */}
+-            <ambientLight intensity={ambientIntensity} />
++            {/* 完美渲染另有環境光 IBL,直接光按補償係數降低,避免同一組數值在兩模式亮度落差 */}
++            <ambientLight intensity={ambientIntensity * (perfectRenderEnabled ? perfectLightScale : 1)} />
+             <directionalLight
+                 position={[
+                     20 * Math.cos(mainLightElevation * Math.PI / 180) * Math.sin(mainLightAzimuth * Math.PI / 180),
+                     20 * Math.sin(mainLightElevation * Math.PI / 180),
+                     20 * Math.cos(mainLightElevation * Math.PI / 180) * Math.cos(mainLightAzimuth * Math.PI / 180)
+                 ]}
+-                intensity={directionalIntensity}
++                intensity={directionalIntensity * (perfectRenderEnabled ? perfectLightScale : 1)}
+                 castShadow={perfectRenderEnabled}
+                 shadow-mapSize-width={2048}
+                 shadow-mapSize-height={2048}
+@@ -565,7 +705,7 @@ export function SceneGraph() {
+                 shadow-camera-far={60}
+                 shadow-bias={-0.001}
+             />
+-            <directionalLight position={[-10, 10, -5]} intensity={directionalIntensity * 0.4} />
++            <directionalLight position={[-10, 10, -5]} intensity={directionalIntensity * 0.4 * (perfectRenderEnabled ? perfectLightScale : 1)} />
+             <hemisphereLight intensity={0.4} groundColor="#444" />
+ 
+             {/* Perfect Render Environment - HDR, SpotLights, ContactShadows */}
+diff --git a/src/components/canvas/StageObjectRenderer.tsx b/src/components/canvas/StageObjectRenderer.tsx
+index e317e8c..a192128 100644
+--- a/src/components/canvas/StageObjectRenderer.tsx
++++ b/src/components/canvas/StageObjectRenderer.tsx
+@@ -9,6 +9,7 @@ import { parseGIF, decompressFrames } from 'gifuct-js';
+ import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
+ import { getObjectDisplayName } from '@/lib/object-utils';
+ import { applyParallaxEnvMap } from '@/lib/parallax-envmap';
++import { REFLECT_LAYER } from '@/lib/reflect-layer';
+ 
+ // [效能] useFrame 每幀重用的臨時物件(單執行緒,跨實例共享安全);消除每幀 new 造成的 GC 卡頓
+ const _tmpBasePos = new THREE.Vector3();
+@@ -606,7 +607,15 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
+     // Apply realtime envMap to non-emissive materials for LED reflection
+     useEffect(() => {
+         if (!material || !envMap || !perfectRenderEnabled) return;
+-        if (object.material_id === 'emissive' || object.type === 'floor_plan') return;
++        // LED / 投影幕等自發光面板不套環境反射(避免鏡面高光疊在畫面上)
++        if (
++            object.material_id === 'emissive' ||
++            object.material_id === 'emissiveMesh' ||
++            object.material_id === 'projectionScreen' ||
++            object.type === 'static_LED' ||
++            object.type === 'moving_LED' ||
++            object.type === 'floor_plan'
++        ) return;
+         if (renderMode !== 'beauty') return;
+ 
+         const mat = material as THREE.MeshStandardMaterial;
+@@ -635,6 +644,19 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
+         // eslint-disable-next-line react-hooks/exhaustive-deps
+     }, [material, overridesJson, object.material_id, object.type]);
+ 
++    // LED 物件加入反射圖層(層 0 保留給主相機,層 REFLECT_LAYER 供反射相機挑選)
++    const isLedType = object.type === 'static_LED' || object.type === 'moving_LED';
++    useEffect(() => {
++        const g = groupRef.current;
++        if (!g) return;
++        g.traverse((o) => {
++            if ((o as THREE.Mesh).isMesh) {
++                if (isLedType) o.layers.enable(REFLECT_LAYER);
++                else o.layers.disable(REFLECT_LAYER);
++            }
++        });
++    }, [isLedType, gltfData]);
++
+     const nodes = gltfData?.nodes ?? {};
+ 
+     // Find all meshes in the loaded GLTF(memoize:供 geometry clone 依賴,避免每次 render 重算)
+diff --git a/src/lib/materials.ts b/src/lib/materials.ts
+index 35cfe11..d9068c9 100644
+--- a/src/lib/materials.ts
++++ b/src/lib/materials.ts
+@@ -507,7 +507,7 @@ export const MATERIAL_LIBRARY: Record<MaterialId, MaterialDefinition> = {
+         id: 'emissive',
+         name: '自發光',
+         color: '#ffffff',
+-        roughness: 0.9,
++        roughness: 1.0, // LED 面板:無鏡面高光
+         metalness: 0.0,
+         emissive: '#ffaa00',
+         emissiveIntensity: 1.0
+@@ -525,7 +525,7 @@ export const MATERIAL_LIBRARY: Record<MaterialId, MaterialDefinition> = {
+         id: 'emissiveMesh',
+         name: '網格LED (透視)',
+         color: '#ffffff',
+-        roughness: 0.9,
++        roughness: 1.0, // LED 面板:無鏡面高光
+         metalness: 0.0,
+         emissive: '#ffaa00',
+         emissiveIntensity: 1.0,
+@@ -831,9 +831,12 @@ export function createPerfectMaterial(materialId: MaterialId): THREE.MeshPhysica
+             break;
+         }
+ 
+-        case 'emissive': {
+-            // 自發光 - 保持原樣
+-            params.envMapIntensity = 0.5;
++        case 'emissive':
++        case 'emissiveMesh': {
++            // LED 自發光面板:不吃環境反射(不該有鏡面高光),粗糙度拉滿消除鏡面項
++            params.envMapIntensity = 0;
++            params.roughness = 1.0;
++            params.metalness = 0.0;
+             break;
+         }
+ 
+diff --git a/src/lib/project-service.ts b/src/lib/project-service.ts
+index 35d4a8c..981cae6 100644
+--- a/src/lib/project-service.ts
++++ b/src/lib/project-service.ts
+@@ -33,6 +33,8 @@ export interface ProjectState {
+     contactShadow?: boolean;
+     toneMapping?: boolean;
+     spotLights?: SpotLightConfig[];
++    perfectLightScale?: number;
++    ledSpillIntensity?: number;
+     reflectionMirror?: number;
+     reflectionBlur?: number;
+     reflectionMetalness?: number;
+diff --git a/src/lib/reflect-layer.ts b/src/lib/reflect-layer.ts
+new file mode 100644
+index 0000000..171fce5
+--- /dev/null
++++ b/src/lib/reflect-layer.ts
+@@ -0,0 +1,2 @@
++/** 反射專用圖層:只有 LED 物件會被加入,反射相機僅渲染此層(其餘物件不參與反射)。 */
++export const REFLECT_LAYER = 1;
+diff --git a/src/store/useStore.ts b/src/store/useStore.ts
+index 711a63b..e37ec64 100644
+--- a/src/store/useStore.ts
++++ b/src/store/useStore.ts
+@@ -40,6 +40,8 @@ export interface StageObject {
+     name?: string; // 顯示名稱:上傳時取自 3D 軟體的 mesh/檔案命名,可由使用者修改
+     rigMirror?: boolean; // 鏡像跟隨:掛載於 Null 時,機關偏移以 ×-1 作用(對稱機關,如左右對開門)
+     materialOverrides?: MaterialOverrides; // 材質參數微調(基底 material_id 之上的覆寫)
++    planarReflector?: boolean; // 平面反射:啟用後在下方參數指定的平面上反射 LED 內容
++    reflectorConfig?: { w: number; d: number; x: number; y: number; z: number }; // 反射平面尺寸與位置(公尺)
+     parentId?: string | null; // 掛載的 Null 節點或父物件 ID;一旦有 parent,instances 的 pos/rot 即為相對 parent 的本地座標
+     curvature?: number; // [NEW] Arc curvature for projection screens (-1 to 1)
+     ledResolution?: { w: number; h: number }; // LED 原生解析度(像素);跨排列共用,放進畫布時作為預設大小
+@@ -345,6 +347,8 @@ interface State {
+ 
+     // Perfect Render Mode [NEW]
+     perfectRenderEnabled: boolean;
++    perfectLightScale: number;     // 完美渲染的燈光補償:完美渲染另有環境光 IBL,需降低直接光 0-1.5
++    ledSpillIntensity: number;     // LED 溢光:以 LED 內容平均色打亮環境 0-3
+     reflectionMirror: number;      // 0-1
+     reflectionBlur: number;        // 0-20
+     reflectionMetalness: number;   // 0-1
+@@ -383,6 +387,8 @@ interface State {
+     // Perfect Render Actions [NEW]
+     setFloorPlanTexture: (url: string | null) => void; // [NEW]
+     setPerfectRenderEnabled: (enabled: boolean) => void;
++    setPerfectLightScale: (value: number) => void;
++    setLedSpillIntensity: (value: number) => void;
+     setReflectionMirror: (value: number) => void;
+     setReflectionBlur: (value: number) => void;
+     setReflectionMetalness: (value: number) => void;
+@@ -641,6 +647,8 @@ export const useStore = create<State>()(
+ 
+             // Perfect Render defaults
+             perfectRenderEnabled: false,
++            perfectLightScale: 0.45,
++            ledSpillIntensity: 0.8,
+             reflectionMirror: 0.6,
+             reflectionBlur: 8,
+             reflectionMetalness: 0.8,
+@@ -829,6 +837,8 @@ export const useStore = create<State>()(
+ 
+             // Perfect Render Actions
+             setPerfectRenderEnabled: (enabled) => set({ perfectRenderEnabled: enabled }),
++            setPerfectLightScale: (value) => set({ perfectLightScale: value }),
++            setLedSpillIntensity: (value) => set({ ledSpillIntensity: value }),
+             setReflectionMirror: (value) => set({ reflectionMirror: value }),
+             setReflectionBlur: (value) => set({ reflectionBlur: value }),
+             setReflectionMetalness: (value) => set({ reflectionMetalness: value }),

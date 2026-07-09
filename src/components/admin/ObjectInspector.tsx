@@ -74,6 +74,7 @@ function LinkToParentDropdown({
 }
 
 export function ObjectInspector() {
+    const objectBounds = useStore((state) => state.objectBounds);
     const liteModeKeepIds = useStore((state) => state.liteModeKeepIds);
     const toggleLiteModeKeep = useStore((state) => state.toggleLiteModeKeep);
     const stageObjects = useStore((state) => state.stageObjects);
@@ -117,11 +118,18 @@ export function ObjectInspector() {
                                 {(obj.type === 'static_LED' || obj.type === 'moving_LED') ? (
                                     <span className="text-[10px] text-yellow-400/60" title="LED 在精簡模式永遠保留">⚡LED</span>
                                 ) : (
-                                    <span
-                                        onClick={(e) => { e.stopPropagation(); toggleLiteModeKeep(obj.id); }}
-                                        className={`text-[10px] cursor-pointer px-1 rounded ${liteModeKeepIds.includes(obj.id) ? 'text-yellow-400 bg-yellow-500/15' : 'text-gray-600 hover:text-gray-400'}`}
-                                        title="精簡模式保留此模型(客戶端 ⚡ 開啟時仍渲染)"
-                                    >⚡</span>
+                                    <span className="flex items-center gap-1">
+                                        <span
+                                            onClick={(e) => { e.stopPropagation(); updateObject(obj.id, { planarReflector: !obj.planarReflector }); }}
+                                            className={`text-[10px] cursor-pointer px-1 rounded ${obj.planarReflector ? 'text-cyan-300 bg-cyan-500/15' : 'text-gray-600 hover:text-gray-400'}`}
+                                            title="平面反射:此物件做鏡面反射(適用舞台地面等平面;僅完美渲染生效)"
+                                        >🪞</span>
+                                        <span
+                                            onClick={(e) => { e.stopPropagation(); toggleLiteModeKeep(obj.id); }}
+                                            className={`text-[10px] cursor-pointer px-1 rounded ${liteModeKeepIds.includes(obj.id) ? 'text-yellow-400 bg-yellow-500/15' : 'text-gray-600 hover:text-gray-400'}`}
+                                            title="精簡模式保留此模型(客戶端 ⚡ 開啟時仍渲染)"
+                                        >⚡</span>
+                                    </span>
                                 )}
                                 {obj.parentId && (
                                     <span className="text-[10px] opacity-60 flex items-center gap-0.5"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg> 已連結</span>
@@ -133,6 +141,51 @@ export function ObjectInspector() {
             </div>
 
             {/* Selected Object Details */}
+            {selectedObject?.planarReflector && (
+                <div className="border-t border-gray-700 pt-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-cyan-300">🪞 反射平面(公尺)</h4>
+                        <button
+                            onClick={() => {
+                                const b = objectBounds[selectedObject.id];
+                                if (!b) return;
+                                updateObject(selectedObject.id, { reflectorConfig: {
+                                    w: Math.max(0.1, b.max[0] - b.min[0]),
+                                    d: Math.max(0.1, b.max[2] - b.min[2]),
+                                    x: (b.max[0] + b.min[0]) / 2,
+                                    y: b.min[1] + 0.005,
+                                    z: (b.max[2] + b.min[2]) / 2,
+                                } });
+                            }}
+                            className="text-[10px] px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200"
+                            title="以物件包圍盒填入(高度取底面)"
+                        >自動填入</button>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1">
+                        {(['w', 'd', 'x', 'y', 'z'] as const).map((k) => {
+                            const cfg = selectedObject.reflectorConfig ?? { w: 10, d: 10, x: 0, y: 0, z: 0 };
+                            return (
+                                <label key={k} className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] text-gray-500 text-center">{k === 'w' ? '寬' : k === 'd' ? '深' : k.toUpperCase()}</span>
+                                    <input
+                                        type="number"
+                                        step={0.1}
+                                        value={cfg[k]}
+                                        onChange={(e) => {
+                                            const v = parseFloat(e.target.value);
+                                            if (!Number.isFinite(v)) return;
+                                            updateObject(selectedObject.id, { reflectorConfig: { ...cfg, [k]: v } });
+                                        }}
+                                        className="w-full bg-gray-900 border border-gray-600 rounded px-1 py-0.5 text-[10px] text-white text-center focus:border-cyan-500 focus:outline-none"
+                                    />
+                                </label>
+                            );
+                        })}
+                    </div>
+                    <p className="text-[9px] text-gray-500">Y = 舞台面高度。反射只顯示 LED 內容,加算疊在地板上。</p>
+                </div>
+            )}
+
             {selectedObject && selectedObject.instances[0] && (
                 <>
                     <div className="border-t border-gray-700 pt-3 space-y-3">

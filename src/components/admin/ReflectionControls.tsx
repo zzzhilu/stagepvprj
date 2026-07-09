@@ -128,6 +128,10 @@ function SpotLightPanel({ index }: { index: number }) {
 
 export function ReflectionControls() {
     const perfectRenderEnabled = useStore((state) => state.perfectRenderEnabled);
+    const perfectLightScale = useStore((state) => state.perfectLightScale);
+    const setPerfectLightScale = useStore((state) => state.setPerfectLightScale);
+    const ledSpillIntensity = useStore((state) => state.ledSpillIntensity);
+    const setLedSpillIntensity = useStore((state) => state.setLedSpillIntensity);
     const reflectionMirror = useStore((state) => state.reflectionMirror);
     const reflectionBlur = useStore((state) => state.reflectionBlur);
     const reflectionMetalness = useStore((state) => state.reflectionMetalness);
@@ -178,6 +182,8 @@ export function ReflectionControls() {
             {/* === 地板反射 === */}
             <div className="space-y-2 pt-2 border-t border-gray-800">
                 <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">地板反射</span>
+                <SliderRow label="完美渲染 亮度補償" value={perfectLightScale} min={0} max={1.5} step={0.05} onChange={setPerfectLightScale} />
+                <SliderRow label="LED 溢光" value={ledSpillIntensity} min={0} max={3} step={0.1} onChange={setLedSpillIntensity} />
                 <SliderRow label="鏡面強度" value={reflectionMirror} min={0} max={1} step={0.05} onChange={setReflectionMirror} />
                 <SliderRow label="模糊程度" value={reflectionBlur} min={0} max={20} step={1} onChange={setReflectionBlur} />
                 <SliderRow label="金屬感" value={reflectionMetalness} min={0} max={1} step={0.05} onChange={setReflectionMetalness} />

@@ -172,6 +172,8 @@ function ProjectEditorContent() {
     const contactShadow = useStore(state => state.contactShadow);
     const toneMapping = useStore(state => state.toneMapping);
     const spotLights = useStore(state => state.spotLights);
+    const perfectLightScale = useStore(state => state.perfectLightScale);
+    const ledSpillIntensity = useStore(state => state.ledSpillIntensity);
     const reflectionMirror = useStore(state => state.reflectionMirror);
     const reflectionBlur = useStore(state => state.reflectionBlur);
     const reflectionMetalness = useStore(state => state.reflectionMetalness);
@@ -235,6 +237,8 @@ function ProjectEditorContent() {
                     ...(data.contactShadow !== undefined ? { contactShadow: data.contactShadow } : {}),
                     ...(data.toneMapping !== undefined ? { toneMapping: data.toneMapping } : {}),
                     ...(data.spotLights !== undefined ? { spotLights: data.spotLights } : {}),
+                    ...(data.perfectLightScale !== undefined ? { perfectLightScale: data.perfectLightScale } : {}),
+                    ...(data.ledSpillIntensity !== undefined ? { ledSpillIntensity: data.ledSpillIntensity } : {}),
                     ...(data.reflectionMirror !== undefined ? { reflectionMirror: data.reflectionMirror } : {}),
                     ...(data.reflectionBlur !== undefined ? { reflectionBlur: data.reflectionBlur } : {}),
                     ...(data.reflectionMetalness !== undefined ? { reflectionMetalness: data.reflectionMetalness } : {}),
@@ -288,6 +292,8 @@ function ProjectEditorContent() {
                     contactShadow,
                     toneMapping,
                     spotLights,
+                    perfectLightScale,
+                    ledSpillIntensity,
                     reflectionMirror,
                     reflectionBlur,
                     reflectionMetalness,
@@ -301,7 +307,7 @@ function ProjectEditorContent() {
         }, 2000); // Debounce 2 seconds
 
         return () => clearTimeout(timeoutId);
-    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, ledLayouts, activeLedLayoutId, screenCropRatio, clientEditPasswordHash, liteModeKeepIds, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, reflectionMirror, reflectionBlur, reflectionMetalness, nulls, rigs, isAuthenticated, isShareMode, isLoading, projectId]);
+    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, ledLayouts, activeLedLayoutId, screenCropRatio, clientEditPasswordHash, liteModeKeepIds, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, perfectLightScale, ledSpillIntensity, reflectionMirror, reflectionBlur, reflectionMetalness, nulls, rigs, isAuthenticated, isShareMode, isLoading, projectId]);
 
     // Show loading while checking auth
     if (isChecking) {

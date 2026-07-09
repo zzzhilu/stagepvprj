@@ -40,6 +40,8 @@ export interface StageObject {
     name?: string; // 顯示名稱:上傳時取自 3D 軟體的 mesh/檔案命名,可由使用者修改
     rigMirror?: boolean; // 鏡像跟隨:掛載於 Null 時,機關偏移以 ×-1 作用(對稱機關,如左右對開門)
     materialOverrides?: MaterialOverrides; // 材質參數微調(基底 material_id 之上的覆寫)
+    planarReflector?: boolean; // 平面反射:啟用後在下方參數指定的平面上反射 LED 內容
+    reflectorConfig?: { w: number; d: number; x: number; y: number; z: number }; // 反射平面尺寸與位置(公尺)
     parentId?: string | null; // 掛載的 Null 節點或父物件 ID;一旦有 parent,instances 的 pos/rot 即為相對 parent 的本地座標
     curvature?: number; // [NEW] Arc curvature for projection screens (-1 to 1)
     ledResolution?: { w: number; h: number }; // LED 原生解析度(像素);跨排列共用,放進畫布時作為預設大小
@@ -345,6 +347,8 @@ interface State {
 
     // Perfect Render Mode [NEW]
     perfectRenderEnabled: boolean;
+    perfectLightScale: number;     // 完美渲染的燈光補償:完美渲染另有環境光 IBL,需降低直接光 0-1.5
+    ledSpillIntensity: number;     // LED 溢光:以 LED 內容平均色打亮環境 0-3
     reflectionMirror: number;      // 0-1
     reflectionBlur: number;        // 0-20
     reflectionMetalness: number;   // 0-1
@@ -383,6 +387,8 @@ interface State {
     // Perfect Render Actions [NEW]
     setFloorPlanTexture: (url: string | null) => void; // [NEW]
     setPerfectRenderEnabled: (enabled: boolean) => void;
+    setPerfectLightScale: (value: number) => void;
+    setLedSpillIntensity: (value: number) => void;
     setReflectionMirror: (value: number) => void;
     setReflectionBlur: (value: number) => void;
     setReflectionMetalness: (value: number) => void;
@@ -641,6 +647,8 @@ export const useStore = create<State>()(
 
             // Perfect Render defaults
             perfectRenderEnabled: false,
+            perfectLightScale: 0.45,
+            ledSpillIntensity: 0.8,
             reflectionMirror: 0.6,
             reflectionBlur: 8,
             reflectionMetalness: 0.8,
@@ -829,6 +837,8 @@ export const useStore = create<State>()(
 
             // Perfect Render Actions
             setPerfectRenderEnabled: (enabled) => set({ perfectRenderEnabled: enabled }),
+            setPerfectLightScale: (value) => set({ perfectLightScale: value }),
+            setLedSpillIntensity: (value) => set({ ledSpillIntensity: value }),
             setReflectionMirror: (value) => set({ reflectionMirror: value }),
             setReflectionBlur: (value) => set({ reflectionBlur: value }),
             setReflectionMetalness: (value) => set({ reflectionMetalness: value }),

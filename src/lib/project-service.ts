@@ -33,6 +33,8 @@ export interface ProjectState {
     contactShadow?: boolean;
     toneMapping?: boolean;
     spotLights?: SpotLightConfig[];
+    perfectLightScale?: number;
+    ledSpillIntensity?: number;
     reflectionMirror?: number;
     reflectionBlur?: number;
     reflectionMetalness?: number;
