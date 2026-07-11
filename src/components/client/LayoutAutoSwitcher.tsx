@@ -12,10 +12,24 @@ import { useStore } from '@/store/useStore';
  */
 function matchLayoutByFilename(filename: string, layouts: { id: string; name: string }[]): string | null {
     const base = filename.toLowerCase().replace(/\.[^.]+$/, '');
+    // token 化:底線/空白/連字號切開(「S06_老歌_inputAll_0707」→ [s06, 老歌, inputall, 0707])
+    const tokens = base.split(/[_\s\-]+/).filter(Boolean);
     const sorted = [...layouts].filter(l => l.name?.trim()).sort((a, b) => b.name.length - a.name.length);
+
+    // 第一輪:token 完全等於排列名(最精確,長名優先)
     for (const l of sorted) {
         const n = l.name.toLowerCase().trim();
-        if (base === n || base.includes(`_${n}_`) || base.endsWith(`_${n}`) || base.startsWith(`${n}_`)) {
+        if (tokens.includes(n)) return l.id;
+    }
+    // 第二輪:token「包含」排列名(寬容:inputall → all、ledP1 → p1)。
+    // 防呆:排列名以數字結尾時,其在 token 中的下一字元不可是數字(p10 不誤中 p1)。
+    for (const l of sorted) {
+        const n = l.name.toLowerCase().trim();
+        const endsWithDigit = /\d$/.test(n);
+        for (const t of tokens) {
+            const idx = t.indexOf(n);
+            if (idx === -1) continue;
+            if (endsWithDigit && /\d/.test(t[idx + n.length] ?? '')) continue;
             return l.id;
         }
     }
@@ -39,11 +53,18 @@ export function LayoutAutoSwitcher() {
             return;
         }
 
-        // 優先級 2:檔名自動偵測;未命中 → 強制預設 UV(null)
+        // 優先級 2:檔名自動偵測
         const tex = st.contentTextures.find((t) => t.id === activeContentId);
         if (!tex?.name) return;
         const matched = matchLayoutByFilename(tex.name, st.ledLayouts);
-        setClientLayoutOverride(matched ?? null);
+        if (matched) {
+            setClientLayoutOverride(matched);
+            return;
+        }
+        // 優先級 3(檔名未命中):名為 all 的排列 → 否則跟隨後台設定。
+        // 絕不強制切到「無排列」— 那會讓客戶第一眼以為介面壞掉。
+        const allLayout = st.ledLayouts.find((l) => l.name?.trim().toLowerCase() === 'all');
+        setClientLayoutOverride(allLayout ? allLayout.id : undefined);
     }, [activeContentId, setClientLayoutOverride]);
 
     return null;

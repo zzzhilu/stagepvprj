@@ -11,6 +11,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ClientToolbar } from '@/components/client/ClientToolbar';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ClientEditGate } from '@/components/client/ClientEditGate';
+import { LayoutAutoSwitcher } from '@/components/client/LayoutAutoSwitcher';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
 
@@ -345,6 +346,8 @@ export default function VideoProgressEditorPage() {
 
             {/* 客戶編輯模式:右上齒輪(第二層密碼) */}
             <ClientEditGate projectId={projectId} />
+            {/* 檔名自動切換 UV 排列 */}
+            <LayoutAutoSwitcher />
 
             {/* Video Controls */}
             <VideoControls />
