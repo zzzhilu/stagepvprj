@@ -124,6 +124,7 @@ function SharePageContent() {
                 ...(data.toneMapping !== undefined ? { toneMapping: data.toneMapping } : {}),
                 ...(data.spotLights !== undefined ? { spotLights: data.spotLights } : {}),
                 ...(data.perfectLightScale !== undefined ? { perfectLightScale: data.perfectLightScale } : {}),
+                ...(data.liteModeDefault !== undefined ? { liteModeDefault: data.liteModeDefault, liteMode: data.liteModeDefault } : {}),
                 ...(data.ledSpillIntensity !== undefined ? { ledSpillIntensity: data.ledSpillIntensity } : {}),
                 ...(data.reflectionMirror !== undefined ? { reflectionMirror: data.reflectionMirror } : {}),
                 ...(data.reflectionBlur !== undefined ? { reflectionBlur: data.reflectionBlur } : {}),

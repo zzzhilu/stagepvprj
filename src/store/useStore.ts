@@ -509,7 +509,9 @@ interface State {
 
     // 精簡預覽模式:客戶端一鍵只渲染 LED + 後台指定保留的模型,鎖 60fps(弱電腦友善)
     liteMode: boolean;                 // runtime-only(客戶端開關)
+    liteModeDefault: boolean;          // 後台預設:客戶端載入時自動套用精簡渲染(同步)
     setLiteMode: (on: boolean) => void;
+    setLiteModeDefault: (on: boolean) => void;
     liteModeKeepIds: string[];         // 後台指定精簡模式仍保留的模型 id(同步)
     toggleLiteModeKeep: (id: string) => void;
     setContentTextures: (textures: ContentTexture[]) => void;
@@ -584,6 +586,7 @@ export const useStore = create<State>()(
             clientEditPasswordHash: null,
             clientEditMode: false,
             liteMode: false,
+            liteModeDefault: false,
             liteModeKeepIds: [],
             cues: [],
             activeCueId: null,
@@ -1189,6 +1192,7 @@ export const useStore = create<State>()(
             setClientEditPasswordHash: (hash) => set({ clientEditPasswordHash: hash }),
             setClientEditMode: (on) => set({ clientEditMode: on }),
             setLiteMode: (on) => set({ liteMode: on }),
+            setLiteModeDefault: (on) => set({ liteModeDefault: on }),
             toggleLiteModeKeep: (id) => set((state) => ({
                 liteModeKeepIds: state.liteModeKeepIds.includes(id)
                     ? state.liteModeKeepIds.filter(x => x !== id)

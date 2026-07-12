@@ -34,6 +34,7 @@ export interface ProjectState {
     toneMapping?: boolean;
     spotLights?: SpotLightConfig[];
     perfectLightScale?: number;
+    liteModeDefault?: boolean;
     ledSpillIntensity?: number;
     reflectionMirror?: number;
     reflectionBlur?: number;
