@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { ProjectService, type ProjectSummary } from '@/lib/project-service';
 
 const AUTH_KEY = 'stagepv_admin_auth';
 
@@ -11,6 +13,57 @@ export default function LandingPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const router = useRouter();
+
+  // 專案 dashboard(通過驗證後直接顯示所有專案,免去多層點擊)
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null); // `${id}:share` / `${id}:gdrive`
+
+  useEffect(() => {
+    if (!authed) return;
+    setLoadingProjects(true);
+    ProjectService.listProjects()
+      .then(setProjects)
+      .catch((e) => console.error('載入專案失敗', e))
+      .finally(() => setLoadingProjects(false));
+  }, [authed]);
+
+  const copyLink = async (projectId: string, kind: 'share' | 'gdrive') => {
+    const url = kind === 'share'
+      ? `${window.location.origin}/share/${projectId}`
+      : `${window.location.origin}/share/${projectId}?playlist=gdrive`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(`${projectId}:${kind}`);
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      window.prompt('請手動複製連結:', url);
+    }
+  };
+
+  const handleCreate = async () => {
+    const name = window.prompt('新專案名稱:');
+    if (!name?.trim()) return;
+    try {
+      setCreating(true);
+      const id = await ProjectService.createProject(name.trim());
+      router.push(`/free-test/${id}`);
+    } catch (e) {
+      console.error(e);
+      alert('建立失敗');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const fmtDate = (d: unknown) => {
+    try {
+      const date = (d as { toDate?: () => Date })?.toDate?.() ?? new Date(d as string | number | Date);
+      return date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    } catch { return ''; }
+  };
 
   // 載入時檢查 sessionStorage 是否已有有效 token(避免重複輸入)
   useEffect(() => {
@@ -112,44 +165,58 @@ export default function LandingPage() {
             </div>
           </div>
         ) : (
-          /* Navigation Buttons */
-          <div className="flex flex-col md:flex-row gap-6 md:gap-10 w-full max-w-3xl">
-            {/* Free Test Button */}
-            <Link
-              href="/free-test"
-              className="flex-1 group relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 to-violet-800 p-1 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-violet-500/30 text-left"
-            >
-              <div className="flex flex-col items-center justify-center h-48 md:h-64 rounded-xl bg-gray-900/50 backdrop-blur-sm p-6 transition-all group-hover:bg-gray-900/30">
-                <div className="text-5xl mb-4"><svg className="w-12 h-12 mx-auto text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 01-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 00-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 01-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 00.657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 01-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 005.427-.63 48.05 48.05 0 00.582-4.717.532.532 0 00-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.959.401v0a.656.656 0 00.658-.663 48.422 48.422 0 00-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 01-.61-.58v0z" /></svg></div>
-                <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">自由測試</h2>
-                <p className="text-gray-400 text-sm text-center">
-                  上傳模型，自由預覽內容
-                </p>
+          /* 專案 Dashboard:所有專案直接列出,每卡直達自由測試/影像進度並可直接複製分享連結 */
+          <div className="w-full max-w-5xl">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4 text-sm text-gray-500">
+                <span>{projects.length} 個專案</span>
+                <Link href="/free-test" className="underline hover:text-gray-300">專案管理</Link>
+                <Link href="/video-progress" className="underline hover:text-gray-300">影像進度列表</Link>
               </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-violet-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-            </Link>
+              <button
+                onClick={handleCreate}
+                disabled={creating}
+                className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold disabled:opacity-50"
+              >
+                {creating ? '建立中...' : '+ 新專案'}
+              </button>
+            </div>
 
-            {/* Video Progress Button */}
-            <Link
-              href="/video-progress"
-              className="flex-1 group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 p-1 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/30"
-            >
-              <div className="flex flex-col items-center justify-center h-48 md:h-64 rounded-xl bg-gray-900/50 backdrop-blur-sm p-6 transition-all group-hover:bg-gray-900/30">
-                <div className="text-5xl mb-4"><svg className="w-12 h-12 mx-auto text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" /></svg></div>
-                <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">影像進度</h2>
-                <p className="text-gray-400 text-sm text-center">
-                  追蹤專案影像製作進度
-                </p>
+            {loadingProjects ? (
+              <div className="h-40 flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-gray-600 border-t-violet-400 rounded-full animate-spin" />
               </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-blue-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-            </Link>
+            ) : projects.length === 0 ? (
+              <p className="text-gray-500 text-center py-16">尚無專案,點右上「+ 新專案」開始</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto pr-1">
+                {projects.map((p) => (
+                  <div key={p.id} className="bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-2xl p-5 hover:border-gray-500 transition-colors">
+                    <div className="flex items-start justify-between mb-1">
+                      <svg className="w-7 h-7 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-2.625 1.125a1.125 1.125 0 01-1.125-1.125v-1.5c0-.621.504-1.125 1.125-1.125m0 3.75h-1.5A1.125 1.125 0 011.125 18.375m17.25 0h1.5m-1.5 0a1.125 1.125 0 01-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h1.5a1.125 1.125 0 001.125-1.125v-1.5a1.125 1.125 0 00-1.125-1.125h-1.5m-15 0v-9a1.125 1.125 0 011.125-1.125h13.5c.621 0 1.125.504 1.125 1.125v9" /></svg>
+                      {p.updatedAt ? <span className="text-[10px] text-gray-500">{fmtDate(p.updatedAt)}</span> : null}
+                    </div>
+                    <h3 className="text-white font-bold text-lg truncate" title={p.name}>{p.name}</h3>
+                    <p className="text-gray-500 text-xs mb-4">建立於 {fmtDate(p.createdAt)}</p>
+
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <Link href={`/free-test/${p.id}`} className="text-center py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-colors">自由測試</Link>
+                      <Link href={`/video-progress/${p.id}`} className="text-center py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors">影像進度</Link>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={() => copyLink(p.id, 'share')} className="py-1.5 rounded-lg bg-gray-700/70 hover:bg-gray-600 text-gray-200 text-xs transition-colors" title="複製 3D 預覽分享連結(share 頁)">
+                        {copied === `${p.id}:share` ? '✅ 已複製' : '🔗 分享 3D 預覽'}
+                      </button>
+                      <button onClick={() => copyLink(p.id, 'gdrive')} className="py-1.5 rounded-lg bg-emerald-700/60 hover:bg-emerald-600 text-emerald-100 text-xs transition-colors" title="複製 GDrive 播放列表分享連結(客戶影像檢視)">
+                        {copied === `${p.id}:gdrive` ? '✅ 已複製' : '☁️ GDrive 分享'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
-
-        {/* Footer */}
-        <div className="absolute bottom-8 text-gray-500 text-sm">
-          © 2026 StagePV - 3D Stage Preview System
-        </div>
       </div>
     </main>
   );
