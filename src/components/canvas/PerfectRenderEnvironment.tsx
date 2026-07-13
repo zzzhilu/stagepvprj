@@ -60,46 +60,16 @@ export function PerfectRenderEnvironment() {
     const envPreset = useStore((state) => state.envPreset) as EnvPreset;
     const envIntensity = useStore((state) => state.envIntensity);
     const contactShadow = useStore((state) => state.contactShadow);
-    const toneMapping = useStore((state) => state.toneMapping);
 
     // 環境貼圖載入失敗後的重試計數(改變即強制重掛 Environment 重新抓取)
     const [envRetryKey, setEnvRetryKey] = useState(0);
 
     const { gl, scene } = useThree();
 
-    // Apply tone mapping when perfect render is enabled
-    useEffect(() => {
-        // three 硬規則:renderer.toneMapping 是材質 program 的編譯期 define,
-        // 改變後「已編譯」的材質不會自動更新 —— 必須對所有材質 needsUpdate 強制重編譯。
-        // 少了這步,「載入即開啟完美渲染」會卡在新舊混雜的光照狀態(部分材質仍是
-        // 無 tone mapping 的 program),要手動重開一次(靠 envMap 重設連帶重編譯)才恢復。
-        const recompileAll = () => {
-            scene.traverse((o) => {
-                const mesh = o as THREE.Mesh;
-                if (!mesh.isMesh || !mesh.material) return;
-                const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-                mats.forEach((m) => { m.needsUpdate = true; });
-            });
-        };
-
-        if (perfectRenderEnabled) {
-            const originalToneMapping = gl.toneMapping;
-            const originalToneMappingExposure = gl.toneMappingExposure;
-
-            if (toneMapping) {
-                // eslint-disable-next-line react-hooks/immutability
-                gl.toneMapping = THREE.ACESFilmicToneMapping;
-                gl.toneMappingExposure = 1.0;
-                recompileAll();
-            }
-
-            return () => {
-                gl.toneMapping = originalToneMapping;
-                gl.toneMappingExposure = originalToneMappingExposure;
-                recompileAll();
-            };
-        }
-    }, [perfectRenderEnabled, toneMapping, gl, scene]);
+    // Tone mapping 改由 SceneGraph 的 EffectComposer 內 ToneMapping pass 統一處理。
+    // 這裡「絕不」設定 gl.toneMapping:EffectComposer 會接管輸出並覆蓋它,
+    // 材質編譯瞬間讀到的值取決於掛載時序 —— 這個競態正是「載入即開啟完美渲染
+    // 光照錯誤、需手動重開」的根因。單一路徑(composer 內)= 結果與時序無關。
 
     if (!perfectRenderEnabled) return null;
 

@@ -435,6 +435,7 @@ export function SceneGraph() {
     // Perfect Render Mode state
     const perfectRenderEnabled = useStore((state) => state.perfectRenderEnabled);
     const perfectLightScale = useStore((state) => state.perfectLightScale);
+    const toneMappingOn = useStore((state) => state.toneMapping);
     // 反射更新頻率自適應用:內容變化中(影片播放/攝影機直播)才需要高頻更新
     const videoPlayingRT = useStore((state) => state.videoPlaying);
     const cameraStreamActiveRT = useStore((state) => state.cameraStreamActive);
@@ -890,6 +891,12 @@ export function SceneGraph() {
                         halfRes={false}
                         quality="medium"
                     />
+                    {/* Tone mapping 必須在 composer 內做:EffectComposer 會接管輸出並忽略
+                        gl.toneMapping(材質編譯期 define 的競態正是「載入即開啟完美渲染會卡
+                        錯誤光照、重開才正常」的根因)。
+                        順序:ACES 在 Bloom「之前」— 與既有調校時的機制一致(舊行為是材質內
+                        先映射、Bloom 後處理),bloomIntensity/Threshold 現值直接適用,觀感不變。 */}
+                    {toneMappingOn ? <ToneMapping mode={ToneMappingMode.ACES_FILMIC} /> : <></>}
                     <Bloom
                         intensity={bloomIntensity * 1.5}
                         luminanceThreshold={bloomThreshold}
