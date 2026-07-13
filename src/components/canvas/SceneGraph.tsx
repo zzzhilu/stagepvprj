@@ -151,6 +151,40 @@ vec4 blurProj( sampler2D tex, vec4 uv, float lod ) {
     return <primitive object={reflector} />;
 }
 
+/**
+ * 完美渲染「自動重啟」保險。
+ *
+ * 「載入即預設開啟完美渲染」存在初始化競態(材質編譯順序、溢光燈掛載時序等),
+ * 已修復 tone mapping 路徑但仍有殘餘(首次載入 LED 溢光可能不生效)。
+ * 已驗證的 workaround 是手動關開一次完美渲染 —— 此元件將其自動化:
+ * 舞台載入完成(objectBounds 首次有資料)後 1 秒,自動關閉 200ms 再開啟,僅執行一次。
+ * 代價是畫面閃爍一瞬,換取客戶第一眼看到正確的光照。
+ */
+function PerfectRenderKickstart() {
+    const perfectRenderEnabled = useStore((s) => s.perfectRenderEnabled);
+    const hasBounds = useStore((s) => Object.keys(s.objectBounds).length > 0);
+    const done = useRef(false);
+    const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+    useEffect(() => {
+        if (done.current || !perfectRenderEnabled || !hasBounds) return;
+        done.current = true; // 僅首次(預設開啟)觸發;之後用戶手動開關不再干預
+        const t1 = setTimeout(() => {
+            useStore.getState().setPerfectRenderEnabled(false);
+            const t2 = setTimeout(() => {
+                useStore.getState().setPerfectRenderEnabled(true);
+            }, 200);
+            timers.current.push(t2);
+        }, 1000);
+        timers.current.push(t1);
+    }, [perfectRenderEnabled, hasBounds]);
+
+    // 卸載清理所有計時器(避免半開半關殘留)
+    useEffect(() => () => { timers.current.forEach(clearTimeout); }, []);
+
+    return null;
+}
+
 function liteVisible(obj: { id: string; type: string }, liteMode: boolean, keepIds: string[]): boolean {
     if (!liteMode) return true;
     if (obj.type === 'static_LED' || obj.type === 'moving_LED') return true;
@@ -634,6 +668,7 @@ export function SceneGraph() {
 
             {/* 3D 機位模型(導播參考) */}
             <PlanarReflectorPlane />
+            <PerfectRenderKickstart />
             <LedSpillLight />
             <CameraMarkers />
 
