@@ -65,10 +65,23 @@ export function PerfectRenderEnvironment() {
     // 環境貼圖載入失敗後的重試計數(改變即強制重掛 Environment 重新抓取)
     const [envRetryKey, setEnvRetryKey] = useState(0);
 
-    const { gl } = useThree();
+    const { gl, scene } = useThree();
 
     // Apply tone mapping when perfect render is enabled
     useEffect(() => {
+        // three 硬規則:renderer.toneMapping 是材質 program 的編譯期 define,
+        // 改變後「已編譯」的材質不會自動更新 —— 必須對所有材質 needsUpdate 強制重編譯。
+        // 少了這步,「載入即開啟完美渲染」會卡在新舊混雜的光照狀態(部分材質仍是
+        // 無 tone mapping 的 program),要手動重開一次(靠 envMap 重設連帶重編譯)才恢復。
+        const recompileAll = () => {
+            scene.traverse((o) => {
+                const mesh = o as THREE.Mesh;
+                if (!mesh.isMesh || !mesh.material) return;
+                const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+                mats.forEach((m) => { m.needsUpdate = true; });
+            });
+        };
+
         if (perfectRenderEnabled) {
             const originalToneMapping = gl.toneMapping;
             const originalToneMappingExposure = gl.toneMappingExposure;
@@ -77,14 +90,16 @@ export function PerfectRenderEnvironment() {
                 // eslint-disable-next-line react-hooks/immutability
                 gl.toneMapping = THREE.ACESFilmicToneMapping;
                 gl.toneMappingExposure = 1.0;
+                recompileAll();
             }
 
             return () => {
                 gl.toneMapping = originalToneMapping;
                 gl.toneMappingExposure = originalToneMappingExposure;
+                recompileAll();
             };
         }
-    }, [perfectRenderEnabled, toneMapping, gl]);
+    }, [perfectRenderEnabled, toneMapping, gl, scene]);
 
     if (!perfectRenderEnabled) return null;
 
