@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
+import { startLive, getClientId } from '@/lib/live-session';
 import { sha256Hex } from '@/lib/client-auth';
 import { ProjectService } from '@/lib/project-service';
 
@@ -82,6 +83,20 @@ export function ClientEditGate({ projectId }: { projectId: string }) {
                             disabled={saving}
                             className="text-[11px] bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold px-3 py-1.5 rounded-full"
                         >{saving ? '儲存中…' : '儲存'}</button>
+                        <button
+                            onClick={async () => {
+                                // 開播:寫入 session、收起編輯 UI 保持畫面精簡(驗證仍在 session,膠囊可隨時結束回來)
+                                await startLive(projectId, getClientId());
+                                useStore.getState().setLiveRole('broadcasting');
+                                setClientEditMode(false);
+                            }}
+                            title="同步你的 cue 與播放狀態給所有開啟此連結的人(觀看者視角自由;僅同步雲端影片)"
+                            className="text-[11px] bg-red-600 hover:bg-red-500 text-white font-semibold px-3 py-1.5 rounded-full"
+                        ><span className="flex items-center gap-1.5">
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                                <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+                                <path d="M7.8 16.2a6 6 0 010-8.4M16.2 7.8a6 6 0 010 8.4M4.9 19.1a10 10 0 010-14.2M19.1 4.9a10 10 0 010 14.2" />
+                            </svg>直播</span></button>
                     </>
                 )}
                 <button

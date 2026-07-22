@@ -505,6 +505,9 @@ interface State {
     clientEditPasswordHash: string | null;
     setClientEditPasswordHash: (hash: string | null) => void;
     clientEditMode: boolean;
+    /** 直播角色(runtime-only):off=無 / broadcasting=操作端 / following=跟隨中 / pausedFollow=暫離跟隨 */
+    liveRole: 'off' | 'broadcasting' | 'following' | 'pausedFollow';
+    setLiveRole: (r: 'off' | 'broadcasting' | 'following' | 'pausedFollow') => void;
     setClientEditMode: (on: boolean) => void;
 
     // 精簡預覽模式:客戶端一鍵只渲染 LED + 後台指定保留的模型,鎖 60fps(弱電腦友善)
@@ -585,6 +588,7 @@ export const useStore = create<State>()(
             showCameraModels: false,
             clientEditPasswordHash: null,
             clientEditMode: false,
+            liveRole: 'off',
             liteMode: false,
             liteModeDefault: false,
             liteModeKeepIds: [],
@@ -1191,6 +1195,7 @@ export const useStore = create<State>()(
             setShowCameraModels: (show) => set({ showCameraModels: show }),
             setClientEditPasswordHash: (hash) => set({ clientEditPasswordHash: hash }),
             setClientEditMode: (on) => set({ clientEditMode: on }),
+            setLiveRole: (r) => set({ liveRole: r }),
             setLiteMode: (on) => set({ liteMode: on }),
             setLiteModeDefault: (on) => set({ liteModeDefault: on }),
             toggleLiteModeKeep: (id) => set((state) => ({

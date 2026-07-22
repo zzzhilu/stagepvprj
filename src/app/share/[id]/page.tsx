@@ -14,6 +14,8 @@ import { ClientLayoutSwitcher } from '@/components/client/ClientLayoutSwitcher';
 import { ClientEditGate } from '@/components/client/ClientEditGate';
 import { ClientGDrivePanel } from '@/components/client/ClientGDrivePanel';
 import { LayoutAutoSwitcher } from '@/components/client/LayoutAutoSwitcher';
+import { InAppBrowserNotice } from '@/components/client/InAppBrowserNotice';
+import { LiveSync } from '@/components/client/LiveSync';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
@@ -325,6 +327,9 @@ function SharePageContent() {
             <ClientGDrivePanel projectId={projectId} />
             {/* 檔名自動切換 UV 排列 */}
             <LayoutAutoSwitcher />
+            {/* App 內建瀏覽器偵測提示 */}
+            <InAppBrowserNotice />
+            <LiveSync projectId={projectId} />
 
             {/* Drawing Overlay */}
             <DrawingOverlay projectId={projectId} />

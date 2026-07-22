@@ -12,6 +12,7 @@ import { ClientToolbar } from '@/components/client/ClientToolbar';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ClientEditGate } from '@/components/client/ClientEditGate';
 import { LayoutAutoSwitcher } from '@/components/client/LayoutAutoSwitcher';
+import { InAppBrowserNotice } from '@/components/client/InAppBrowserNotice';
 import { ProjectService } from '@/lib/project-service';
 import { useStore } from '@/store/useStore';
 
@@ -348,6 +349,8 @@ export default function VideoProgressEditorPage() {
             <ClientEditGate projectId={projectId} />
             {/* 檔名自動切換 UV 排列 */}
             <LayoutAutoSwitcher />
+            {/* App 內建瀏覽器偵測提示 */}
+            <InAppBrowserNotice />
 
             {/* Video Controls */}
             <VideoControls />
