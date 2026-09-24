@@ -1,5 +1,6 @@
 'use client';
 import { getObjectDisplayName } from '@/lib/object-utils';
+import { adminAuthHeaders } from '@/lib/admin-client';
 
 import { useStore, ModelType } from '@/store/useStore';
 import { useState, useRef } from 'react';
@@ -124,6 +125,7 @@ export function ModelUploader() {
                         body: arrayBuffer,
                         headers: {
                             'Content-Type': 'application/octet-stream',
+                            ...adminAuthHeaders(),
                         },
                     });
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useStore, R2Video, VideoFolder } from '@/store/useStore';
+import { adminAuthHeaders } from '@/lib/admin-client';
 import { useState, useRef } from 'react';
 
 interface R2VideoManagerProps {
@@ -54,7 +55,7 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
             // Step 1: Get presigned URL from our API
             const presignedResponse = await fetch('/api/r2-upload', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...adminAuthHeaders() },
                 body: JSON.stringify({
                     filename: file.name,
                     contentType: file.type,
@@ -156,7 +157,7 @@ export function R2VideoManager({ projectId, onSave }: R2VideoManagerProps) {
             // Delete from R2
             const response = await fetch('/api/r2-upload', {
                 method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...adminAuthHeaders() },
                 body: JSON.stringify({ key }),
             });
 

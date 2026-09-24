@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getDriveClient } from '@/lib/drive';
+import { requireAdmin } from '@/lib/admin-auth-server';
 
 // Configure dynamic API route
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+  const unauthorized = requireAdmin(request);
+  if (unauthorized) return unauthorized;
+
   try {
     const { searchParams } = new URL(request.url);
     const fileId = searchParams.get('fileId');

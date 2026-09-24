@@ -55,6 +55,10 @@ export async function GET(
     }
 
     const { mimeType, size: fileSize } = meta;
+    // 只串流影音/圖片,避免被拿來下載 Service Account 看得到的文件、試算表等
+    if (!/^(video|image|audio)\//.test(mimeType)) {
+      return new NextResponse('Unsupported file type', { status: 415 });
+    }
     if (!fileSize) {
       // Shared Drive 某些檔案 metadata 不含 size → 無法做 Range 分段,退回完整串流
       console.warn('[drive/stream] no size in metadata (Shared Drive?), full stream fallback', fileId);
