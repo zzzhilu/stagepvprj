@@ -286,6 +286,8 @@ interface State {
     activeViewId: string | null;
     contentTextures: ContentTexture[];
     activeContentId: string | null;
+    // 後台鎖定的分享預設內容(內容輸入的圖片/影片)。跨端同步欄位,刻意不進 persist。
+    defaultContentId: string | null;
     renderMode: RenderMode;
     ambientIntensity: number;
     directionalIntensity: number;
@@ -442,6 +444,7 @@ interface State {
     removeContentTexture: (id: string) => void;
     updateContentTexture: (id: string, updates: Partial<ContentTexture>) => void;
     setActiveContent: (id: string | null) => void;
+    setDefaultContent: (id: string | null) => void;
     setRenderMode: (mode: RenderMode) => void;
     setAmbientIntensity: (intensity: number) => void;
     setDirectionalIntensity: (intensity: number) => void;
@@ -607,6 +610,7 @@ export const useStore = create<State>()(
             activeViewId: null,
             contentTextures: [],
             activeContentId: null,
+            defaultContentId: null,
             renderMode: 'beauty',
             ambientIntensity: 0.8,
             directionalIntensity: 1.2,
@@ -1075,7 +1079,8 @@ export const useStore = create<State>()(
             removeContentTexture: (id) => set((state) => ({
                 contentTextures: state.contentTextures.filter(t => t.id !== id),
                 // Clear selection if deleted content was active
-                activeContentId: state.activeContentId === id ? null : state.activeContentId
+                activeContentId: state.activeContentId === id ? null : state.activeContentId,
+                defaultContentId: state.defaultContentId === id ? null : state.defaultContentId
             })),
             updateContentTexture: (id, updates) => set((state) => ({
                 contentTextures: state.contentTextures.map(t =>
@@ -1083,6 +1088,8 @@ export const useStore = create<State>()(
                 )
             })),
             setActiveContent: (id) => set({ activeContentId: id }),
+            // 鎖定時同時切到該內容顯示;解鎖只清除預設,不動目前顯示
+            setDefaultContent: (id) => set(id ? { defaultContentId: id, activeContentId: id } : { defaultContentId: null }),
             setRenderMode: (mode) => set({ renderMode: mode }),
             setAmbientIntensity: (intensity) => set({ ambientIntensity: intensity }),
             setDirectionalIntensity: (intensity) => set({ directionalIntensity: intensity }),

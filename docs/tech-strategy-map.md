@@ -11,7 +11,7 @@
 1. **程式本身健康**：`tsc` ✅、`next build` ✅，功能完整度高（機關、LED 排列、Cue、直播上牆、客戶編輯、Live 同步）。
 2. **最大風險不在功能，而在「資料邊界」**：API 沒驗證（R2 可被任意刪檔、Drive 可被任意下載），Firestore 沒有規則，還有**跨專案資料污染**的結構性漏洞（見 §4 P0-3）。
 3. **文件和 repo 有落差**：GitHub 預設分支仍是 8 個月前的 `master`；`ARCHITECTURE.md`、`AI_CONTEXT.md` 已過時；`CLAUDE.md` 寫說 FFmpeg/Cloudinary 仍在使用，但實際上已經沒有接線。
-4. **下一步（第 3 點：鎖定預設內容）的接點已經確認**，見 §5。
+4. **第 3 點「鎖定預設內容」已依 §5 實作。**
 
 ---
 
@@ -148,17 +148,14 @@ stageObjects 全量訂閱、AdminControls 569 行單體、GLB node transform 被
 - `/free-test/[id]?share=1`：直接用 Firestore 的 `activeContentId`，也就是後台最後點的那個。
 - `/share/[id]`：`?video` → 第一支 R2/GDrive 影片 → `activeContentId`。
 
-### 建議設計（待你確認後才實作）
-新增獨立欄位 `defaultContentId`（鎖定的預設內容），**不去改動 `activeContentId` 的行為**：
-- 後台可以照常點其他內容預覽；auto-save 仍然會寫 `activeContentId`，但分享頁**優先讀 `defaultContentId`**，所以預設不會跑掉。
-- 分享頁優先序：`?video=`（明確指定）→ **`defaultContentId`** → 原本的邏輯（向下相容，舊專案不受影響）。
-- 依 CLAUDE.md「同步系統三條路徑」，這個跨端欄位要加在四個地方：`ProjectState`、`/free-test/[id]` 存檔、`/free-test/[id]` 載入、`/share/[id]` 載入。不放進 persist（避免 P0-3 的污染）。
-- 被鎖定的內容禁止刪除（需要先解鎖）。
-
-**需要你決定：**
-1. 鎖定範圍：只有「內容輸入」的圖片和影片，還是也包含 R2/GDrive 影片清單？
-2. 鎖定後在後台點其他縮圖：**允許預覽但不改預設**（建議），還是完全禁止切換？
-3. `/share/[id]` 也要套用嗎？目前那頁有影片時會優先播第一支影片。
+### 已實作：鎖定預設內容（`defaultContentId`）
+依你的決定：①只鎖「內容輸入」上傳的圖片和影片；②鎖定後後台照常可以預覽其他內容，只是不改變預設；③新增獨立的預設內容欄位，`/share/[id]` 也套用。
+- 新欄位 `defaultContentId`，**不去改動 `activeContentId` 的行為**。後台點其他內容照常預覽；auto-save 仍然會寫 `activeContentId`，但分享頁優先讀 `defaultContentId`。
+- `/free-test/[id]?share=1`：預設內容仍存在於清單中時，優先顯示它。
+- `/share/[id]` 優先序：`?video=`（明確指定）→ **`defaultContentId`** → 第一支 R2/GDrive 影片 → `activeContentId`。套用預設內容時，不會觸發第一支影片綁定的 cue。
+- 同步路徑（CLAUDE.md 規則）：`ProjectState`、`/free-test/[id]` 存檔與載入、`/share/[id]` 載入都已加上；刻意**不進 persist**，載入時一律 `?? null` 重設，避免 P0-3 的污染。
+- 鎖定中的內容不能刪除（刪除鈕隱藏，長按也會被擋）。
+- 不受影響：`?playlist=gdrive` 播放清單模式（會自動播放 Drive 第一支影片）、Live 同步跟隨、客戶本機上傳。這些都是客戶端明確的操作。
 
 ---
 
@@ -168,7 +165,7 @@ stageObjects 全量訂閱、AdminControls 569 行單體、GLB node transform 被
 |---|---|---|
 | ✅ 1 | 分支改以 main 為基礎（已完成） | — |
 | ✅ 2 | 本文件（技術盤點） | — |
-| 3 | **鎖定預設內容**（§5，等你回覆 3 個決策） | 低-中 |
+| ✅ 3 | 鎖定預設內容（§5） | 低-中 |
 | 4 | P0-1/P0-2 API 驗證（小改動、高價值） | 低 |
 | 5 | P0-3/P0-4 專案載入重設 + 分頁寫入範圍 | 中 |
 | 6 | 死碼/套件清理（§3，逐項確認） | 低 |

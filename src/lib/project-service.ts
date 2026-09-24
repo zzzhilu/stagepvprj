@@ -10,6 +10,7 @@ export interface ProjectState {
     contentTextures: ContentTexture[];
     activeViewId: string | null;
     activeContentId: string | null;
+    defaultContentId?: string | null; // 分享頁預設內容(鎖定);舊專案無此欄位
     cues?: any[]; // Store cues
     r2Videos?: R2Video[]; // R2 videos for Image Progress
     videoFolders?: any[];

@@ -137,6 +137,11 @@ function SharePageContent() {
                 rigValues: {},
             });
 
+            // 後台鎖定的預設內容(僅限「內容輸入」清單內仍存在的項目)
+            const defaultContent = data.defaultContentId
+                ? data.contentTextures?.find(c => c.id === data.defaultContentId)
+                : undefined;
+
             // Find the specified video
             if (videoId) {
                 let video: any = null;
@@ -198,6 +203,10 @@ function SharePageContent() {
                     if (data.contentTextures) setContentTextures(data.contentTextures);
                     if (data.activeContentId) setActiveContent(data.activeContentId);
                 }
+            } else if (defaultContent) {
+                // 優先序:?video 明確指定 > 鎖定的預設內容 > 第一支 R2/GDrive 影片 > activeContentId
+                setContentTextures(data.contentTextures!);
+                setActiveContent(defaultContent.id);
             } else if ((data.r2Videos && data.r2Videos.length > 0) || (data.gdriveVideos && data.gdriveVideos.length > 0)) {
                 let firstVideo: any = null;
                 let isR2 = false;
@@ -265,7 +274,7 @@ function SharePageContent() {
 
             const targetCueId = cueId ||
                 (videoId && allVideos.find((v: { id: string; cueId?: string; driveFileId?: string }) => v.id === videoId || (v as any).driveFileId === videoId)?.cueId) ||
-                (!videoId && allVideos[0]?.cueId);
+                (!videoId && !defaultContent && allVideos[0]?.cueId);
             if (targetCueId && data.cues?.length) {
                 // Small delay to ensure store is hydrated
                 setTimeout(() => applyCue(targetCueId), 200);

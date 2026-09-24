@@ -155,6 +155,7 @@ function ProjectEditorContent() {
     const contentTextures = useStore(state => state.contentTextures);
     const activeViewId = useStore(state => state.activeViewId);
     const activeContentId = useStore(state => state.activeContentId);
+    const defaultContentId = useStore(state => state.defaultContentId);
     const cues = useStore(state => state.cues); // [NEW]
     const r2Videos = useStore(state => state.r2Videos);
     const videoFolders = useStore(state => state.videoFolders);
@@ -218,6 +219,10 @@ function ProjectEditorContent() {
                     ...(data.contentTextures ? { contentTextures: data.contentTextures } : {}),
                     ...(data.activeViewId ? { activeViewId: data.activeViewId } : {}),
                     ...(data.activeContentId ? { activeContentId: data.activeContentId } : {}),
+                    defaultContentId: data.defaultContentId ?? null,
+                    // 分享模式:有鎖定的預設內容就優先顯示(後台最後點的 activeContentId 不影響客戶)
+                    ...(isShareMode && data.defaultContentId && data.contentTextures?.some(t => t.id === data.defaultContentId)
+                        ? { activeContentId: data.defaultContentId } : {}),
                     ...(data.cues ? { cues: data.cues } : {}),
                     ...(data.r2Videos ? { r2Videos: data.r2Videos } : {}),
                     ...(data.videoFolders ? { videoFolders: data.videoFolders } : {}),
@@ -271,6 +276,7 @@ function ProjectEditorContent() {
                     contentTextures,
                     activeViewId,
                     activeContentId,
+                    defaultContentId,
                     cues, // [NEW]
                     r2Videos,
                     videoFolders,
@@ -310,7 +316,7 @@ function ProjectEditorContent() {
         }, 2000); // Debounce 2 seconds
 
         return () => clearTimeout(timeoutId);
-    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, ledLayouts, activeLedLayoutId, screenCropRatio, clientEditPasswordHash, liteModeKeepIds, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, perfectLightScale, liteModeDefault, ledSpillIntensity, reflectionMirror, reflectionBlur, reflectionMetalness, nulls, rigs, isAuthenticated, isShareMode, isLoading, projectId]);
+    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, defaultContentId, cues, r2Videos, videoFolders, gdriveVideos, ledLayouts, activeLedLayoutId, screenCropRatio, clientEditPasswordHash, liteModeKeepIds, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, perfectLightScale, liteModeDefault, ledSpillIntensity, reflectionMirror, reflectionBlur, reflectionMetalness, nulls, rigs, isAuthenticated, isShareMode, isLoading, projectId]);
 
     // Show loading while checking auth
     if (isChecking) {
