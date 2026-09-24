@@ -109,12 +109,17 @@ stageObjects 全量訂閱、AdminControls 569 行單體、GLB node transform 被
 
 | # | 問題 | 位置 | 影響 | 建議 |
 |---|---|---|---|---|
-| P0-1 | **`DELETE /api/r2-upload` 沒有驗證，可刪除任意 key** | `api/r2-upload/route.ts:108` | 任何人都能清空 R2 上的客戶影片 | 驗證 admin token；限制 key 前綴 |
-| P0-2 | **`/api/drive/proxy`、`/api/drive/stream/[fileId]` 沒有驗證**，接受任意 fileId | `api/drive/*` | Service Account 能存取的**所有** Drive 檔案（含 Shared Drive）都可以被下載 | 只允許專案登記過的 `driveFileId`，或驗證 token |
-| P0-3 | **跨專案資料污染**：persist 會保留上一個專案的 `cues/r2Videos/gdriveVideos/videoFolders/floorPlanTextureUrl…`；載入新專案時「欄位不存在就不覆蓋」（`...(data.cues ? …)`）；接著 auto-save 把殘留值寫進新專案。`createProject` 只初始化 5 個欄位，所以**新專案必中** | `free-test/[id]/page.tsx:215`、`video-progress/[id]/page.tsx:192`、`useStore.ts` partialize | A 專案的 cue/影片清單可能出現在 B 專案（含客戶機密內容） | 載入前先重設為預設值（`useStore.setState(initialProjectState)`），缺欄位時給空值而不是保留舊值 |
+| ✅ P0-1 | **`DELETE /api/r2-upload` 沒有驗證，可刪除任意 key** | `api/r2-upload/route.ts:108` | 任何人都能清空 R2 上的客戶影片 | 驗證 admin token；限制 key 前綴 |
+| ✅ P0-2 | **`/api/drive/proxy`、`/api/drive/stream/[fileId]` 沒有驗證**，接受任意 fileId | `api/drive/*` | Service Account 能存取的**所有** Drive 檔案（含 Shared Drive）都可以被下載 | 只允許專案登記過的 `driveFileId`，或驗證 token |
+| ✅ P0-3 | **跨專案資料污染**：persist 會保留上一個專案的 `cues/r2Videos/gdriveVideos/videoFolders/floorPlanTextureUrl…`；載入新專案時「欄位不存在就不覆蓋」（`...(data.cues ? …)`）；接著 auto-save 把殘留值寫進新專案。`createProject` 只初始化 5 個欄位，所以**新專案必中** | `free-test/[id]/page.tsx:215`、`video-progress/[id]/page.tsx:192`、`useStore.ts` partialize | A 專案的 cue/影片清單可能出現在 B 專案（含客戶機密內容） | 載入前先重設為預設值（`useStore.setState(initialProjectState)`），缺欄位時給空值而不是保留舊值 |
 | P0-4 | **兩個頁面同時 auto-save 全量欄位**（`/free-test/[id]` 與 `/video-progress/[id]`） | 兩頁的 auto-save effect | 兩個分頁同時開著會 last-write-wins，互相覆蓋 | 各頁只寫自己負責的欄位，或加版本號 |
 | P0-5 | Firestore 無 Security Rules、admin `'0903'` fallback | 已列於 CLAUDE.md §3/§8 | — | 沿用既有計畫（依 CLAUDE.md 慣例，**不擅自重構驗證機制**） |
 | P0-6 | 後台登入只在前端檢查 `token.length === 32`；`AUTH_SECRET` 有預設值 | `free-test/[id]/page.tsx:197` | 在 sessionStorage 塞任意 32 字元就能進後台 UI | 載入時呼叫已存在的 `GET /api/admin-auth?token=` 驗證（目前沒有人用它） |
+
+**已修正（本 PR）**
+- P0-1/P0-2：`r2-upload`（POST/DELETE）、`compress-glb`、`drive/proxy`、`drive/direct-url` 需要後台 token（`x-admin-token`，由 `lib/admin-auth-server.ts` 驗證）；R2 刪除只允許 `videos/` 路徑。另外發現 **`drive/direct-url` 會把 Service Account 的 OAuth access token 回傳給呼叫者**（drive.readonly，約 1 小時有效），現在也需要後台 token。`drive/stream` 仍公開給分享頁使用，但只串流影音與圖片。
+- P0-3：`getProjectStateDefaults()`（`useStore.ts`）在三個載入點（`/free-test/[id]`、`/share/[id]`、`/video-progress/[id]`）先重設 35 個專案層級欄位，再套上專案資料。
+- 仍待處理：P0-4（兩頁同時 auto-save）、P0-5（Rules）、P0-6（前端 token 驗證，會動到登入流程，依 CLAUDE.md 需要你明確同意）；`drive/sync` 可列出 Service Account 看得到的任何資料夾（客戶自助連結資料夾是設計上的功能，要收斂需要討論）；Cloudflare Worker（`cf-worker-gdrive`）的串流沒有檔案類型限制，需要另外部署。
 
 ### 🟠 P1：正確性
 - `/share/[id]` 的內容優先序固定為「`?video` → 第一支 R2/GDrive 影片 → `activeContentId`」，**後台無法指定預設內容**（第 3 點的需求來源）。
@@ -166,8 +171,8 @@ stageObjects 全量訂閱、AdminControls 569 行單體、GLB node transform 被
 | ✅ 1 | 分支改以 main 為基礎（已完成） | — |
 | ✅ 2 | 本文件（技術盤點） | — |
 | ✅ 3 | 鎖定預設內容（§5） | 低-中 |
-| 4 | P0-1/P0-2 API 驗證（小改動、高價值） | 低 |
-| 5 | P0-3/P0-4 專案載入重設 + 分頁寫入範圍 | 中 |
+| ✅ 4 | P0-1/P0-2 API 驗證 | 低 |
+| ◐ 5 | P0-3 專案載入重設 ✅；P0-4 分頁寫入範圍（待做） | 中 |
 | 6 | 死碼/套件清理（§3，逐項確認） | 低 |
 | 7 | lint 歸零 + CI；預設分支改 main | 低 |
 | 8 | Firestore Rules（依 stagepv-strategy-2026 排程） | 中 |

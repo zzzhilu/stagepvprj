@@ -1405,3 +1405,26 @@ export const useStore = create<State>()(
         }
     )
 );
+
+/**
+ * 專案層級欄位(auto-save 寫入 Firestore 的欄位)。
+ * 載入專案前先重設為初始值,再套上專案資料:避免專案缺少的欄位沿用上一個專案
+ * (persist/記憶體殘留)的值,之後又被 auto-save 寫進這個專案(跨專案資料污染)。
+ * 新增跨端同步欄位時,也要加進這裡。
+ */
+const PROJECT_SCOPED_KEYS = [
+    'stageObjects', 'views', 'contentTextures', 'activeViewId', 'activeContentId', 'defaultContentId',
+    'cues', 'r2Videos', 'videoFolders', 'gdriveVideos', 'ledLayouts', 'activeLedLayoutId',
+    'screenCropRatio', 'clientEditPasswordHash', 'liteModeKeepIds', 'gdriveFolders', 'floorPlanTextureUrl',
+    'ambientIntensity', 'directionalIntensity', 'bloomIntensity', 'bloomThreshold',
+    'perfectRenderEnabled', 'envPreset', 'envIntensity', 'contactShadow', 'toneMapping', 'spotLights',
+    'perfectLightScale', 'liteModeDefault', 'ledSpillIntensity',
+    'reflectionMirror', 'reflectionBlur', 'reflectionMetalness',
+    'nulls', 'rigs',
+] as const satisfies readonly (keyof State)[];
+
+/** 專案層級欄位的初始值(getInitialState 為未經 persist 還原的原始預設) */
+export function getProjectStateDefaults(): Partial<State> {
+    const initial = useStore.getInitialState();
+    return Object.fromEntries(PROJECT_SCOPED_KEYS.map((key) => [key, initial[key]])) as Partial<State>;
+}

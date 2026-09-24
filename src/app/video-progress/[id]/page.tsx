@@ -14,7 +14,7 @@ import { ClientEditGate } from '@/components/client/ClientEditGate';
 import { LayoutAutoSwitcher } from '@/components/client/LayoutAutoSwitcher';
 import { InAppBrowserNotice } from '@/components/client/InAppBrowserNotice';
 import { ProjectService } from '@/lib/project-service';
-import { useStore } from '@/store/useStore';
+import { useStore, getProjectStateDefaults } from '@/store/useStore';
 
 const AUTH_KEY = 'stagepv_admin_auth';
 
@@ -188,6 +188,8 @@ export default function VideoProgressEditorPage() {
             if (data) {
                 // Load project state into store (always reset to ensure isolation)
                 if (data.name) setCurrentProjectName(data.name);
+                // 先重設專案層級欄位,缺少的欄位不沿用上一個專案(避免 auto-save 寫入污染)
+                useStore.setState(getProjectStateDefaults());
                 setMode('admin'); // Explicitly set to admin mode for the editor
                 setStageObjects(data.stageObjects || []);
                 setViews(data.views || []);

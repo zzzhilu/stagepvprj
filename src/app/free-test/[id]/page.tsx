@@ -16,7 +16,7 @@ import { ObjectHoverTooltip } from '@/components/admin/ObjectHoverTooltip';
 import { ClientToolbar } from '@/components/client/ClientToolbar';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ProjectService } from '@/lib/project-service';
-import { useStore } from '@/store/useStore';
+import { useStore, getProjectStateDefaults } from '@/store/useStore';
 import { RigPanel } from '@/components/client/RigPanel';
 
 const AUTH_KEY = 'stagepv_admin_auth';
@@ -214,6 +214,8 @@ function ProjectEditorContent() {
                 if (data.name) setCurrentProjectName(data.name);
                 // [效能] 專案還原合併為單次 setState(原本 25+ 次分散 setter,初始化重渲染風暴主因)
                 useStore.setState({
+                    // 先重設專案層級欄位,缺少的欄位不沿用上一個專案(避免 auto-save 寫入污染)
+                    ...getProjectStateDefaults(),
                     ...(data.stageObjects ? { stageObjects: data.stageObjects } : {}),
                     ...(data.views ? { views: data.views } : {}),
                     ...(data.contentTextures ? { contentTextures: data.contentTextures } : {}),

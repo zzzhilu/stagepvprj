@@ -18,7 +18,7 @@ import { InAppBrowserNotice } from '@/components/client/InAppBrowserNotice';
 import { LiveSync } from '@/components/client/LiveSync';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ProjectService } from '@/lib/project-service';
-import { useStore } from '@/store/useStore';
+import { useStore, getProjectStateDefaults } from '@/store/useStore';
 import { ClientPlaylistSidebar } from '@/components/client/ClientPlaylistSidebar';
 import { resolveGDriveUrl } from '@/lib/gdrive-direct';
 
@@ -106,6 +106,8 @@ function SharePageContent() {
             // [效能] 專案還原合併為單次 setState:原本 20+ 次分散 setter 每次都觸發
             // 全訂閱者重渲染,初始化期主執行緒阻塞的主因之一。所有 setter 均為純 set,合併安全。
             useStore.setState({
+                // 先重設專案層級欄位,缺少的欄位不沿用上一個專案(客戶編輯儲存 cues/views 時也不會帶入殘留)
+                ...getProjectStateDefaults(),
                 ...(data.stageObjects ? { stageObjects: data.stageObjects } : {}),
                 ...(data.views ? { views: data.views } : {}),
                 ...(data.cues ? { cues: data.cues } : {}),
