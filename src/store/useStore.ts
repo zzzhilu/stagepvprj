@@ -37,6 +37,9 @@ export interface StageObject {
     instances: Instance[];
     type: ModelType; // Model category type
     meshNames?: string[]; // Optional: specific mesh names to filter from the GLB
+    // 新版上傳(舊物件無這兩個欄位,渲染行為不變):
+    meshIndices?: number[]; // 依 GLB 場景遍歷順序指定 mesh(可對應未命名/同名 mesh);有值時優先於 meshNames
+    applyNodeTransform?: boolean; // 保留 GLB 節點的位置/旋轉/縮放(聚合物件用;單一 mesh 物件直接寫進 instances)
     name?: string; // 顯示名稱:上傳時取自 3D 軟體的 mesh/檔案命名,可由使用者修改
     rigMirror?: boolean; // 鏡像跟隨:掛載於 Null 時,機關偏移以 ×-1 作用(對稱機關,如左右對開門)
     materialOverrides?: MaterialOverrides; // 材質參數微調(基底 material_id 之上的覆寫)

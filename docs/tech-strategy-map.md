@@ -80,7 +80,7 @@ flowchart LR
 ## 3. 模組狀態（main）
 
 ### 仍在用、但有已知債（沿用 CLAUDE.md §8，不重複）
-stageObjects 全量訂閱、AdminControls 569 行單體、GLB node transform 被丟棄、Z 軸反轉，詳見 CLAUDE.md §6。
+stageObjects 全量訂閱、AdminControls 569 行單體、Z 軸反轉，詳見 CLAUDE.md §6。GLB node transform 被丟棄的問題：**新上傳的物件已經修正**（保留模型位置，不符合命名規則的 mesh 可以手動指定類型），舊物件的行為維持不變。
 
 ### 已沒有任何地方引用（死碼候選，**需你確認才刪**）
 | 項目 | 說明 |

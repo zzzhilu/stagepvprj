@@ -7,6 +7,7 @@ import { globalVideoElement } from './VideoManager';
 import { useFrame } from '@react-three/fiber';
 import { parseGIF, decompressFrames } from 'gifuct-js';
 import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
+import { collectSceneMeshes, meshMatrixInScene } from '@/lib/node-transform';
 import { getObjectDisplayName } from '@/lib/object-utils';
 import { applyParallaxEnvMap } from '@/lib/parallax-envmap';
 import { REFLECT_LAYER } from '@/lib/reflect-layer';
@@ -661,6 +662,11 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
 
     // Find all meshes in the loaded GLTF(memoize:供 geometry clone 依賴,避免每次 render 重算)
     const meshNodes = useMemo(() => {
+        // 新版上傳物件:依場景遍歷順序取 mesh(nodes 以名稱為 key,未命名/同名 mesh 會遺失)
+        if (object.meshIndices && gltfData?.scene) {
+            const all = collectSceneMeshes(gltfData.scene);
+            return object.meshIndices.map(idx => all[idx]).filter((m): m is THREE.Mesh => !!m);
+        }
         let list = Object.values(nodes).filter((node): node is THREE.Mesh =>
             (node as THREE.Object3D).type === 'Mesh'
         );
@@ -668,7 +674,20 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
             list = list.filter(mesh => object.meshNames!.includes(mesh.name));
         }
         return list;
-    }, [nodes, object.meshNames]);
+    }, [nodes, gltfData, object.meshNames, object.meshIndices]);
+
+    // 保留 GLB 節點 transform(僅 applyNodeTransform 的物件;舊物件為 null → 行為不變)
+    const nodeTransforms = useMemo(() => {
+        if (!object.applyNodeTransform || !gltfData?.scene) return null;
+        return meshNodes.map(n => {
+            const matrix = meshMatrixInScene(n, gltfData.scene);
+            const position = new THREE.Vector3();
+            const quaternion = new THREE.Quaternion();
+            const scale = new THREE.Vector3();
+            matrix.decompose(position, quaternion, scale);
+            return { matrix, position, quaternion, scale };
+        });
+    }, [object.applyNodeTransform, gltfData, meshNodes]);
 
     // ⚠️ 關鍵修復:geometry 只在來源變更時 clone 一次,並在替換/卸載時 dispose。
     // 原本在 render JSX 內 clone 且從不釋放,機關滑桿拖動(每秒數十次 re-render)
@@ -713,16 +732,20 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
             const box = new THREE.Box3();
             const v = new THREE.Vector3();
             let has = false;
-            for (const geo of clonedGeometries) {
+            for (let gi = 0; gi < clonedGeometries.length; gi++) {
+                const geo = clonedGeometries[gi];
                 if (!geo.boundingBox) geo.computeBoundingBox();
                 const bb = geo.boundingBox;
                 if (!bb) continue;
+                const nodeMatrix = nodeTransforms?.[gi]?.matrix;
                 for (let i = 0; i < 8; i++) {
                     v.set(
                         i & 1 ? bb.max.x : bb.min.x,
                         i & 2 ? bb.max.y : bb.min.y,
                         i & 4 ? bb.max.z : bb.min.z,
-                    ).applyMatrix4(world);
+                    );
+                    if (nodeMatrix) v.applyMatrix4(nodeMatrix);
+                    v.applyMatrix4(world);
                     box.expandByPoint(v);
                     has = true;
                 }
@@ -732,7 +755,7 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
             }
         });
         return () => cancelAnimationFrame(id);
-    }, [clonedGeometries, object.id, setObjectBounds, worldTransform]);
+    }, [clonedGeometries, nodeTransforms, object.id, setObjectBounds, worldTransform]);
 
     // Animate position/rotation using useFrame
     useFrame((_, delta) => {
@@ -843,8 +866,14 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
                 const geometry = clonedGeometries[i];
                 if (!geometry) return null;
 
+                const nodeTf = nodeTransforms?.[i];
                 return (
-                    <group key={node.uuid}>
+                    <group
+                        key={node.uuid}
+                        position={nodeTf?.position}
+                        quaternion={nodeTf?.quaternion}
+                        scale={nodeTf?.scale}
+                    >
                         {/* Front face - main material */}
                         <mesh
                             geometry={geometry}

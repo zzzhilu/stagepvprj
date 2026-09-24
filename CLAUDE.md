@@ -79,8 +79,8 @@ client/
 ## 6. 慣例與地雷(改 code 前必讀)
 
 1. **Z 軸反轉**:instance 預設 `scale:[1,1,-1]`,Z 鏡像、法線靠 DoubleSide 掩蓋。
-2. **GLB node transform 被丟棄**:只取 geometry;pivot 必須在 DCC 烘進 geometry。旋轉機關軸心 = geometry 原點或用 Null。
-3. **mesh 命名即分類**;`moving_LED` **與 `static_LED`** 上傳時均逐 mesh 拆成獨立物件(舊聚合 static LED 需重新上傳)。
+2. **GLB node transform**:**舊物件**(無 `meshIndices`)只取 geometry、丟棄節點 transform;pivot 必須在 DCC 烘進 geometry。**新版上傳**(上傳面板「保留模型原始位置」,預設開)保留節點 transform:逐 mesh 拆分的類型把 S_z·W 拆進 `instances`(軸心 = mesh 原點);聚合類型設 `applyNodeTransform`,在渲染時套用各 mesh 的節點矩陣(`lib/node-transform.ts`)。旋轉機關軸心 = 物件原點或用 Null。
+3. **mesh 命名即分類**;不符合規則的 mesh 會列在上傳面板,可以手動指定類型或不匯入。`moving_LED`/`static_LED`/`moving_prop`/`prop`/`band` 上傳時均逐 mesh 拆成獨立物件(舊聚合 static LED 需重新上傳)。新版物件用 `meshIndices`(GLB 場景遍歷順序)找 mesh,優先於 `meshNames`。
 4. 角度:store 弧度、UI 度。UI 文案繁中。刪除用長按。
 5. **frameloop demand**:useFrame 動畫要確保有 invalidate 來源(機關靠 RigInvalidator;新增高頻動畫先想這條)。
 6. COOP/COEP(FFmpeg WASM):新外部資源必須支援 CORS。

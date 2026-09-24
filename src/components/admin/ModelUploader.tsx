@@ -3,19 +3,38 @@ import { getObjectDisplayName } from '@/lib/object-utils';
 import { adminAuthHeaders } from '@/lib/admin-client';
 
 import { useStore, ModelType } from '@/store/useStore';
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { getMaterialOptions, type MaterialId } from '@/lib/materials';
 import { MaterialSelector } from './MaterialSelector';
 import { getDRACOLoader } from '@/lib/draco';
+import { collectSceneMeshes, meshMatrixInScene, mirroredInstanceFromMatrix } from '@/lib/node-transform';
 
+
+// GLB 內的單一 mesh(index = 場景遍歷順序,對應 StageObject.meshIndices)
+interface ParsedMesh {
+    index: number;
+    name: string;
+    autoType: ModelType | null; // 依命名規則自動辨識;null = 不符合規則
+    matrix: THREE.Matrix4;      // 相對 GLB 場景根節點的世界矩陣
+}
 
 interface ParsedModel {
     type: ModelType;
-    meshes: THREE.Mesh[];
+    meshes: ParsedMesh[];
     count: number;
 }
+
+// 逐 mesh 拆成獨立物件的類型(其餘類型聚合成單一物件)
+const SPLIT_TYPES: ModelType[] = ['moving_LED', 'static_LED', 'moving_prop', 'prop', 'band'];
+// 可手動指定的類型(basic_camera 非上傳用)
+const ASSIGNABLE_TYPES: ModelType[] = ['venues', 'stage', 'static_LED', 'moving_LED', 'moving_prop', 'prop', 'band', 'floor_plan'];
+const DEFAULT_INSTANCE = {
+    pos: [0, 0, 0] as [number, number, number],
+    rot: [0, 0, 0] as [number, number, number],
+    scale: [1, 1, -1] as [number, number, number],
+};
 
 interface CompressionStats {
     originalSize: number;
@@ -31,7 +50,11 @@ export function ModelUploader() {
     const setLoading = useStore((state) => state.setLoading);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-    const [parsedModels, setParsedModels] = useState<ParsedModel[]>([]);
+    const [parsedMeshes, setParsedMeshes] = useState<ParsedMesh[]>([]);
+    // 不符合命名規則的 mesh 手動指定類型('' = 不匯入)
+    const [manualTypes, setManualTypes] = useState<Record<number, ModelType | ''>>({});
+    // 保留 GLB 節點的位置/旋轉/縮放(關閉 = 舊行為,全部歸零到世界中心)
+    const [preserveTransform, setPreserveTransform] = useState<boolean>(true);
     const [modelUrl, setModelUrl] = useState<string>('');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -42,6 +65,25 @@ export function ModelUploader() {
     const [compressionStats, setCompressionStats] = useState<CompressionStats | null>(null);
 
     const materialOptions = getMaterialOptions();
+
+    const unclassifiedMeshes = useMemo(() => parsedMeshes.filter(m => !m.autoType), [parsedMeshes]);
+
+    // 依類型分組(自動辨識 + 手動指定)
+    const parsedModels: ParsedModel[] = useMemo(() => {
+        const groups = new Map<ModelType, ParsedMesh[]>();
+        for (const m of parsedMeshes) {
+            const type = m.autoType ?? (manualTypes[m.index] || null);
+            if (!type) continue;
+            if (!groups.has(type)) groups.set(type, []);
+            groups.get(type)!.push(m);
+        }
+        return Array.from(groups, ([type, meshes]) => ({ type, meshes, count: meshes.length }));
+    }, [parsedMeshes, manualTypes]);
+
+    const resetParsed = () => {
+        setParsedMeshes([]);
+        setManualTypes({});
+    };
 
     const handleMaterialChange = (objectId: string, materialId: MaterialId) => {
         updateObjectMaterial(objectId, materialId);
@@ -98,7 +140,7 @@ export function ModelUploader() {
         setSelectedFile(file); // Store file for upload later
 
         setLoading(true, enableCompression ? '壓縮模型中...' : '解析模型中...');
-        setParsedModels([]);
+        resetParsed();
         setCompressionStats(null);
 
         try {
@@ -171,35 +213,20 @@ export function ModelUploader() {
             loader.load(
                 url,
                 (gltf) => {
-                    // Parse all meshes from the model
-                    const categorizedMeshes: Map<ModelType, THREE.Mesh[]> = new Map();
+                    // 偵測所有 mesh(含未命名、同名、不符合命名規則者),順序即 meshIndices
+                    const parsed: ParsedMesh[] = collectSceneMeshes(gltf.scene).map((mesh, index) => ({
+                        index,
+                        name: mesh.name,
+                        autoType: getModelType(mesh.name),
+                        matrix: meshMatrixInScene(mesh, gltf.scene),
+                    }));
 
-                    gltf.scene.traverse((child) => {
-                        if ((child as THREE.Mesh).isMesh) {
-                            const mesh = child as THREE.Mesh;
-                            const type = getModelType(mesh.name);
-
-                            if (type) {
-                                if (!categorizedMeshes.has(type)) {
-                                    categorizedMeshes.set(type, []);
-                                }
-                                categorizedMeshes.get(type)!.push(mesh);
-                            }
-                        }
-                    });
-
-                    // Create ParsedModel objects
-                    const parsed: ParsedModel[] = [];
-                    categorizedMeshes.forEach((meshes, type) => {
-                        parsed.push({
-                            type,
-                            meshes,
-                            count: meshes.length
-                        });
-                    });
-
-                    setParsedModels(parsed);
+                    setParsedMeshes(parsed);
+                    setManualTypes({});
                     setLoading(false);
+                    if (parsed.length === 0) {
+                        alert('此 GLB 檔案中沒有任何網格(mesh)。');
+                    }
                 },
                 undefined,
                 (error) => {
@@ -219,6 +246,7 @@ export function ModelUploader() {
 
     const handleConfirmUpload = async () => {
         if (!selectedFile || parsedModels.length === 0) return;
+        const uploadName = selectedFile.name;
 
         setLoading(true, '上傳模型至雲端 (Firebase)...');
 
@@ -240,57 +268,51 @@ export function ModelUploader() {
             console.log('Model uploaded to:', cloudUrl);
 
             // Create StageObject for each type using cloud URL
-            // Create StageObject for each type using cloud URL
+            // 新版上傳帶 meshIndices(依順序取 mesh,支援未命名/同名)與節點 transform;舊物件不受影響
             parsedModels.forEach(parsed => {
                 // For moving objects, props, and band members, create individual controllable objects for EACH mesh
-                if (parsed.type === 'moving_LED' || parsed.type === 'static_LED' || parsed.type === 'moving_prop' || parsed.type === 'prop' || parsed.type === 'band') {
+                if (SPLIT_TYPES.includes(parsed.type)) {
                     parsed.meshes.forEach(mesh => {
+                        const displayName = mesh.name || `未命名_${mesh.index}`;
                         const newObject = {
                             // id 需全域唯一:跨檔案可能有同名 mesh(如多個 GLB 都含 "truss"),
                             // 直接用 mesh.name 當 id 會碰撞 → React key 重複導致渲染錯亂。
                             // 故加唯一後綴;mesh 名稱保留在 name / meshNames 供顯示與機關辨識。
-                            id: `${mesh.name}__${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                            id: `${displayName}__${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
                             model_path: cloudUrl,
                             material_id: getDefaultMaterial(parsed.type),
                             type: parsed.type,
-                            name: mesh.name, // 保留 3D 軟體中的原始命名作為顯示名稱
+                            name: displayName, // 保留 3D 軟體中的原始命名作為顯示名稱
                             meshNames: [mesh.name], // Filter to ONLY show this specific mesh
-                            instances: [
-                                {
-                                    pos: [0, 0, 0] as [number, number, number],
-                                    rot: [0, 0, 0] as [number, number, number],
-                                    scale: [1, 1, -1] as [number, number, number]
-                                }
-                            ]
+                            meshIndices: [mesh.index],
+                            // 單一 mesh:節點 transform 直接寫進 instance(軸心 = mesh 原點,Gizmo 顯示實際數值)
+                            instances: [preserveTransform ? mirroredInstanceFromMatrix(mesh.matrix) : { ...DEFAULT_INSTANCE }]
                         };
                         addObject(newObject);
                     });
                 } else {
                     // For static objects (venues, stage), keep them aggregated as one object
                     const newObject = {
-                        id: `obj_${parsed.type}_${Date.now()}`,
+                        id: `obj_${parsed.type}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
                         model_path: cloudUrl,
                         material_id: getDefaultMaterial(parsed.type),
                         type: parsed.type,
                         // 聚合物件:單一 mesh 用 mesh 名,多 mesh 用原始上傳檔名(不含時間戳)
-                        name: parsed.meshes.length === 1
+                        name: parsed.meshes.length === 1 && parsed.meshes[0].name
                             ? parsed.meshes[0].name
-                            : selectedFile.name.replace(/\.glb$/i, ''),
+                            : uploadName.replace(/\.glb$/i, ''),
                         meshNames: parsed.meshes.map(m => m.name),
-                        instances: [
-                            {
-                                pos: [0, 0, 0] as [number, number, number],
-                                rot: [0, 0, 0] as [number, number, number],
-                                scale: [1, 1, -1] as [number, number, number]
-                            }
-                        ]
+                        meshIndices: parsed.meshes.map(m => m.index),
+                        // 聚合物件:各 mesh 保留自己的節點 transform,物件本身維持預設 instance
+                        ...(preserveTransform ? { applyNodeTransform: true } : {}),
+                        instances: [{ ...DEFAULT_INSTANCE }]
                     };
                     addObject(newObject);
                 }
             });
 
             // Clear the UI
-            setParsedModels([]);
+            resetParsed();
             setModelUrl('');
             setSelectedFile(null);
             if (fileInputRef.current) {
@@ -445,6 +467,18 @@ export function ModelUploader() {
                     <span className="text-xs text-yellow-500">(iOS Safari 可能不支援)</span>
                 </label>
 
+                {/* Preserve node transform toggle */}
+                <label className="flex items-center gap-2 text-sm text-gray-300 mb-3 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={preserveTransform}
+                        onChange={(e) => setPreserveTransform(e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-violet-500 focus:ring-violet-500"
+                    />
+                    <span>保留模型原始位置</span>
+                    <span className="text-xs text-gray-500">(關閉 = 全部歸零到世界中心)</span>
+                </label>
+
                 {/* Compression Stats */}
                 {compressionStats && (
                     <div className="bg-green-900/30 border border-green-700 rounded p-2 mb-3">
@@ -465,24 +499,68 @@ export function ModelUploader() {
                 )}
 
                 {/* Parsed Models Preview */}
-                {parsedModels.length > 0 && (
+                {parsedMeshes.length > 0 && (
                     <div className="bg-gray-900 rounded p-3 mb-3">
                         <h4 className="text-sm font-semibold text-green-400 mb-2">
-                            <svg className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg> 解析完成！發現 {parsedModels.length} 種類型：
+                            <svg className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg> 解析完成！共 {parsedMeshes.length} 個部件{parsedModels.length > 0 ? `,將匯入 ${parsedModels.length} 種類型:` : ''}
                         </h4>
                         <div className="space-y-1 mb-3">
-                            {parsedModels.map((parsed, idx) => (
-                                <div key={idx} className="flex items-center justify-between text-xs bg-gray-800 p-2 rounded">
+                            {parsedModels.map((parsed) => (
+                                <div key={parsed.type} className="flex items-center justify-between text-xs bg-gray-800 p-2 rounded">
                                     <span className="text-gray-300">{typeLabels[parsed.type]}</span>
                                     <span className="text-blue-400 font-mono">{parsed.count} 個部件</span>
                                 </div>
                             ))}
                         </div>
+
+                        {/* 不符合命名規則的部件:手動指定類型 */}
+                        {unclassifiedMeshes.length > 0 && (
+                            <div className="bg-amber-900/20 border border-amber-700/60 rounded p-2 mb-3">
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                    <span className="text-xs font-semibold text-amber-300">
+                                        {unclassifiedMeshes.length} 個部件不符合命名規則
+                                    </span>
+                                    <select
+                                        value=""
+                                        onChange={(e) => {
+                                            const type = e.target.value as ModelType | '';
+                                            setManualTypes(Object.fromEntries(unclassifiedMeshes.map(m => [m.index, type])));
+                                        }}
+                                        className="bg-gray-800 border border-gray-600 rounded px-1 py-0.5 text-[11px] text-gray-200"
+                                        title="全部指定為"
+                                    >
+                                        <option value="" disabled>全部設為…</option>
+                                        <option value="">不匯入</option>
+                                        {ASSIGNABLE_TYPES.map(t => <option key={t} value={t}>{typeLabels[t]}</option>)}
+                                    </select>
+                                </div>
+                                <p className="text-[10px] text-gray-400 mb-2">請為每個部件指定類型;維持「不匯入」則略過</p>
+                                <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                                    {unclassifiedMeshes.map(m => (
+                                        <div key={m.index} className="flex items-center justify-between gap-2 text-xs bg-gray-800 px-2 py-1 rounded">
+                                            <span className={`truncate ${m.name ? 'text-gray-300' : 'text-gray-500 italic'}`} title={m.name || `未命名 #${m.index}`}>
+                                                {m.name || `未命名 #${m.index}`}
+                                            </span>
+                                            <select
+                                                value={manualTypes[m.index] ?? ''}
+                                                onChange={(e) => setManualTypes(prev => ({ ...prev, [m.index]: e.target.value as ModelType | '' }))}
+                                                className="flex-shrink-0 bg-gray-900 border border-gray-600 rounded px-1 py-0.5 text-[11px] text-gray-200"
+                                            >
+                                                <option value="">不匯入</option>
+                                                {ASSIGNABLE_TYPES.map(t => <option key={t} value={t}>{typeLabels[t]}</option>)}
+                                            </select>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         <button
                             onClick={handleConfirmUpload}
-                            className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded font-semibold transition-colors"
+                            disabled={parsedModels.length === 0}
+                            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed text-white py-2 px-4 rounded font-semibold transition-colors"
                         >
-                            確認上傳
+                            {parsedModels.length === 0 ? '請先為部件指定類型' : '確認上傳'}
                         </button>
                     </div>
                 )}
