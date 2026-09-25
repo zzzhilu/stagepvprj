@@ -1,9 +1,7 @@
 import { OrbitControls, PerspectiveCamera, TransformControls , useProgress } from '@react-three/drei';
 import { useStore, StageObject } from '@/store/useStore';
 import type { NullNode } from '@/store/useStore';
-import { StageObjectRenderer } from './StageObjectRenderer';
-import { BoxPrimitiveRenderer } from './BoxPrimitiveRenderer';
-import { ProjectionScreenRenderer } from './ProjectionScreenRenderer';
+import { pickRenderer } from './pick-renderer';
 import { PaperFigureRenderer } from './PaperFigureRenderer';
 import { CameraCapture } from './CameraCapture';
 import { VideoManager } from './VideoManager';
@@ -372,11 +370,7 @@ function NullGroup({
 
             {childObjects.map(obj => {
                 const objRef = objectRefs.current.get(obj.id);
-                const Renderer = obj.model_path === '__box__'
-                    ? BoxPrimitiveRenderer
-                    : obj.model_path === '__projection_screen__'
-                        ? ProjectionScreenRenderer
-                        : StageObjectRenderer;
+                const Renderer = pickRenderer(obj.model_path);
 
                 return (
                     <ErrorBoundary
@@ -409,11 +403,7 @@ function NullGroup({
                 <group position={negDelta.pos} rotation={negDelta.rot}>
                     {mirroredObjects.map(obj => {
                         const objRef = objectRefs.current.get(obj.id);
-                        const Renderer = obj.model_path === '__box__'
-                            ? BoxPrimitiveRenderer
-                            : obj.model_path === '__projection_screen__'
-                                ? ProjectionScreenRenderer
-                                : StageObjectRenderer;
+                        const Renderer = pickRenderer(obj.model_path);
                         return (
                             <ErrorBoundary
                                 key={obj.id}
@@ -771,11 +761,7 @@ export function SceneGraph() {
                 .filter(obj => (!obj.parentId || !nulls.some(n => n.id === obj.parentId)) && liteVisible(obj, liteModeTop, liteKeepIdsTop))
                 .map((obj) => {
                     const objRef = objectRefsRef.current.get(obj.id);
-                    const Renderer = obj.model_path === '__box__'
-                        ? BoxPrimitiveRenderer
-                        : obj.model_path === '__projection_screen__'
-                            ? ProjectionScreenRenderer
-                            : StageObjectRenderer;
+                    const Renderer = pickRenderer(obj.model_path);
 
                     return (
                         <ErrorBoundary
