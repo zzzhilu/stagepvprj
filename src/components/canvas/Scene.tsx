@@ -3,7 +3,7 @@
 import { Canvas } from '@react-three/fiber';
 import { Preload } from '@react-three/drei';
 import { SceneGraph } from './SceneGraph';
-import { Suspense, useEffect, useRef } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useStore } from '@/store/useStore';
 import { setCanvasRef } from '@/components/client/VideoControls';
 
@@ -58,19 +58,26 @@ export default function Scene() {
     // Use 'always' frameloop when video is playing or in recording mode
     const frameloop = (isVideoActive && videoPlaying) || isRecordingMode ? 'always' : 'demand';
 
+    // Cap pixel ratio on touch / small screens: high-DPR phones otherwise render
+    // ~2.5x the pixels for little visible gain. Desktop keeps full quality (also used for recording).
+    const [maxDpr] = useState(() =>
+        typeof window !== 'undefined' && window.matchMedia('(max-width: 800px), (pointer: coarse)').matches ? 1.5 : 2
+    );
+
     return (
         <Canvas
             gl={{
-                antialias: true,
+                // AA is handled by the SMAA pass in EffectComposer; native MSAA on the
+                // default framebuffer would only apply to the final blit and is wasted work.
+                antialias: false,
                 powerPreference: 'high-performance',
                 failIfMajorPerformanceCaveat: false,
-                preserveDrawingBuffer: true,
+                preserveDrawingBuffer: true, // kept for canvas.captureStream() recording compatibility
                 alpha: false,
             }}
-            dpr={[1, 2]}
+            dpr={[1, maxDpr]}
             camera={{ position: [0, 5, 10], fov: 50 }}
             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-            shadows="soft"
             frameloop={frameloop}
         >
             <color attach="background" args={['#000']} />

@@ -17,29 +17,22 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
     const activeTexture = useMemo(() => {
         if (activeContentId) {
             const selected = contentTextures.find(t => t.id === activeContentId);
-            if (selected) {
-                console.log('Active texture selected:', selected);
-                return selected;
-            }
+            if (selected) return selected;
         }
         return null;
     }, [contentTextures, activeContentId]);
 
     // Create and manage video texture using global video element
     useEffect(() => {
-        if (!activeTexture || activeTexture.type !== 'video') {
-            if (videoTexture) {
-                videoTexture.dispose();
-                setVideoTexture(null);
-            }
-            return;
-        }
+        if (!activeTexture || activeTexture.type !== 'video') return;
+
+        let texture: THREE.VideoTexture | null = null;
 
         // Wait for global video element to be available
         const checkVideo = setInterval(() => {
             if (globalVideoElement) {
                 clearInterval(checkVideo);
-                const texture = new THREE.VideoTexture(globalVideoElement);
+                texture = new THREE.VideoTexture(globalVideoElement);
                 texture.colorSpace = THREE.SRGBColorSpace;
                 texture.wrapS = THREE.ClampToEdgeWrapping;
                 texture.wrapT = THREE.ClampToEdgeWrapping;
@@ -52,15 +45,14 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
                 // texture.offset.x = 1;
 
                 setVideoTexture(texture);
-                console.log('Video texture created from global video element');
             }
         }, 100);
 
         return () => {
             clearInterval(checkVideo);
-            if (videoTexture) {
-                videoTexture.dispose();
-            }
+            // Dispose the texture created by this effect run (not a stale state value)
+            texture?.dispose();
+            setVideoTexture(null);
         };
     }, [activeTexture]);
 
@@ -68,12 +60,9 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
     const imageTexture = useMemo(() => {
         if (!activeTexture || activeTexture.type !== 'image') return null;
 
-        console.log('Loading image texture from:', activeTexture.file_path);
         const texture = new THREE.TextureLoader().load(
             activeTexture.file_path,
-            (tex) => {
-                console.log('Image texture loaded successfully', tex);
-            },
+            undefined,
             undefined,
             (err) => {
                 console.error('Image texture loading error:', err);
@@ -93,6 +82,9 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
 
         return texture;
     }, [activeTexture]);
+
+    // Free GPU memory of the previous image texture when content changes
+    useEffect(() => () => imageTexture?.dispose(), [imageTexture]);
 
 
     // Select active texture map
@@ -119,7 +111,6 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
                 // For emissive material with texture
                 if (object.material_id === 'emissive') {
                     const matDef = MATERIAL_LIBRARY.emissive;
-                    console.log('Creating emissive material, has texture:', !!textureMap);
 
                     if (textureMap) {
                         // Use texture as emissive map with black base color
@@ -148,22 +139,26 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
         }
     }, [renderMode, object.material_id, textureMap]);
 
+    // Free GPU resources of the previous material when it is replaced
+    useEffect(() => () => material.dispose(), [material]);
+
+    // Find all meshes in the loaded GLTF (memoized: recomputing each render is wasted work)
+    const nodes = gltfData?.nodes;
+    const meshNames = object.meshNames;
+    const meshNodes = useMemo(() => {
+        if (!nodes) return [];
+        let meshes = Object.values(nodes).filter((node): node is THREE.Mesh =>
+            (node as THREE.Object3D).type === 'Mesh'
+        );
+        // If meshNames is specified, filter to only those meshes
+        if (meshNames && meshNames.length > 0) {
+            meshes = meshes.filter(mesh => meshNames.includes(mesh.name));
+        }
+        return meshes;
+    }, [nodes, meshNames]);
+
     // Show error placeholder if loading failed
     if (!gltfData) return null;
-
-    const { nodes } = gltfData;
-
-    // Find all meshes in the loaded GLTF
-    let meshNodes = Object.values(nodes).filter((node): node is THREE.Mesh =>
-        (node as THREE.Object3D).type === 'Mesh'
-    );
-
-    // If meshNames is specified, filter to only those meshes
-    if (object.meshNames && object.meshNames.length > 0) {
-        meshNodes = meshNodes.filter(mesh =>
-            object.meshNames!.includes(mesh.name)
-        );
-    }
 
     // Show warning placeholder if no meshes found
     if (meshNodes.length === 0) {
@@ -178,21 +173,13 @@ export function StageObjectRenderer({ object }: { object: StageObject }) {
     return (
         <group>
             {meshNodes.map((node) => {
-                // Clone the geometry to ensure UV attributes are preserved
-                const geometry = node.geometry.clone();
-
-                // Log UV information for debugging
-                if (geometry.attributes.uv) {
-                    console.log(`Mesh ${node.name} has UV coordinates`);
-                } else {
-                    console.warn(`Mesh ${node.name} is missing UV coordinates`);
-                }
-
+                // Use the cached GLTF geometry directly (read-only, UVs included).
+                // Cloning here created a new GPU buffer on every re-render and leaked memory.
                 return (
                     <Instances
                         key={node.uuid}
                         range={object.instances.length}
-                        geometry={geometry}
+                        geometry={node.geometry}
                         material={material}
                     >
                         {object.instances.map((inst, i) => (

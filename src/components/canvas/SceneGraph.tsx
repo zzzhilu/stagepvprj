@@ -111,7 +111,7 @@ export function SceneGraph() {
 
             {/* Enhanced lighting for better model visibility */}
             <ambientLight intensity={ambientIntensity} />
-            <directionalLight position={[10, 10, 5]} intensity={directionalIntensity} castShadow />
+            <directionalLight position={[10, 10, 5]} intensity={directionalIntensity} />
             <directionalLight position={[-10, 10, -5]} intensity={directionalIntensity * 0.4} />
             <hemisphereLight intensity={0.4} groundColor="#444" />
 
