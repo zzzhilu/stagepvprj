@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useStore, type StageObject } from '@/store/useStore';
 import { PRESET_MODELS, type PresetModel } from '@/lib/presets';
+import { PROCEDURAL_VENUES, procPath } from '@/lib/procedural';
 
 export function QuickAddPanel() {
     const addObject = useStore((state) => state.addObject);
@@ -76,8 +77,40 @@ export function QuickAddPanel() {
         addObject(newObj);
     };
 
+    // 向量建模場館:只存 `__proc__:<id>` 參照,幾何在瀏覽器即時生成(零下載)
+    const handleAddProcVenue = (venue: typeof PROCEDURAL_VENUES[0]) => {
+        const newObj: StageObject = {
+            id: `proc_${venue.id}_${crypto.randomUUID().slice(0, 8)}`,
+            model_path: procPath(venue.id),
+            material_id: 'concrete',
+            type: 'venues',
+            name: venue.name,
+            instances: [{ pos: [0, 0, 0], rot: [0, 0, 0], scale: [1, 1, 1] }],
+        };
+        addObject(newObj);
+    };
+
     return (
         <div className="p-4 space-y-4">
+            {/* ── 向量建模場館 ── */}
+            {PROCEDURAL_VENUES.length > 0 && (
+                <div>
+                    <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2">場館模板(向量建模)</h3>
+                    <div className="space-y-1.5">
+                        {PROCEDURAL_VENUES.map(v => (
+                            <button
+                                key={v.id}
+                                onClick={() => handleAddProcVenue(v)}
+                                title={v.description}
+                                className="w-full text-left bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white"
+                            >
+                                {v.name}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* ── Box 台板生成器 ── */}
             <div>
                 <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">

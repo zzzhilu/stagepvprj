@@ -94,6 +94,8 @@ client/
 14. **parallax-envmap**:注入點對 r182 chunk 字串 `reflectVec = inverseTransformDirection(...)`;three 升版要重驗。包圍盒每 60 幀自動算(venues 聯集)。
 15. **getObjectDisplayName(undefined) 會 crash** — `leds.find()` 結果先 guard。
 
+16. **向量建模(程序化場館)**:`model_path = '__proc__:<id>'`,幾何由 `lib/procedural` 從純數字 spec 即時生成(零下載)。只同步參照,不動同步系統;**id 發布後不可改名**。渲染器選擇統一走 `canvas/pick-renderer.ts`(新增 primitive 類型改這一處)。完整慣例見 `docs/procedural-modeling.md`。
+
 ## 7. 開發工作流(與 AI 協作慣例)
 
 - 交付形式:`git apply` patch → `/mnt/user-data/outputs/`;基於**最新 main** 生成並在乾淨 clone `git apply --check` 驗證。
