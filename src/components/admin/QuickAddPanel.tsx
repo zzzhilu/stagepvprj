@@ -82,7 +82,7 @@ export function QuickAddPanel() {
         const newObj: StageObject = {
             id: `proc_${venue.id}_${crypto.randomUUID().slice(0, 8)}`,
             model_path: procPath(venue.id),
-            material_id: 'concrete',
+            material_id: 'matteGray', // 場館主體材質(可在物件材質面板更換/微調);霧面不反光,避免完美渲染過曝
             type: 'venues',
             name: venue.name,
             instances: [{ pos: [0, 0, 0], rot: [0, 0, 0], scale: [1, 1, 1] }],

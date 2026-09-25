@@ -15,7 +15,11 @@ export type Vec3 = [number, number, number];
 interface PartBase {
     /** 部件名稱(除錯/量測對照用,例如「1F 左側看台」) */
     name?: string;
-    material: MaterialId;
+    /**
+     * 固定材質。省略 = 跟隨場館物件本身的材質(後台材質面板可換材質球、微調顏色/粗糙度/反射)。
+     * 只有需要和主體區隔的部件才指定(例如黑色舞台面)。
+     */
+    material?: MaterialId;
 }
 
 /** 方塊:柱子、控台、舞台箱體等 */

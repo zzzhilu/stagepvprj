@@ -13,7 +13,8 @@ import type { ProcVenueSpec, ProcPart, Vec2, Vec3, TiersPart } from './types';
  */
 
 export interface BuiltGroup {
-    material: MaterialId;
+    /** null = 跟隨場館物件的材質(主體);有值 = 部件指定的固定材質 */
+    material: MaterialId | null;
     geometry: THREE.BufferGeometry;
 }
 
@@ -342,7 +343,7 @@ function normalizeAttributes(g: THREE.BufferGeometry): THREE.BufferGeometry {
 }
 
 export function buildVenue(spec: ProcVenueSpec): BuiltVenue {
-    const byMaterial = new Map<MaterialId, THREE.BufferGeometry[]>();
+    const byMaterial = new Map<MaterialId | null, THREE.BufferGeometry[]>();
     const seatsByMaterial = new Map<MaterialId, THREE.Matrix4[]>();
 
     for (const part of spec.parts) {
@@ -352,9 +353,10 @@ export function buildVenue(spec: ProcVenueSpec): BuiltVenue {
             seatsByMaterial.set(part.seats.material, seatMatrices);
         }
         const g = normalizeAttributes(buildPart(part, seatMatrices));
-        const list = byMaterial.get(part.material) ?? [];
+        const slot = part.material ?? null;
+        const list = byMaterial.get(slot) ?? [];
         list.push(g);
-        byMaterial.set(part.material, list);
+        byMaterial.set(slot, list);
     }
 
     const groups: BuiltGroup[] = [];
@@ -362,7 +364,7 @@ export function buildVenue(spec: ProcVenueSpec): BuiltVenue {
     for (const [material, list] of byMaterial) {
         const merged = list.length === 1 ? list[0] : mergeGeometries(list);
         if (list.length > 1) list.forEach(g => g.dispose());
-        if (!merged) throw new Error(`[procedural] 合併失敗:material=${material}`);
+        if (!merged) throw new Error(`[procedural] 合併失敗:material=${material ?? '(場館主材質)'}`);
         merged.computeBoundingSphere();
         merged.computeBoundingBox();
         triangleCount += merged.getAttribute('position').count / 3;

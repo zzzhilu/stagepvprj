@@ -57,31 +57,32 @@ export const TMC_VENUE: ProcVenueDef = {
             // ── 地面與舞台 ──
             {
                 name: '觀眾廳平地',
-                kind: 'slab', material: 'concrete', y: -0.1, thickness: 0.1,
+                // 頂面 y=0.02:與場景內建地面(y=-0.01)拉開 3cm,避免深度衝突(z-fighting)閃爍
+                kind: 'slab', y: -0.08, thickness: 0.1,
                 polygon: [...SIDE_LEFT_BACK, ...REAR_LOWER.slice(1, -1), ...SIDE_RIGHT_BACK],
             },
             { name: '主舞台', kind: 'slab', material: 'blackPlastic', y: 0, thickness: 1.25, polygon: rect(0, -16.55, 35.4, 20.9) },
             { name: '後舞台', kind: 'slab', material: 'blackPlastic', y: 0, thickness: 1.25, polygon: rect(0.5, -34.35, 22, 14.3) },
 
             // ── 舞台塔 ──
-            { name: '舞台塔左牆', kind: 'wall', material: 'matteGray', y: 0, height: 21, thickness: 0.4, path: [[-17.7, -6.5], [-17.7, -27.2], [-10.5, -27.2]] },
-            { name: '舞台塔右牆', kind: 'wall', material: 'matteGray', y: 0, height: 21, thickness: 0.4, path: [[17.7, -6.5], [17.7, -27.2], [11.5, -27.2]] },
-            { name: '後舞台口上牆', kind: 'box', material: 'matteGray', center: [0.5, 16.75, -27.2], size: [22, 8.5, 0.4] },
-            { name: '後舞台牆', kind: 'wall', material: 'matteGray', y: 0, height: 12.5, thickness: 0.3, path: [[-10.5, -27.2], [-10.5, -41.5], [11.5, -41.5], [11.5, -27.2]] },
-            { name: '後舞台頂', kind: 'slab', material: 'matteGray', y: 12.5, thickness: 0.3, polygon: rect(0.5, -34.35, 22, 14.3) },
-            { name: '鏡框上楣', kind: 'box', material: 'matteGray', center: [0, 19, -6.6], size: [35.4, 4, 0.4] },
-            { name: '舞台後幕牆', kind: 'box', material: 'matteGray', center: [0, 11.125, -24.8], size: [30, 19.75, 0.1] },
+            { name: '舞台塔左牆', kind: 'wall', y: 0, height: 21, thickness: 0.4, path: [[-17.7, -6.5], [-17.7, -27.2], [-10.5, -27.2]] },
+            { name: '舞台塔右牆', kind: 'wall', y: 0, height: 21, thickness: 0.4, path: [[17.7, -6.5], [17.7, -27.2], [11.5, -27.2]] },
+            { name: '後舞台口上牆', kind: 'box', center: [0.5, 16.75, -27.2], size: [22, 8.5, 0.4] },
+            { name: '後舞台牆', kind: 'wall', y: 0, height: 12.5, thickness: 0.3, path: [[-10.5, -27.2], [-10.5, -41.5], [11.5, -41.5], [11.5, -27.2]] },
+            { name: '後舞台頂', kind: 'slab', y: 12.5, thickness: 0.3, polygon: rect(0.5, -34.35, 22, 14.3) },
+            { name: '鏡框上楣', kind: 'box', center: [0, 19, -6.6], size: [35.4, 4, 0.4] },
+            { name: '舞台後幕牆', kind: 'box', center: [0, 11.125, -24.8], size: [30, 19.75, 0.1] },
             // 舞台塔兩側吊桿天橋(兩層,x 1.6m 寬,z -25 → -9.3)+ 欄杆
             ...([-1, 1] as const).flatMap(sx => [11.8, 17.7].flatMap(gy => [
                 {
                     name: `天橋 ${sx < 0 ? '左' : '右'} ${gy}m`,
-                    kind: 'box' as const, material: 'matteGray' as const,
+                    kind: 'box' as const,
                     center: [sx * 16.72, gy + 0.35, -17.15] as [number, number, number],
                     size: [1.64, 0.7, 15.7] as [number, number, number],
                 },
                 {
                     name: `天橋欄杆 ${sx < 0 ? '左' : '右'} ${gy}m`,
-                    kind: 'wall' as const, material: 'matteGray' as const,
+                    kind: 'wall' as const,
                     path: [[sx * 15.93, -25], [sx * 15.93, -9.3]] as Vec2[],
                     y: gy + 0.7, height: 1.2, thickness: 0.05,
                 },
@@ -89,18 +90,18 @@ export const TMC_VENUE: ProcVenueDef = {
 
             // ── 觀眾廳牆 ──
             // 北流招牌:兩側斜向雕塑折面牆(由原模型萃取,左右不對稱)
-            { name: '左側折面牆', kind: 'facets', material: 'matteGray', ...TMC_WALL_LEFT },
-            { name: '右側折面牆', kind: 'facets', material: 'matteGray', ...TMC_WALL_RIGHT },
-            { name: '左側背板', kind: 'wall', material: 'matteGray', y: 0, height: 20.5, thickness: 0.3, path: SIDE_LEFT_BACK },
-            { name: '右側背板', kind: 'wall', material: 'matteGray', y: 0, height: 20.5, thickness: 0.3, path: SIDE_RIGHT_BACK },
-            { name: '一樓後牆', kind: 'wall', material: 'matteGray', y: 0, height: 11, thickness: 0.3, path: REAR_LOWER },
-            { name: '二樓後牆', kind: 'wall', material: 'matteGray', y: 11, height: 10, thickness: 0.3, path: REAR_UPPER },
+            { name: '左側折面牆', kind: 'facets', ...TMC_WALL_LEFT },
+            { name: '右側折面牆', kind: 'facets', ...TMC_WALL_RIGHT },
+            { name: '左側背板', kind: 'wall', y: 0, height: 20.5, thickness: 0.3, path: SIDE_LEFT_BACK },
+            { name: '右側背板', kind: 'wall', y: 0, height: 20.5, thickness: 0.3, path: SIDE_RIGHT_BACK },
+            { name: '一樓後牆', kind: 'wall', y: 0, height: 11, thickness: 0.3, path: REAR_LOWER },
+            { name: '二樓後牆', kind: 'wall', y: 11, height: 10, thickness: 0.3, path: REAR_UPPER },
 
             // ── 天花環帶:牆面到中央開口之間(前段寬約 8m、後方轉角約 14m、後方正中約 3m),y 19.8~20.6 ──
             // 做法:以開口邊緣為「前緣」往外長一排,再以牆的外輪廓裁切
             {
                 name: '天花環帶',
-                kind: 'tiers', material: 'matteGray',
+                kind: 'tiers',
                 path: CEILING_OPENING, side: 1,
                 y: 19.8, rows: 1, rowDepth: 16, riserHeight: 0.8, baseY: 19.8,
                 clip: ROOM_OUTLINE,
@@ -109,7 +110,7 @@ export const TMC_VENUE: ProcVenueDef = {
             // ── 一樓後方看台 ──
             {
                 name: '一樓看台',
-                kind: 'tiers', material: 'concrete',
+                kind: 'tiers',
                 path: arc(LOWER_C, LOWER_R, HALF - 0.6, HALF + 0.6, 48), side: -1,
                 y: 2.53, rows: LOWER_ROWS, rowDepth: LOWER_ROW_DEPTH, riserHeight: 0.24,
                 baseY: 0, clip: CLIP_LOWER,
@@ -117,7 +118,7 @@ export const TMC_VENUE: ProcVenueDef = {
             },
             {
                 name: '一樓看台後走道',
-                kind: 'tiers', material: 'concrete',
+                kind: 'tiers',
                 path: arc(LOWER_C, LOWER_R + LOWER_ROWS * LOWER_ROW_DEPTH, HALF - 0.6, HALF + 0.6, 48), side: -1,
                 y: 6.13, rows: 1, rowDepth: 3.2, riserHeight: 0.24,
                 baseY: 0, clip: CLIP_LOWER,
@@ -126,7 +127,7 @@ export const TMC_VENUE: ProcVenueDef = {
             // ── 二樓樓座 ──
             {
                 name: '二樓樓座',
-                kind: 'tiers', material: 'concrete',
+                kind: 'tiers',
                 path: arc(UPPER_C, UPPER_R, HALF - 0.85, HALF + 0.85, 48), side: -1,
                 y: 8.85, rows: 19, rowDepth: 0.93, riserHeight: 0.5,
                 baseY: [8.6, 11], clip: CLIP_UPPER,
@@ -134,7 +135,7 @@ export const TMC_VENUE: ProcVenueDef = {
             },
             {
                 name: '樓座前緣欄板',
-                kind: 'wall', material: 'matteGray',
+                kind: 'wall',
                 path: arc(UPPER_C, UPPER_R - 0.3, HALF - 0.76, HALF + 0.76, 40),
                 y: 8.6, height: 1.8, thickness: 0.3,
             },
