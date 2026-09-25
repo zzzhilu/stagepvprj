@@ -40,12 +40,20 @@ scripts/measure-glb.mjs          # 從參考 GLB 量尺寸
 | `box` | 柱子、控台、箱體 | `center`、`size`、`rotY` |
 | `slab` | 地板、舞台面、樓板、屋頂 | `polygon`(俯視輪廓)、`y`、`thickness` |
 | `wall` | 牆 | `path`、`closed`、`y`、`height`、`thickness` |
-| `tiers` | 階梯看台(可含座椅) | `path`(第一排前緣)、`side`、`y`、`rows`、`rowDepth`、`riserHeight`、`seats` |
+| `tiers` | 階梯看台(可含座椅);也可當「沿折線的一圈帶狀體」用(例:天花環帶) | `path`(第一排前緣)、`side`、`y`、`rows`、`rowDepth`、`riserHeight`、`baseY`、`clip`、`seats` |
 
 輔助函式:`arc(center, r, a0, a1, segs)` 產生弧線、`rect(cx, cz, w, d)` 產生矩形、`offsetPolyline`。
 
 `tiers.side`:看台往折線的哪一側延伸(1 = 行進方向左側)。弧形看台常用 `side: -1`,讓看台往外擴。
 座椅會自動面向前緣方向(舞台)。
+
+`tiers.baseY`:省略 = 每排只往下多一階(懸挑樓座);`0` = 實心落地;`[前, 後]` = 斜向底面(樓座下方的斜天花)。
+`tiers.clip`:俯視**凸**多邊形,看台只保留範圍內的部分(弧形看台切齊側牆);座椅也只擺在範圍內。
+
+## 7. 範例:北流表演廳(`venues/tmc.ts`)
+
+原 GLB 1.2MB / 28,686 三角形 → 向量版 0 下載 / 約 15,500 三角形 + 3,858 張座椅(InstancedMesh),4 次 draw call,生成約 55ms。
+量測方式:`measure-glb.mjs` 取高度分佈,再以 x=0、x=-15、y=1/5/10/15/20.3、z=5 切片取剖面,紅黑疊圖比對。
 
 ## 5. 效能規則
 

@@ -181,8 +181,73 @@ function sampleAlong(path: Vec2[], pitch: number): { p: Vec2; t: Vec2 }[] {
 
 // ───────────────────────── 部件 → 幾何 ─────────────────────────
 
+/** 凸多邊形 clip 的「內側」判斷:統一轉成逆時針(x→z 為正向)後,點在每條邊左側即為內側 */
+function toCCW(poly: Vec2[]): Vec2[] {
+    let area = 0;
+    for (let i = 0; i < poly.length; i++) {
+        const a = poly[i], b = poly[(i + 1) % poly.length];
+        area += a[0] * b[1] - b[0] * a[1];
+    }
+    return area >= 0 ? poly : [...poly].reverse();
+}
+
+function sideOf(a: Vec2, b: Vec2, p: Vec2): number {
+    return (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+}
+
+function insideConvex(clip: Vec2[], p: Vec2): boolean {
+    for (let i = 0; i < clip.length; i++) {
+        if (sideOf(clip[i], clip[(i + 1) % clip.length], p) < 0) return false;
+    }
+    return true;
+}
+
+/** Sutherland–Hodgman:以凸多邊形裁切任意多邊形 */
+function clipPolygon(subject: Vec2[], clip: Vec2[]): Vec2[] {
+    let out = subject;
+    for (let i = 0; i < clip.length && out.length > 0; i++) {
+        const a = clip[i], b = clip[(i + 1) % clip.length];
+        const input = out;
+        out = [];
+        for (let j = 0; j < input.length; j++) {
+            const p = input[j], q = input[(j + 1) % input.length];
+            const sp = sideOf(a, b, p), sq = sideOf(a, b, q);
+            if (sp >= 0) out.push(p);
+            if ((sp >= 0) !== (sq >= 0)) {
+                const t = sp / (sp - sq);
+                out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
+            }
+        }
+    }
+    return out;
+}
+
+/** 平面多邊形往上擠出的實心柱體(頂、底扇形三角化 + 側面) */
+function prism(tb: TriBuilder, poly: Vec2[], y0: number, y1: number) {
+    const n = poly.length;
+    if (n < 3) return;
+    for (let i = 1; i < n - 1; i++) {
+        const a = poly[0], b = poly[i], c = poly[i + 1];
+        tb.tri([a[0], y1, a[1]], [b[0], y1, b[1]], [c[0], y1, c[1]]);
+        tb.tri([a[0], y0, a[1]], [c[0], y0, c[1]], [b[0], y0, b[1]]);
+    }
+    for (let i = 0; i < n; i++) {
+        const p = poly[i], q = poly[(i + 1) % n];
+        tb.quad([p[0], y0, p[1]], [q[0], y0, q[1]], [q[0], y1, q[1]], [p[0], y1, p[1]]);
+    }
+}
+
+function tierBottom(part: TiersPart, i: number): number {
+    const b = part.baseY;
+    if (b === undefined) return part.y + Math.max(0, i - 1) * part.riserHeight;
+    if (typeof b === 'number') return b;
+    const t = part.rows > 1 ? i / (part.rows - 1) : 0;
+    return b[0] + (b[1] - b[0]) * t;
+}
+
 function buildTiers(part: TiersPart, tb: TriBuilder, seatMatrices: THREE.Matrix4[] | null) {
     const side = part.side ?? 1;
+    const clip = part.clip ? toCCW(part.clip) : null;
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
@@ -193,13 +258,24 @@ function buildTiers(part: TiersPart, tb: TriBuilder, seatMatrices: THREE.Matrix4
         const inner = offsetPolyline(part.path, side * i * part.rowDepth);
         const outer = offsetPolyline(part.path, side * (i + 1) * part.rowDepth);
         const top = part.y + (i + 1) * part.riserHeight;
-        // 每排往下多延伸一階,使看台下方呈連續階梯狀底面(懸挑樓座從下方看也不會破洞)
-        const bottom = part.y + Math.max(0, i - 1) * part.riserHeight;
-        band(tb, inner, outer, bottom, top, false);
+        const bottom = Math.min(tierBottom(part, i), top - 0.01);
+
+        if (!clip) {
+            band(tb, inner, outer, bottom, top, false);
+        } else {
+            // 逐段四邊形裁切後擠出;完全在範圍外的段落直接略過
+            for (let k = 0; k < inner.length - 1; k++) {
+                const quad: Vec2[] = [inner[k], inner[k + 1], outer[k + 1], outer[k]];
+                prism(tb, clipPolygon(toCCW(quad), clip), bottom, top);
+            }
+        }
 
         if (seatMatrices && part.seats) {
             const center = offsetPolyline(part.path, side * (i + 0.5) * part.rowDepth);
             for (const { p, t } of sampleAlong(center, part.seats.pitch)) {
+                // 椅子寬約 0.5m:兩側邊緣都在範圍內才擺
+                if (clip && !(insideConvex(clip, [p[0] - t[0] * 0.25, p[1] - t[1] * 0.25])
+                    && insideConvex(clip, [p[0] + t[0] * 0.25, p[1] + t[1] * 0.25]))) continue;
                 // 椅背朝看台後方(= 左法線 × side)
                 const bx = -t[1] * side, bz = t[0] * side;
                 q.setFromAxisAngle(up, Math.atan2(bx, bz));

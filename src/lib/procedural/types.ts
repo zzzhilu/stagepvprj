@@ -53,6 +53,13 @@ export interface TiersPart extends PartBase {
     rows: number;
     rowDepth: number;    // 每排深度(排距)
     riserHeight: number; // 每排升高
+    /**
+     * 看台底面高度。省略 = 每排只往下延伸一階(懸挑樓座的階梯狀底面)。
+     * number = 實心到該高度(例如 0 = 實心落地);[前排, 後排] = 斜向底面(樓座下方的斜天花)。
+     */
+    baseY?: number | [number, number];
+    /** 裁切範圍(俯視凸多邊形):看台只保留在多邊形內的部分,用於讓弧形看台切齊側牆 */
+    clip?: Vec2[];
     /** 座椅(InstancedMesh,一次繪製);省略則只有階梯 */
     seats?: {
         material: MaterialId;
