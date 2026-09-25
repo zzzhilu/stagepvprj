@@ -320,6 +320,15 @@ function buildPart(part: ProcPart, seatMatrices: THREE.Matrix4[] | null): THREE.
             buildTiers(part, tb, seatMatrices);
             return tb.build();
         }
+        case 'facets': {
+            const tb = new TriBuilder();
+            const v = part.vertices;
+            const at = (i: number): Vec3 => [v[i * 3], v[i * 3 + 1], v[i * 3 + 2]];
+            for (let i = 0; i + 2 < part.indices.length; i += 3) {
+                tb.tri(at(part.indices[i]), at(part.indices[i + 1]), at(part.indices[i + 2]));
+            }
+            return tb.build();
+        }
     }
 }
 

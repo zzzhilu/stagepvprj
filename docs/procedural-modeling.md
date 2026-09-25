@@ -41,6 +41,7 @@ scripts/measure-glb.mjs          # 從參考 GLB 量尺寸
 | `slab` | 地板、舞台面、樓板、屋頂 | `polygon`(俯視輪廓)、`y`、`thickness` |
 | `wall` | 牆 | `path`、`closed`、`y`、`height`、`thickness` |
 | `tiers` | 階梯看台(可含座椅);也可當「沿折線的一圈帶狀體」用(例:天花環帶) | `path`(第一排前緣)、`side`、`y`、`rows`、`rowDepth`、`riserHeight`、`baseY`、`clip`、`seats` |
+| `facets` | 參數化表達不了的不規則造型(例:北流側牆雕塑折面) | `vertices`(x,y,z 平鋪)、`indices`(三角形);資料可放獨立檔案(如 `tmc-walls.ts`) |
 
 輔助函式:`arc(center, r, a0, a1, segs)` 產生弧線、`rect(cx, cz, w, d)` 產生矩形、`offsetPolyline`。
 
@@ -67,5 +68,7 @@ scripts/measure-glb.mjs          # 從參考 GLB 量尺寸
 
 ## 7. 範例:北流表演廳(`venues/tmc.ts`)
 
-原 GLB 1.2MB / 28,686 三角形 → 向量版 0 下載 / 約 15,500 三角形 + 3,858 張座椅(InstancedMesh),4 次 draw call,生成約 55ms。
+原 GLB 1.2MB / 28,686 三角形 → 向量版 0 下載 / 約 15,700 三角形 + 3,858 張座椅(InstancedMesh),4 次 draw call,生成約 55ms。
 量測方式:`measure-glb.mjs` 取高度分佈,再以 x=0、x=-15、y=1/5/10/15/20.3、z=5 切片取剖面,紅黑疊圖比對。
+側牆雕塑折面:從觀眾廳內部射線取樣,只保留觀眾看得到的折面三角形(左 103、右 101 面,公分精度,約 7.7KB),存成 `facets`。
+**原則:能用參數描述的就用參數;有辨識度、參數描述不了的造型(招牌折面、雕塑牆)用 `facets` 保留原樣,不要簡化掉。**

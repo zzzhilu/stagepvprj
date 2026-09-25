@@ -67,7 +67,17 @@ export interface TiersPart extends PartBase {
     };
 }
 
-export type ProcPart = BoxPart | SlabPart | WallPart | TiersPart;
+/**
+ * 折面:直接以頂點 + 三角形索引描述的不規則面(例如北流側牆的雕塑折面)。
+ * 參數化部件無法表達的造型才用它;資料仍是純數字(公尺,建議四捨五入到公分)。
+ */
+export interface FacetsPart extends PartBase {
+    kind: 'facets';
+    vertices: number[]; // [x0, y0, z0, x1, y1, z1, ...]
+    indices: number[];  // 每 3 個一組三角形
+}
+
+export type ProcPart = BoxPart | SlabPart | WallPart | TiersPart | FacetsPart;
 
 export interface ProcVenueSpec {
     parts: ProcPart[];

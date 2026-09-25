@@ -1,5 +1,6 @@
 import type { ProcVenueDef, Vec2 } from '../types';
 import { arc, rect } from '../build';
+import { TMC_WALL_LEFT, TMC_WALL_RIGHT } from './tmc-walls';
 
 /**
  * 臺北流行音樂中心(北流)表演廳 — 向量建模版
@@ -11,9 +12,10 @@ import { arc, rect } from '../build';
 
 const mirror = (pts: Vec2[]): Vec2[] => pts.map(([x, z]) => [-x, z] as Vec2).reverse();
 
-// 觀眾廳側牆:原模型為鋸齒狀折面,於 y=5/10/15 三個高度取平均後近乎直線 x ≈ -20.7 − 0.55z(折面起伏 ±1m)
-const SIDE_LEFT: Vec2[] = [[-17.5, -6.1], [-24.8, 7.2], [-32.1, 20.5]];
-const SIDE_RIGHT: Vec2[] = mirror(SIDE_LEFT);
+// 觀眾廳側牆:雕塑折面見 tmc-walls.ts;折面平均線 x ≈ -20.7 − 0.55z(用於裁切範圍與背板定位)
+// 折面牆後方的背板(平均線往外 3.2m):補住折面之間的細縫,本身被折面擋住看不到
+const SIDE_LEFT_BACK: Vec2[] = [[-20.3, -7.6], [-27.6, 5.7], [-34.9, 19], [-32.1, 20.5]];
+const SIDE_RIGHT_BACK: Vec2[] = mirror(SIDE_LEFT_BACK);
 
 // 一樓後牆(看台後緣)
 const REAR_LOWER: Vec2[] = [[-32.1, 20.5], [-19, 36.6], [-10, 37.9], [0, 38.2], [10, 37.9], [19, 36.6], [32.1, 20.5]];
@@ -49,14 +51,14 @@ export const TMC_VENUE: ProcVenueDef = {
         '由北流 GLB(單一 mesh,28,686 三角形,65.5×22.1×88.9m)量測:' +
         '舞台後幕牆 z=-24.8、兩側天橋 11.8/17.7m、天花環帶 y≈20~21;一樓看台 15 排(排距 0.95、級高 0.24,首排高 2.77 @ z=21.04)、' +
         '樓座 19 排(排距 0.93、級高 0.50,9.35→18.35m)、舞台面 1.25m、舞台塔 21m。' +
-        '樓座末排累積誤差約 0.4m;側牆鋸齒折面以平均直線表示(起伏 ±1m)。',
+        '樓座末排累積誤差約 0.4m;兩側雕塑折面牆以原模型可見三角形保存(左 103、右 101 面,公分精度)。',
     spec: {
         parts: [
             // ── 地面與舞台 ──
             {
                 name: '觀眾廳平地',
                 kind: 'slab', material: 'concrete', y: -0.1, thickness: 0.1,
-                polygon: [...SIDE_LEFT, ...REAR_LOWER.slice(1, -1), ...SIDE_RIGHT],
+                polygon: [...SIDE_LEFT_BACK, ...REAR_LOWER.slice(1, -1), ...SIDE_RIGHT_BACK],
             },
             { name: '主舞台', kind: 'slab', material: 'blackPlastic', y: 0, thickness: 1.25, polygon: rect(0, -16.55, 35.4, 20.9) },
             { name: '後舞台', kind: 'slab', material: 'blackPlastic', y: 0, thickness: 1.25, polygon: rect(0.5, -34.35, 22, 14.3) },
@@ -86,8 +88,11 @@ export const TMC_VENUE: ProcVenueDef = {
             ])),
 
             // ── 觀眾廳牆 ──
-            { name: '左側牆', kind: 'wall', material: 'matteGray', y: 0, height: 20.5, thickness: 0.3, path: SIDE_LEFT },
-            { name: '右側牆', kind: 'wall', material: 'matteGray', y: 0, height: 20.5, thickness: 0.3, path: SIDE_RIGHT },
+            // 北流招牌:兩側斜向雕塑折面牆(由原模型萃取,左右不對稱)
+            { name: '左側折面牆', kind: 'facets', material: 'matteGray', ...TMC_WALL_LEFT },
+            { name: '右側折面牆', kind: 'facets', material: 'matteGray', ...TMC_WALL_RIGHT },
+            { name: '左側背板', kind: 'wall', material: 'matteGray', y: 0, height: 20.5, thickness: 0.3, path: SIDE_LEFT_BACK },
+            { name: '右側背板', kind: 'wall', material: 'matteGray', y: 0, height: 20.5, thickness: 0.3, path: SIDE_RIGHT_BACK },
             { name: '一樓後牆', kind: 'wall', material: 'matteGray', y: 0, height: 11, thickness: 0.3, path: REAR_LOWER },
             { name: '二樓後牆', kind: 'wall', material: 'matteGray', y: 11, height: 10, thickness: 0.3, path: REAR_UPPER },
 
