@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { rateLimit } from '@/lib/ratelimit';
+import { requireAdmin } from '@/lib/admin-auth-server';
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID!;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID!;
@@ -25,6 +26,9 @@ const s3Client = new S3Client({
  * Returns: { uploadUrl: string, publicUrl: string, videoId: string, filename: string, key: string }
  */
 export async function POST(request: NextRequest) {
+    const unauthorized = requireAdmin(request);
+    if (unauthorized) return unauthorized;
+
     // Security: Rate limiting (10 requests per minute per IP)
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
         request.headers.get('x-real-ip') ||
@@ -106,6 +110,9 @@ export async function POST(request: NextRequest) {
  * Returns: { success: true }
  */
 export async function DELETE(request: NextRequest) {
+    const unauthorized = requireAdmin(request);
+    if (unauthorized) return unauthorized;
+
     // Security: Rate limiting (10 requests per minute per IP)
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
         request.headers.get('x-real-ip') ||
@@ -136,6 +143,14 @@ export async function DELETE(request: NextRequest) {
         if (!key) {
             return NextResponse.json(
                 { error: 'Missing key' },
+                { status: 400 }
+            );
+        }
+
+        // 只允許刪除本 API 上傳時產生的 videos/ 路徑
+        if (typeof key !== 'string' || !key.startsWith('videos/') || key.includes('..')) {
+            return NextResponse.json(
+                { error: 'Invalid key' },
                 { status: 400 }
             );
         }

@@ -3,8 +3,12 @@ import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { draco, textureCompress } from '@gltf-transform/functions';
 import { rateLimit } from '@/lib/ratelimit';
+import { requireAdmin } from '@/lib/admin-auth-server';
 
 export async function POST(request: NextRequest) {
+    const unauthorized = requireAdmin(request);
+    if (unauthorized) return unauthorized;
+
     // Security: Rate limiting (3 compressions per minute per IP - CPU intensive)
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
         request.headers.get('x-real-ip') ||

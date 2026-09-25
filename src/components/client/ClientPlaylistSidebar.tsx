@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { matchCueForFilename } from '@/lib/cue-match';
 import { useStore } from '@/store/useStore';
 import { resolveGDriveUrl } from '@/lib/gdrive-direct';
 import { ProjectService } from '@/lib/project-service';
@@ -104,43 +105,8 @@ export function ClientPlaylistSidebar({ projectId }: { projectId: string }) {
                     const existing = currentProjectVideos.find((p: any) => p.driveFileId === vid.id)
                         || findExistingByDriveId(vid.id);
                     
-                    let autoCueId = undefined;
-                    if (vid.name) {
-                        const lowerFilename = vid.name.toLowerCase();
-                        
-                        const cueMatch = lowerFilename.match(/cue\s*[-_]?\s*(\d+)/i);
-                        if (cueMatch) {
-                            const numStr = cueMatch[1];
-                            const numInt = parseInt(numStr, 10).toString();
-                            
-                            const exactCue = currentCues.find((c: any) => {
-                                if (!c.name) return false;
-                                const n = c.name.toLowerCase().trim();
-                                return n === numStr || n === numInt || 
-                                       n === `cue${numStr}` || n === `cue${numInt}` ||
-                                       n === `cue ${numStr}` || n === `cue ${numInt}`;
-                            });
-                            if (exactCue) autoCueId = exactCue.id;
-                        }
+                    const autoCueId = matchCueForFilename(vid.name, currentCues);
 
-                        if (!autoCueId) {
-                            const sortedCues = [...currentCues].filter(c => c.name).sort((a, b) => b.name.length - a.name.length);
-                            for (const c of sortedCues) {
-                                const cNameLower = c.name.toLowerCase().trim();
-                                if (/^\d+$/.test(cNameLower)) {
-                                    const regex = new RegExp(`(^|[^\\d])${cNameLower}([^\\d]|$)`, 'i');
-                                    if (regex.test(lowerFilename)) {
-                                        autoCueId = c.id; break;
-                                    }
-                                } else {
-                                    if (lowerFilename.includes(cNameLower)) {
-                                        autoCueId = c.id; break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
                     if (existing) {
                         return {
                             ...existing,

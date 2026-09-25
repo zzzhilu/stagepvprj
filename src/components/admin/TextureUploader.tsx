@@ -13,6 +13,8 @@ export function TextureUploader() {
     const contentTextures = useStore((state) => state.contentTextures);
     const activeContentId = useStore((state) => state.activeContentId);
     const setActiveContent = useStore((state) => state.setActiveContent);
+    const defaultContentId = useStore((state) => state.defaultContentId);
+    const setDefaultContent = useStore((state) => state.setDefaultContent);
     const setLoading = useStore((state) => state.setLoading);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -99,6 +101,10 @@ export function TextureUploader() {
     };
 
     const handleLongPressStart = (id: string) => {
+        if (id === defaultContentId) {
+            alert('此內容已鎖定為分享預設,請先解除鎖定再刪除。');
+            return;
+        }
         setDeletingId(id);
         deleteTimerRef.current = setTimeout(() => {
             removeContentTexture(id);
@@ -113,6 +119,10 @@ export function TextureUploader() {
         }
         setDeletingId(null);
     };
+
+    const defaultTexture = defaultContentId
+        ? contentTextures.find(t => t.id === defaultContentId)
+        : undefined;
 
     // Separate textures by type
     const images = contentTextures.filter(t => t.type === 'image');
@@ -229,6 +239,26 @@ export function TextureUploader() {
                     </span>
                 </div>
 
+                {/* 分享預設內容狀態 */}
+                {defaultTexture ? (
+                    <div className="mb-3 p-2 rounded bg-amber-900/30 border border-amber-600/60 text-xs">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-amber-300 truncate" title={defaultTexture.name}>
+                                🔒 分享預設:{defaultTexture.name}
+                            </span>
+                            <button
+                                onClick={() => setDefaultContent(null)}
+                                className="flex-shrink-0 bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded"
+                            >
+                                解除鎖定
+                            </button>
+                        </div>
+                        <p className="text-gray-400 mt-1">客戶開啟分享頁會先看到此內容;後台點其他內容只是預覽,不影響預設</p>
+                    </div>
+                ) : contentTextures.length > 0 && (
+                    <p className="mb-3 text-[10px] text-gray-500">點縮圖右下 🔓 可鎖定為客戶分享頁的預設內容</p>
+                )}
+
                 {contentTextures.length === 0 ? (
                     <p className="text-xs text-gray-500 text-center py-4">尚未上傳任何內容</p>
                 ) : (
@@ -240,19 +270,27 @@ export function TextureUploader() {
                                 <div className="grid grid-cols-2 gap-2">
                                     {images.map(texture => {
                                         const isActive = activeContentId === texture.id;
+                                        const isDefault = defaultContentId === texture.id;
                                         return (
                                             <div
                                                 key={texture.id}
                                                 onClick={() => setActiveContent(texture.id)}
-                                                className={`bg-gray-800 rounded overflow-hidden group relative cursor-pointer transition-all ${isActive ? 'ring-2 ring-violet-500 scale-[1.02]' : 'hover:ring-1 hover:ring-gray-600'
+                                                className={`bg-gray-800 rounded overflow-hidden group relative cursor-pointer transition-all ${isDefault ? 'ring-2 ring-amber-400' : ''} ${isActive ? `${isDefault ? '' : 'ring-2 ring-violet-500'} scale-[1.02]` : (isDefault ? '' : 'hover:ring-1 hover:ring-gray-600')
                                                     }`}
                                             >
-                                                {/* Active Indicator */}
-                                                {isActive && (
-                                                    <div className="absolute top-1 left-1 z-10 bg-violet-500 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">
-                                                        播放中
-                                                    </div>
-                                                )}
+                                                {/* Active / Default Indicators */}
+                                                <div className="absolute top-1 left-1 z-10 flex gap-1">
+                                                    {isDefault && (
+                                                        <div className="bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">
+                                                            🔒 預設
+                                                        </div>
+                                                    )}
+                                                    {isActive && (
+                                                        <div className="bg-violet-500 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">
+                                                            播放中
+                                                        </div>
+                                                    )}
+                                                </div>
 
                                                 {/* Thumbnail */}
                                                 <div className="aspect-video bg-gray-700 flex items-center justify-center relative overflow-hidden">
@@ -268,8 +306,8 @@ export function TextureUploader() {
                                                         </svg>
                                                     )}
 
-                                                    {/* Delete Button */}
-                                                    <button
+                                                    {/* Delete Button (鎖定中不可刪) */}
+                                                    {!isDefault && <button
                                                         onMouseDown={(e) => { e.stopPropagation(); handleLongPressStart(texture.id); }}
                                                         onMouseUp={handleLongPressEnd}
                                                         onMouseLeave={handleLongPressEnd}
@@ -282,17 +320,27 @@ export function TextureUploader() {
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                                         </svg>
-                                                    </button>
+                                                    </button>}
                                                 </div>
 
                                                 {/* Info */}
-                                                <div className="p-2">
-                                                    <p className="text-xs text-gray-300 truncate" title={texture.name}>
-                                                        {texture.name}
-                                                    </p>
-                                                    <p className="text-xs text-gray-500">
-                                                        {texture.file_size ? formatFileSize(texture.file_size) : ''}
-                                                    </p>
+                                                <div className="p-2 flex items-start justify-between gap-1">
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs text-gray-300 truncate" title={texture.name}>
+                                                            {texture.name}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500">
+                                                            {texture.file_size ? formatFileSize(texture.file_size) : ''}
+                                                        </p>
+                                                    </div>
+                                                    {/* 鎖定為分享預設 */}
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setDefaultContent(isDefault ? null : texture.id); }}
+                                                        className={`flex-shrink-0 text-sm px-1 rounded transition-colors ${isDefault ? 'text-amber-400' : 'text-gray-500 hover:text-amber-300'}`}
+                                                        title={isDefault ? '解除分享預設' : '鎖定為分享預設內容'}
+                                                    >
+                                                        {isDefault ? '🔒' : '🔓'}
+                                                    </button>
                                                 </div>
                                             </div>
                                         );
@@ -301,25 +349,33 @@ export function TextureUploader() {
                             </div>
                         )}
 
-                        {images.length > 0 && (
+                        {videos.length > 0 && (
                             <div>
                                 <h5 className="text-xs font-medium text-green-400 mb-2 flex items-center gap-1"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg> 影片 ({videos.length})</h5>
                                 <div className="grid grid-cols-2 gap-2">
                                     {videos.map(texture => {
                                         const isActive = activeContentId === texture.id;
+                                        const isDefault = defaultContentId === texture.id;
                                         return (
                                             <div
                                                 key={texture.id}
                                                 onClick={() => setActiveContent(texture.id)}
-                                                className={`bg-gray-800 rounded overflow-hidden group relative cursor-pointer transition-all ${isActive ? 'ring-2 ring-violet-500 scale-[1.02]' : 'hover:ring-1 hover:ring-gray-600'
+                                                className={`bg-gray-800 rounded overflow-hidden group relative cursor-pointer transition-all ${isDefault ? 'ring-2 ring-amber-400' : ''} ${isActive ? `${isDefault ? '' : 'ring-2 ring-violet-500'} scale-[1.02]` : (isDefault ? '' : 'hover:ring-1 hover:ring-gray-600')
                                                     }`}
                                             >
-                                                {/* Active Indicator */}
-                                                {isActive && (
-                                                    <div className="absolute top-1 left-1 z-10 bg-violet-500 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">
-                                                        播放中
-                                                    </div>
-                                                )}
+                                                {/* Active / Default Indicators */}
+                                                <div className="absolute top-1 left-1 z-10 flex gap-1">
+                                                    {isDefault && (
+                                                        <div className="bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">
+                                                            🔒 預設
+                                                        </div>
+                                                    )}
+                                                    {isActive && (
+                                                        <div className="bg-violet-500 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">
+                                                            播放中
+                                                        </div>
+                                                    )}
+                                                </div>
 
                                                 {/* Thumbnail */}
                                                 <div className="aspect-video bg-gray-700 flex items-center justify-center relative overflow-hidden">
@@ -336,8 +392,8 @@ export function TextureUploader() {
                                                         </svg>
                                                     )}
 
-                                                    {/* Delete Button */}
-                                                    <button
+                                                    {/* Delete Button (鎖定中不可刪) */}
+                                                    {!isDefault && <button
                                                         onMouseDown={(e) => { e.stopPropagation(); handleLongPressStart(texture.id); }}
                                                         onMouseUp={handleLongPressEnd}
                                                         onMouseLeave={handleLongPressEnd}
@@ -350,17 +406,27 @@ export function TextureUploader() {
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                                         </svg>
-                                                    </button>
+                                                    </button>}
                                                 </div>
 
                                                 {/* Info */}
-                                                <div className="p-2">
-                                                    <p className="text-xs text-gray-300 truncate" title={texture.name}>
-                                                        {texture.name}
-                                                    </p>
-                                                    <p className="text-xs text-gray-500">
-                                                        {texture.file_size ? formatFileSize(texture.file_size) : ''}
-                                                    </p>
+                                                <div className="p-2 flex items-start justify-between gap-1">
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs text-gray-300 truncate" title={texture.name}>
+                                                            {texture.name}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500">
+                                                            {texture.file_size ? formatFileSize(texture.file_size) : ''}
+                                                        </p>
+                                                    </div>
+                                                    {/* 鎖定為分享預設 */}
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setDefaultContent(isDefault ? null : texture.id); }}
+                                                        className={`flex-shrink-0 text-sm px-1 rounded transition-colors ${isDefault ? 'text-amber-400' : 'text-gray-500 hover:text-amber-300'}`}
+                                                        title={isDefault ? '解除分享預設' : '鎖定為分享預設內容'}
+                                                    >
+                                                        {isDefault ? '🔒' : '🔓'}
+                                                    </button>
                                                 </div>
                                             </div>
                                         );

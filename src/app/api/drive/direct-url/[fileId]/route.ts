@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDriveAuth } from '@/lib/drive';
 import { google } from 'googleapis';
+import { requireAdmin } from '@/lib/admin-auth-server';
 
 /**
  * Generate a short-lived direct download URL for a Google Drive file.
@@ -13,6 +14,9 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ fileId: string }> }
 ) {
+  const unauthorized = requireAdmin(request);
+  if (unauthorized) return unauthorized;
+
   try {
     const params = await context.params;
     const fileId = params.fileId;

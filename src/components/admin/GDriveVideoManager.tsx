@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { matchCueForFilename } from '@/lib/cue-match';
 import { useStore } from '@/store/useStore';
 import { resolveGDriveUrl } from '@/lib/gdrive-direct';
 
@@ -57,51 +58,8 @@ export function GDriveVideoManager({ projectId, onSave }: { projectId: string; o
             const newVideos = data.videos.map((vid: any) => {
                 const existing = currentProjectVideos.find((p: any) => p.driveFileId === vid.id);
                 
-                let autoCueId = undefined;
-                if (vid.name) {
-                    const lowerFilename = vid.name.toLowerCase();
-                    
-                    // 1. Explicitly match the "cueX" pattern (e.g. cue03, cue3, cue_03)
-                    const cueMatch = lowerFilename.match(/cue\s*[-_]?\s*(\d+)/i);
-                    if (cueMatch) {
-                        const numStr = cueMatch[1]; // e.g. "03"
-                        const numInt = parseInt(numStr, 10).toString(); // e.g. "3"
-                        
-                        const exactCue = currentCues.find((c: any) => {
-                            if (!c.name) return false;
-                            const n = c.name.toLowerCase().trim();
-                            return n === numStr || n === numInt || 
-                                   n === `cue${numStr}` || n === `cue${numInt}` ||
-                                   n === `cue ${numStr}` || n === `cue ${numInt}`;
-                        });
-                        
-                        if (exactCue) {
-                            autoCueId = exactCue.id;
-                        }
-                    }
+                const autoCueId = matchCueForFilename(vid.name, currentCues);
 
-                    // 2. Fallback: match by full name, sorting by longest name first to prevent partial matches
-                    if (!autoCueId) {
-                        const sortedCues = [...currentCues].filter(c => c.name).sort((a, b) => b.name.length - a.name.length);
-                        for (const c of sortedCues) {
-                            const cNameLower = c.name.toLowerCase().trim();
-                            // If cue name is purely numeric, require word boundaries to avoid matching inside dates (like "0" in "0403")
-                            if (/^\d+$/.test(cNameLower)) {
-                                const regex = new RegExp(`(^|[^\\d])${cNameLower}([^\\d]|$)`, 'i');
-                                if (regex.test(lowerFilename)) {
-                                    autoCueId = c.id;
-                                    break;
-                                }
-                            } else {
-                                if (lowerFilename.includes(cNameLower)) {
-                                    autoCueId = c.id;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                
                 if (existing) {
                     // Retain all existing attributes (like id, cueId, etc.) and just update basic info
                     return {

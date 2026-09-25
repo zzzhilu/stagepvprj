@@ -16,7 +16,7 @@ import { ObjectHoverTooltip } from '@/components/admin/ObjectHoverTooltip';
 import { ClientToolbar } from '@/components/client/ClientToolbar';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ProjectService } from '@/lib/project-service';
-import { useStore } from '@/store/useStore';
+import { useStore, getProjectStateDefaults } from '@/store/useStore';
 import { RigPanel } from '@/components/client/RigPanel';
 
 const AUTH_KEY = 'stagepv_admin_auth';
@@ -155,6 +155,7 @@ function ProjectEditorContent() {
     const contentTextures = useStore(state => state.contentTextures);
     const activeViewId = useStore(state => state.activeViewId);
     const activeContentId = useStore(state => state.activeContentId);
+    const defaultContentId = useStore(state => state.defaultContentId);
     const cues = useStore(state => state.cues); // [NEW]
     const r2Videos = useStore(state => state.r2Videos);
     const videoFolders = useStore(state => state.videoFolders);
@@ -213,11 +214,17 @@ function ProjectEditorContent() {
                 if (data.name) setCurrentProjectName(data.name);
                 // [效能] 專案還原合併為單次 setState(原本 25+ 次分散 setter,初始化重渲染風暴主因)
                 useStore.setState({
+                    // 先重設專案層級欄位,缺少的欄位不沿用上一個專案(避免 auto-save 寫入污染)
+                    ...getProjectStateDefaults(),
                     ...(data.stageObjects ? { stageObjects: data.stageObjects } : {}),
                     ...(data.views ? { views: data.views } : {}),
                     ...(data.contentTextures ? { contentTextures: data.contentTextures } : {}),
                     ...(data.activeViewId ? { activeViewId: data.activeViewId } : {}),
                     ...(data.activeContentId ? { activeContentId: data.activeContentId } : {}),
+                    defaultContentId: data.defaultContentId ?? null,
+                    // 分享模式:有鎖定的預設內容就優先顯示(後台最後點的 activeContentId 不影響客戶)
+                    ...(isShareMode && data.defaultContentId && data.contentTextures?.some(t => t.id === data.defaultContentId)
+                        ? { activeContentId: data.defaultContentId } : {}),
                     ...(data.cues ? { cues: data.cues } : {}),
                     ...(data.r2Videos ? { r2Videos: data.r2Videos } : {}),
                     ...(data.videoFolders ? { videoFolders: data.videoFolders } : {}),
@@ -271,6 +278,7 @@ function ProjectEditorContent() {
                     contentTextures,
                     activeViewId,
                     activeContentId,
+                    defaultContentId,
                     cues, // [NEW]
                     r2Videos,
                     videoFolders,
@@ -310,7 +318,7 @@ function ProjectEditorContent() {
         }, 2000); // Debounce 2 seconds
 
         return () => clearTimeout(timeoutId);
-    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, cues, r2Videos, videoFolders, gdriveVideos, ledLayouts, activeLedLayoutId, screenCropRatio, clientEditPasswordHash, liteModeKeepIds, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, perfectLightScale, liteModeDefault, ledSpillIntensity, reflectionMirror, reflectionBlur, reflectionMetalness, nulls, rigs, isAuthenticated, isShareMode, isLoading, projectId]);
+    }, [stageObjects, views, contentTextures, activeViewId, activeContentId, defaultContentId, cues, r2Videos, videoFolders, gdriveVideos, ledLayouts, activeLedLayoutId, screenCropRatio, clientEditPasswordHash, liteModeKeepIds, gdriveFolders, floorPlanTextureUrl, ambientIntensity, directionalIntensity, bloomIntensity, bloomThreshold, perfectRenderEnabled, envPreset, envIntensity, contactShadow, toneMapping, spotLights, perfectLightScale, liteModeDefault, ledSpillIntensity, reflectionMirror, reflectionBlur, reflectionMetalness, nulls, rigs, isAuthenticated, isShareMode, isLoading, projectId]);
 
     // Show loading while checking auth
     if (isChecking) {

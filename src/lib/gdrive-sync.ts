@@ -1,9 +1,10 @@
 import { useStore } from '@/store/useStore';
+import { matchCueForFilename } from '@/lib/cue-match';
 
 /**
  * Google Drive 資料夾同步(共用邏輯,後台 GDriveVideoManager 與客戶端面板皆可用)。
  * 拉取資料夾影片 → 與現有列表 merge(保留既有 cue 綁定等配置)→ cue 自動匹配
- * (檔名含 cueXX 或 cue 名稱時自動掛載)→ 更新 store。
+ * (見 lib/cue-match.ts;檔名不含 cue 時使用第一個 cue)→ 更新 store。
  * 回傳同步到的影片數。呼叫端自行負責持久化(admin auto-save 或客戶端部分更新)。
  */
 export async function syncGDriveFolder(projectId: string, folderId: string): Promise<number> {
@@ -22,35 +23,7 @@ export async function syncGDriveFolder(projectId: string, folderId: string): Pro
     const newVideos = data.videos.map((vid: any) => {
         const existing = currentProjectVideos.find((p: any) => p.driveFileId === vid.id);
 
-        let autoCueId: string | undefined = undefined;
-        if (vid.name) {
-            const lowerFilename = vid.name.toLowerCase();
-            const cueMatch = lowerFilename.match(/cue\s*[-_]?\s*(\d+)/i);
-            if (cueMatch) {
-                const numStr = cueMatch[1];
-                const numInt = parseInt(numStr, 10).toString();
-                const exactCue = currentCues.find((c: any) => {
-                    if (!c.name) return false;
-                    const n = c.name.toLowerCase().trim();
-                    return n === numStr || n === numInt ||
-                        n === `cue${numStr}` || n === `cue${numInt}` ||
-                        n === `cue ${numStr}` || n === `cue ${numInt}`;
-                });
-                if (exactCue) autoCueId = exactCue.id;
-            }
-            if (!autoCueId) {
-                const sortedCues = [...currentCues].filter((c: any) => c.name).sort((a: any, b: any) => b.name.length - a.name.length);
-                for (const c of sortedCues) {
-                    const cNameLower = c.name.toLowerCase().trim();
-                    if (/^\d+$/.test(cNameLower)) {
-                        const regex = new RegExp(`(^|[^\\d])${cNameLower}([^\\d]|$)`, 'i');
-                        if (regex.test(lowerFilename)) { autoCueId = c.id; break; }
-                    } else {
-                        if (lowerFilename.includes(cNameLower)) { autoCueId = c.id; break; }
-                    }
-                }
-            }
-        }
+        const autoCueId = matchCueForFilename(vid.name, currentCues);
 
         if (existing) {
             return { ...existing, cueId: existing.cueId || autoCueId, filename: vid.name, thumbnail_url: vid.thumbnail_url, size: vid.size };

@@ -37,6 +37,9 @@ export interface StageObject {
     instances: Instance[];
     type: ModelType; // Model category type
     meshNames?: string[]; // Optional: specific mesh names to filter from the GLB
+    // 新版上傳(舊物件無這兩個欄位,渲染行為不變):
+    meshIndices?: number[]; // 依 GLB 場景遍歷順序指定 mesh(可對應未命名/同名 mesh);有值時優先於 meshNames
+    applyNodeTransform?: boolean; // 保留 GLB 節點的位置/旋轉/縮放(聚合物件用;單一 mesh 物件直接寫進 instances)
     name?: string; // 顯示名稱:上傳時取自 3D 軟體的 mesh/檔案命名,可由使用者修改
     rigMirror?: boolean; // 鏡像跟隨:掛載於 Null 時,機關偏移以 ×-1 作用(對稱機關,如左右對開門)
     materialOverrides?: MaterialOverrides; // 材質參數微調(基底 material_id 之上的覆寫)
@@ -286,6 +289,8 @@ interface State {
     activeViewId: string | null;
     contentTextures: ContentTexture[];
     activeContentId: string | null;
+    // 後台鎖定的分享預設內容(內容輸入的圖片/影片)。跨端同步欄位,刻意不進 persist。
+    defaultContentId: string | null;
     renderMode: RenderMode;
     ambientIntensity: number;
     directionalIntensity: number;
@@ -442,6 +447,7 @@ interface State {
     removeContentTexture: (id: string) => void;
     updateContentTexture: (id: string, updates: Partial<ContentTexture>) => void;
     setActiveContent: (id: string | null) => void;
+    setDefaultContent: (id: string | null) => void;
     setRenderMode: (mode: RenderMode) => void;
     setAmbientIntensity: (intensity: number) => void;
     setDirectionalIntensity: (intensity: number) => void;
@@ -607,6 +613,7 @@ export const useStore = create<State>()(
             activeViewId: null,
             contentTextures: [],
             activeContentId: null,
+            defaultContentId: null,
             renderMode: 'beauty',
             ambientIntensity: 0.8,
             directionalIntensity: 1.2,
@@ -1075,7 +1082,8 @@ export const useStore = create<State>()(
             removeContentTexture: (id) => set((state) => ({
                 contentTextures: state.contentTextures.filter(t => t.id !== id),
                 // Clear selection if deleted content was active
-                activeContentId: state.activeContentId === id ? null : state.activeContentId
+                activeContentId: state.activeContentId === id ? null : state.activeContentId,
+                defaultContentId: state.defaultContentId === id ? null : state.defaultContentId
             })),
             updateContentTexture: (id, updates) => set((state) => ({
                 contentTextures: state.contentTextures.map(t =>
@@ -1083,6 +1091,8 @@ export const useStore = create<State>()(
                 )
             })),
             setActiveContent: (id) => set({ activeContentId: id }),
+            // 鎖定時同時切到該內容顯示;解鎖只清除預設,不動目前顯示
+            setDefaultContent: (id) => set(id ? { defaultContentId: id, activeContentId: id } : { defaultContentId: null }),
             setRenderMode: (mode) => set({ renderMode: mode }),
             setAmbientIntensity: (intensity) => set({ ambientIntensity: intensity }),
             setDirectionalIntensity: (intensity) => set({ directionalIntensity: intensity }),
@@ -1398,3 +1408,26 @@ export const useStore = create<State>()(
         }
     )
 );
+
+/**
+ * 專案層級欄位(auto-save 寫入 Firestore 的欄位)。
+ * 載入專案前先重設為初始值,再套上專案資料:避免專案缺少的欄位沿用上一個專案
+ * (persist/記憶體殘留)的值,之後又被 auto-save 寫進這個專案(跨專案資料污染)。
+ * 新增跨端同步欄位時,也要加進這裡。
+ */
+const PROJECT_SCOPED_KEYS = [
+    'stageObjects', 'views', 'contentTextures', 'activeViewId', 'activeContentId', 'defaultContentId',
+    'cues', 'r2Videos', 'videoFolders', 'gdriveVideos', 'ledLayouts', 'activeLedLayoutId',
+    'screenCropRatio', 'clientEditPasswordHash', 'liteModeKeepIds', 'gdriveFolders', 'floorPlanTextureUrl',
+    'ambientIntensity', 'directionalIntensity', 'bloomIntensity', 'bloomThreshold',
+    'perfectRenderEnabled', 'envPreset', 'envIntensity', 'contactShadow', 'toneMapping', 'spotLights',
+    'perfectLightScale', 'liteModeDefault', 'ledSpillIntensity',
+    'reflectionMirror', 'reflectionBlur', 'reflectionMetalness',
+    'nulls', 'rigs',
+] as const satisfies readonly (keyof State)[];
+
+/** 專案層級欄位的初始值(getInitialState 為未經 persist 還原的原始預設) */
+export function getProjectStateDefaults(): Partial<State> {
+    const initial = useStore.getInitialState();
+    return Object.fromEntries(PROJECT_SCOPED_KEYS.map((key) => [key, initial[key]])) as Partial<State>;
+}

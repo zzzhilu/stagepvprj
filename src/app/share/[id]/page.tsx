@@ -18,7 +18,7 @@ import { InAppBrowserNotice } from '@/components/client/InAppBrowserNotice';
 import { LiveSync } from '@/components/client/LiveSync';
 import { DrawingOverlay } from '@/components/client/DrawingOverlay';
 import { ProjectService } from '@/lib/project-service';
-import { useStore } from '@/store/useStore';
+import { useStore, getProjectStateDefaults } from '@/store/useStore';
 import { ClientPlaylistSidebar } from '@/components/client/ClientPlaylistSidebar';
 import { resolveGDriveUrl } from '@/lib/gdrive-direct';
 
@@ -106,6 +106,8 @@ function SharePageContent() {
             // [效能] 專案還原合併為單次 setState:原本 20+ 次分散 setter 每次都觸發
             // 全訂閱者重渲染,初始化期主執行緒阻塞的主因之一。所有 setter 均為純 set,合併安全。
             useStore.setState({
+                // 先重設專案層級欄位,缺少的欄位不沿用上一個專案(客戶編輯儲存 cues/views 時也不會帶入殘留)
+                ...getProjectStateDefaults(),
                 ...(data.stageObjects ? { stageObjects: data.stageObjects } : {}),
                 ...(data.views ? { views: data.views } : {}),
                 ...(data.cues ? { cues: data.cues } : {}),
@@ -136,6 +138,11 @@ function SharePageContent() {
                 rigs: data.rigs || [],
                 rigValues: {},
             });
+
+            // 後台鎖定的預設內容(僅限「內容輸入」清單內仍存在的項目)
+            const defaultContent = data.defaultContentId
+                ? data.contentTextures?.find(c => c.id === data.defaultContentId)
+                : undefined;
 
             // Find the specified video
             if (videoId) {
@@ -198,6 +205,10 @@ function SharePageContent() {
                     if (data.contentTextures) setContentTextures(data.contentTextures);
                     if (data.activeContentId) setActiveContent(data.activeContentId);
                 }
+            } else if (defaultContent) {
+                // 優先序:?video 明確指定 > 鎖定的預設內容 > 第一支 R2/GDrive 影片 > activeContentId
+                setContentTextures(data.contentTextures!);
+                setActiveContent(defaultContent.id);
             } else if ((data.r2Videos && data.r2Videos.length > 0) || (data.gdriveVideos && data.gdriveVideos.length > 0)) {
                 let firstVideo: any = null;
                 let isR2 = false;
@@ -265,7 +276,7 @@ function SharePageContent() {
 
             const targetCueId = cueId ||
                 (videoId && allVideos.find((v: { id: string; cueId?: string; driveFileId?: string }) => v.id === videoId || (v as any).driveFileId === videoId)?.cueId) ||
-                (!videoId && allVideos[0]?.cueId);
+                (!videoId && !defaultContent && allVideos[0]?.cueId);
             if (targetCueId && data.cues?.length) {
                 // Small delay to ensure store is hydrated
                 setTimeout(() => applyCue(targetCueId), 200);
