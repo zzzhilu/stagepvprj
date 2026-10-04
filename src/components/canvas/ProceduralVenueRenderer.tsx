@@ -2,6 +2,7 @@ import { StageObject, useStore } from '@/store/useStore';
 import * as THREE from 'three';
 import { createMaterial, createPerfectMaterial, applyMaterialOverrides, MATERIAL_LIBRARY } from '@/lib/materials';
 import { applyParallaxEnvMap } from '@/lib/parallax-envmap';
+import { setPlanarReflection } from '@/lib/planar-reflection';
 import type { MaterialId } from '@/lib/materials';
 import { useMemo, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { getProceduralVenue } from '@/lib/procedural';
@@ -103,6 +104,12 @@ export const ProceduralVenueRenderer = forwardRef<THREE.Group, {
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mainMaterial, fixedMaterials, envMap, perfectRenderEnabled, renderMode]);
+
+    // 🪞 平面反射:套在場館所有材質上;shader 只讓「高度 = 反射平面」的朝上表面反射(例如舞台面)
+    useEffect(() => {
+        const on = !!object.planarReflector && perfectRenderEnabled && renderMode === 'beauty';
+        [mainMaterial, ...fixedMaterials.values()].forEach(m => setPlanarReflection(m, on));
+    }, [mainMaterial, fixedMaterials, object.planarReflector, perfectRenderEnabled, renderMode]);
 
     // 座椅 InstancedMesh:矩陣一次寫入
     const seatMeshes = useMemo(() => {

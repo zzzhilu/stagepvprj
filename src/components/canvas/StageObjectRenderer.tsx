@@ -11,6 +11,7 @@ import { collectSceneMeshes, meshMatrixInScene } from '@/lib/node-transform';
 import { getObjectDisplayName } from '@/lib/object-utils';
 import { applyParallaxEnvMap } from '@/lib/parallax-envmap';
 import { REFLECT_LAYER } from '@/lib/reflect-layer';
+import { setPlanarReflection } from '@/lib/planar-reflection';
 
 // [效能] useFrame 每幀重用的臨時物件(單執行緒,跨實例共享安全);消除每幀 new 造成的 GC 卡頓
 const _tmpBasePos = new THREE.Vector3();
@@ -644,6 +645,20 @@ export const StageObjectRenderer = forwardRef<THREE.Group, {
         applyMaterialOverrides(material as THREE.MeshStandardMaterial, def, object.materialOverrides);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [material, overridesJson, object.material_id, object.type]);
+
+    // 🪞 平面反射:反射直接做在此物件的材質上(只在完美渲染 + beauty 生效;關閉只改 uniform、不重編譯)
+    useEffect(() => {
+        if (!material || Array.isArray(material)) return;
+        if (
+            object.material_id === 'emissive' ||
+            object.material_id === 'emissiveMesh' ||
+            object.material_id === 'projectionScreen' ||
+            object.type === 'static_LED' ||
+            object.type === 'moving_LED' ||
+            object.type === 'floor_plan'
+        ) return;
+        setPlanarReflection(material, !!object.planarReflector && perfectRenderEnabled && renderMode === 'beauty');
+    }, [material, object.planarReflector, perfectRenderEnabled, renderMode, object.material_id, object.type]);
 
     // LED 物件加入反射圖層(層 0 保留給主相機,層 REFLECT_LAYER 供反射相機挑選)
     const isLedType = object.type === 'static_LED' || object.type === 'moving_LED';

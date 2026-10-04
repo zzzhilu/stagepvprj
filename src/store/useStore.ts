@@ -43,8 +43,8 @@ export interface StageObject {
     name?: string; // 顯示名稱:上傳時取自 3D 軟體的 mesh/檔案命名,可由使用者修改
     rigMirror?: boolean; // 鏡像跟隨:掛載於 Null 時,機關偏移以 ×-1 作用(對稱機關,如左右對開門)
     materialOverrides?: MaterialOverrides; // 材質參數微調(基底 material_id 之上的覆寫)
-    planarReflector?: boolean; // 平面反射:啟用後在下方參數指定的平面上反射 LED 內容
-    reflectorConfig?: { w: number; d: number; x: number; y: number; z: number }; // 反射平面尺寸與位置(公尺)
+    planarReflector?: boolean; // 舞台板反射:此物件材質上高度 = reflectorConfig.y 的朝上表面反射 LED(lib/planar-reflection.ts)
+    reflectorConfig?: { w: number; d: number; x: number; y: number; z: number }; // 只用 y(反射面高度,公尺);w/d/x/z 為舊版反射板欄位,保留相容
     parentId?: string | null; // 掛載的 Null 節點或父物件 ID;一旦有 parent,instances 的 pos/rot 即為相對 parent 的本地座標
     curvature?: number; // [NEW] Arc curvature for projection screens (-1 to 1)
     ledResolution?: { w: number; h: number }; // LED 原生解析度(像素);跨排列共用,放進畫布時作為預設大小
