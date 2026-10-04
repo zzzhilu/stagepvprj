@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { addShaderPatch } from './shader-patch';
 
 /**
  * Parallax 校正環境反射(cruciform 手法,適配 three r182 PMREM 管線)。
@@ -29,12 +30,10 @@ export function setParallaxEnabled(on: boolean) {
 
 const INJECT_ANCHOR = 'reflectVec = inverseTransformDirection( reflectVec, viewMatrix );';
 
-/** 對材質注入 parallax 校正(onBeforeCompile;共享 program cache) */
+/** 對材質注入 parallax 校正(onBeforeCompile) */
+// 共享 program cache(同一 patch 的材質共用編譯結果);以 addShaderPatch 串接,可與平面反射等其他注入並存
 export function applyParallaxEnvMap(mat: THREE.Material) {
-    if ((mat as any).__parallaxApplied) return;
-    (mat as any).__parallaxApplied = true;
-
-    mat.onBeforeCompile = (shader) => {
+    addShaderPatch(mat, 'parallax-envmap-v1', (shader) => {
         Object.assign(shader.uniforms, parallaxUniforms);
 
         shader.vertexShader = shader.vertexShader
@@ -65,7 +64,5 @@ vec3 parallaxCorrectDir( vec3 dir, vec3 pos ) {
         shader.fragmentShader = shader.fragmentShader
             .replace('#include <common>', '#include <common>\n' + parallaxPars)
             .replace('#include <envmap_physical_pars_fragment>', patchedChunk);
-    };
-    // 共享 program cache(同一 patch 的材質共用編譯結果)
-    mat.customProgramCacheKey = () => 'parallax-envmap-v1';
+    });
 }

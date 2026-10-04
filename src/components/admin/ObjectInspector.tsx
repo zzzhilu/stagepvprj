@@ -122,7 +122,7 @@ export function ObjectInspector() {
                                         <span
                                             onClick={(e) => { e.stopPropagation(); updateObject(obj.id, { planarReflector: !obj.planarReflector }); }}
                                             className={`text-[10px] cursor-pointer px-1 rounded ${obj.planarReflector ? 'text-cyan-300 bg-cyan-500/15' : 'text-gray-600 hover:text-gray-400'}`}
-                                            title="平面反射:此物件做鏡面反射(適用舞台地面等平面;僅完美渲染生效)"
+                                            title="舞台板反射:此物件的頂面反射 LED,結合物件本身材質(僅完美渲染生效)"
                                         >🪞</span>
                                         <span
                                             onClick={(e) => { e.stopPropagation(); toggleLiteModeKeep(obj.id); }}
@@ -141,50 +141,46 @@ export function ObjectInspector() {
             </div>
 
             {/* Selected Object Details */}
-            {selectedObject?.planarReflector && (
-                <div className="border-t border-gray-700 pt-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-bold text-cyan-300">🪞 反射平面(公尺)</h4>
-                        <button
-                            onClick={() => {
-                                const b = objectBounds[selectedObject.id];
-                                if (!b) return;
-                                updateObject(selectedObject.id, { reflectorConfig: {
-                                    w: Math.max(0.1, b.max[0] - b.min[0]),
-                                    d: Math.max(0.1, b.max[2] - b.min[2]),
-                                    x: (b.max[0] + b.min[0]) / 2,
-                                    y: b.min[1] + 0.005,
-                                    z: (b.max[2] + b.min[2]) / 2,
-                                } });
-                            }}
-                            className="text-[10px] px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200"
-                            title="以物件包圍盒填入(高度取底面)"
-                        >自動填入</button>
+            {selectedObject?.planarReflector && (() => {
+                const b = objectBounds[selectedObject.id];
+                const cfg = selectedObject.reflectorConfig;
+                const y = cfg?.y ?? b?.min[1];
+                // 只保留高度;寬深/位置已不需要(反射跟著物件本身的形狀),舊欄位原樣保留以相容舊專案
+                const setY = (v: number) => updateObject(selectedObject.id, {
+                    reflectorConfig: { ...(cfg ?? { w: 10, d: 10, x: 0, z: 0 }), y: v },
+                });
+                return (
+                    <div className="border-t border-gray-700 pt-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-bold text-cyan-300">🪞 舞台板反射</h4>
+                            <button
+                                onClick={() => { if (b) setY(b.min[1]); }}
+                                className="text-[10px] px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200"
+                                title="以物件包圍盒底面填入"
+                            >自動填入</button>
+                        </div>
+                        <label className="flex items-center gap-2">
+                            <span className="text-[10px] text-gray-400 whitespace-nowrap">反射面高度 Y(公尺)</span>
+                            <input
+                                type="number"
+                                step={0.01}
+                                value={y !== undefined ? Number(y.toFixed(3)) : ''}
+                                placeholder="自動"
+                                onChange={(e) => {
+                                    const v = parseFloat(e.target.value);
+                                    if (Number.isFinite(v)) setY(v);
+                                }}
+                                className="w-full bg-gray-900 border border-gray-600 rounded px-1 py-0.5 text-[10px] text-white text-center focus:border-cyan-500 focus:outline-none"
+                            />
+                        </label>
+                        <p className="text-[9px] text-gray-500 leading-relaxed">
+                            反射直接做在此物件的材質上:只有高度 = Y 的朝上表面會反射 LED。
+                            材質的粗糙度(越粗越糊越淡)、金屬度/顏色、凹凸(拉絲/格紋)都會影響反射;
+                            整體強度與模糊在「完美渲染設定 → 鏡面強度/模糊程度」。僅完美渲染生效。
+                        </p>
                     </div>
-                    <div className="grid grid-cols-5 gap-1">
-                        {(['w', 'd', 'x', 'y', 'z'] as const).map((k) => {
-                            const cfg = selectedObject.reflectorConfig ?? { w: 10, d: 10, x: 0, y: 0, z: 0 };
-                            return (
-                                <label key={k} className="flex flex-col gap-0.5">
-                                    <span className="text-[9px] text-gray-500 text-center">{k === 'w' ? '寬' : k === 'd' ? '深' : k.toUpperCase()}</span>
-                                    <input
-                                        type="number"
-                                        step={0.1}
-                                        value={cfg[k]}
-                                        onChange={(e) => {
-                                            const v = parseFloat(e.target.value);
-                                            if (!Number.isFinite(v)) return;
-                                            updateObject(selectedObject.id, { reflectorConfig: { ...cfg, [k]: v } });
-                                        }}
-                                        className="w-full bg-gray-900 border border-gray-600 rounded px-1 py-0.5 text-[10px] text-white text-center focus:border-cyan-500 focus:outline-none"
-                                    />
-                                </label>
-                            );
-                        })}
-                    </div>
-                    <p className="text-[9px] text-gray-500">Y = 舞台面高度。反射只顯示 LED 內容,加算疊在地板上。</p>
-                </div>
-            )}
+                );
+            })()}
 
             {selectedObject && selectedObject.instances[0] && (
                 <>

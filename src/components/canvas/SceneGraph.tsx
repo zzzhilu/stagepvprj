@@ -1,9 +1,7 @@
 import { OrbitControls, PerspectiveCamera, TransformControls , useProgress } from '@react-three/drei';
 import { useStore, StageObject } from '@/store/useStore';
 import type { NullNode } from '@/store/useStore';
-import { StageObjectRenderer } from './StageObjectRenderer';
-import { BoxPrimitiveRenderer } from './BoxPrimitiveRenderer';
-import { ProjectionScreenRenderer } from './ProjectionScreenRenderer';
+import { pickRenderer } from './pick-renderer';
 import { PaperFigureRenderer } from './PaperFigureRenderer';
 import { CameraCapture } from './CameraCapture';
 import { VideoManager } from './VideoManager';
@@ -22,133 +20,174 @@ import { ToneMappingMode } from 'postprocessing';
 import { rigDelta, rigVisibility, addVec3 } from '@/lib/rig-utils';
 import { CameraMarkers } from './CameraMarkers';
 import { setParallaxBox, setParallaxEnabled } from '@/lib/parallax-envmap';
-import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
+import { planarReflectionUniforms } from '@/lib/planar-reflection';
 import { REFLECT_LAYER } from '@/lib/reflect-layer';
 import { LedSpillLight } from './LedSpillLight';
 
 // 精簡模式:LED 永遠保留 + 後台指定 keepIds;其餘不渲染(直接卸載,省 draw call/材質/useFrame)
 /**
- * 平面反射器(舞台地面)。只反射 LED 素材:
- * 反射用的虛擬相機 layers 只設 REFLECT_LAYER,而僅 LED mesh 被加入該層,
+ * 舞台板平面反射(反射做在被 🪞 標記的物件自己的材質上,見 lib/planar-reflection.ts)。
+ * 只反射 LED 素材:鏡像相機 layers 只設 REFLECT_LAYER,而僅 LED mesh 被加入該層,
  * 因此桁架/舞台/場館完全不參與反射渲染 —— 又快又乾淨(無法線暴露、無遞迴過曝)。
- * 全場僅建立一個(多個反射面會互相反射)。
+ * 全場一個反射平面(高度取第一個標記物件);每幀一次額外渲染,僅完美渲染 + beauty 模式啟用。
  */
-function PlanarReflectorPlane() {
+const _mirrorNormal = new THREE.Vector3(0, 1, 0);
+const _mirrorPlanePos = new THREE.Vector3();
+const _mirrorCamPos = new THREE.Vector3();
+const _mirrorRot = new THREE.Matrix4();
+const _mirrorView = new THREE.Vector3();
+const _mirrorLook = new THREE.Vector3();
+const _mirrorTarget = new THREE.Vector3();
+const _mirrorPlane = new THREE.Plane();
+const _mirrorClip = new THREE.Vector4();
+const _mirrorQ = new THREE.Vector4();
+const _mirrorClearColor = new THREE.Color();
+const _mirrorSize = new THREE.Vector2();
+const MIRROR_BIAS = new THREE.Matrix4().set(
+    0.5, 0, 0, 0.5,
+    0, 0.5, 0, 0.5,
+    0, 0, 0.5, 0.5,
+    0, 0, 0, 1
+);
+
+function PlanarMirror() {
     const perfectRenderEnabled = useStore((s) => s.perfectRenderEnabled);
     const renderMode = useStore((s) => s.renderMode);
-    const stageObjects = useStore((s) => s.stageObjects);
-    const objectBounds = useStore((s) => s.objectBounds);
     const reflectionMirror = useStore((s) => s.reflectionMirror);
     const reflectionBlur = useStore((s) => s.reflectionBlur);
+    // 指紋 selector:只在「第一個標記物件 / 其設定高度 / 包圍盒底面」變化時 re-render
+    const planeKey = useStore((s) => {
+        const t = s.stageObjects.find((o) => o.planarReflector);
+        if (!t) return '';
+        const y = t.reflectorConfig?.y ?? s.objectBounds[t.id]?.min[1];
+        return `${t.id}|${y ?? ''}`;
+    });
+    const [targetId, yStr] = planeKey.split('|');
+    const planeY = yStr !== undefined && yStr !== '' ? parseFloat(yStr) : NaN;
+    const active = perfectRenderEnabled && renderMode === 'beauty' && !!targetId && Number.isFinite(planeY);
 
-    const target = stageObjects.find((o) => o.planarReflector);
-    const b = target ? objectBounds[target.id] : undefined;
-    // 反射僅在完美渲染 + beauty 模式生效(普通模式零成本:不建立 Reflector、不做額外渲染)
-    const active = perfectRenderEnabled && renderMode === 'beauty' && !!target && !!b;
-
-    // 診斷:標記了卻沒有包圍盒(例如 Box primitive 尚未量測)→ 提示而非靜默失敗
+    // 診斷:標記了卻沒有高度(未設 Y 且尚無包圍盒)→ 提示而非靜默失敗
     useEffect(() => {
-        if (perfectRenderEnabled && target && !b) {
-            console.warn('[PlanarReflector] 已標記物件但尚無包圍盒資料,反射平面無法建立:', target.id);
+        if (perfectRenderEnabled && targetId && !Number.isFinite(planeY)) {
+            console.warn('[PlanarMirror] 已標記物件但尚無反射高度(未設定 Y 且無包圍盒資料):', targetId);
         }
-    }, [perfectRenderEnabled, target, b]);
+    }, [perfectRenderEnabled, targetId, planeY]);
 
-    // 手動參數優先;未設定時以包圍盒推算(頂面中心)作為起始值
-    const cfg = target?.reflectorConfig ?? (b ? {
-        w: Math.max(0.1, b.max[0] - b.min[0]),
-        d: Math.max(0.1, b.max[2] - b.min[2]),
-        x: (b.max[0] + b.min[0]) / 2,
-        y: b.min[1] + 0.005, // 底面:舞台面通常在包圍盒底部(取頂面會讓平面浮在半空)
-        z: (b.max[2] + b.min[2]) / 2,
-    } : null);
-
-    const reflector = useMemo(() => {
-        if (!active || !cfg) return null;
-        const w = Math.max(0.1, cfg.w);
-        const d = Math.max(0.1, cfg.d);
-        const geo = new THREE.PlaneGeometry(w, d);
-        const TEX = 1024;
-        const r = new Reflector(geo, {
-            textureWidth: TEX,
-            textureHeight: TEX,
-            color: 0x7f7f7f, // 中性:blendOverlay 遇純黑會把反射乘成 0
-            multisample: 0,  // 關閉 MSAA:與 mipmap 生成衝突(且反射本就要模糊,不需抗鋸齒)
+    const mirror = useMemo(() => {
+        if (!active) return null;
+        const rt = new THREE.WebGLRenderTarget(1024, 1024, {
+            // 開啟 mipmap:模糊改用硬體三線性 mip 插值(等同 roughness 的模糊原理)
+            generateMipmaps: true,
+            minFilter: THREE.LinearMipmapLinearFilter,
+            magFilter: THREE.LinearFilter,
         });
-        // 關鍵:反射相機只看 LED 圖層
-        r.camera.layers.set(REFLECT_LAYER);
+        const camera = new THREE.PerspectiveCamera();
+        camera.layers.set(REFLECT_LAYER); // 關鍵:鏡像相機只看 LED 圖層
+        return { rt, camera };
+    }, [active]);
 
-        // 開啟 mipmap:模糊改用硬體三線性 mip 插值(等同 roughness 的模糊原理),
-        // 連續平滑、無多重取樣造成的分層重影。three 渲染到 target 後會自動更新 mipmap。
-        const rt = r.getRenderTarget();
-        rt.texture.generateMipmaps = true;
-        rt.texture.minFilter = THREE.LinearMipmapLinearFilter;
-        rt.texture.magFilter = THREE.LinearFilter;
-        rt.texture.needsUpdate = true;
-
-        // 注入可調模糊:在投影取樣處做 13 點高斯近似(螢幕空間偏移需乘 vUv.w 保持透視一致)
-        const mat = r.material as THREE.ShaderMaterial;
-        mat.uniforms.uBlur = { value: 0 };
-        mat.uniforms.uTexel = { value: new THREE.Vector2(1 / TEX, 1 / TEX) };
-        mat.fragmentShader = mat.fragmentShader
-            .replace(
-                'uniform sampler2D tDiffuse;',
-                `uniform sampler2D tDiffuse;
-uniform float uBlur;
-uniform float uStrength;
-uniform vec2 uTexel;
-// mip-based 模糊:LOD bias 讓硬體做三線性插值(與 roughness 同原理),
-// 再以 4 個微小偏移取樣消除 mip 層之間的接縫,得到連續柔化。
-vec4 blurProj( sampler2D tex, vec4 uv, float lod ) {
-	if ( lod < 0.01 ) return texture2DProj( tex, uv );
-	vec2 o = uTexel * uv.w * lod * 0.75;
-	vec4 sum = texture2DProj( tex, uv, lod ) * 0.4;
-	sum += texture2DProj( tex, uv + vec4( o.x, o.y, 0.0, 0.0 ), lod ) * 0.15;
-	sum += texture2DProj( tex, uv + vec4( -o.x, o.y, 0.0, 0.0 ), lod ) * 0.15;
-	sum += texture2DProj( tex, uv + vec4( o.x, -o.y, 0.0, 0.0 ), lod ) * 0.15;
-	sum += texture2DProj( tex, uv + vec4( -o.x, -o.y, 0.0, 0.0 ), lod ) * 0.15;
-	return sum;
-}`
-            )
-            .replace(
-                'vec4 base = texture2DProj( tDiffuse, vUv );',
-                'vec4 base = blurProj( tDiffuse, vUv, uBlur );'
-            )
-            .replace(
-                'gl_FragColor = vec4( blendOverlay( base.rgb, color ), 1.0 );',
-                'gl_FragColor = vec4( base.rgb * uStrength, 1.0 );'
-            );
-        mat.uniforms.uStrength = { value: 1 };
-        // 加算混合:LED 反射光疊加在地板材質上(而非蓋一層黑板)
-        mat.transparent = true;
-        mat.blending = THREE.AdditiveBlending;
-        mat.depthWrite = false;
-        mat.needsUpdate = true;
-        r.rotation.x = -Math.PI / 2;
-        r.position.set(cfg.x, cfg.y, cfg.z);
-        return r;
-    }, [active, cfg?.w, cfg?.d, cfg?.x, cfg?.y, cfg?.z]);
-
-    // 反射強度/模糊:以材質 opacity 與 blur uniform 近似(Reflector 為自訂 shader)
-    // 滑桿即時更新 uniform(不重建 reflector)
     useEffect(() => {
-        if (!reflector) return;
-        const mat = reflector.material as THREE.ShaderMaterial;
-        if (mat.uniforms.uStrength) mat.uniforms.uStrength.value = reflectionMirror; // 鏡面強度
-        if (mat.uniforms.uBlur) mat.uniforms.uBlur.value = reflectionBlur * 0.3; // 滑桿 0–20 → mip LOD 0–6
-    }, [reflector, reflectionMirror, reflectionBlur]);
-
-    // 卸載時釋放資源(僅在 reflector 實例更換時)
-    useEffect(() => {
-        if (!reflector) return;
+        const u = planarReflectionUniforms;
+        if (!mirror) {
+            u.uMirrorActive.value = 0;
+            return;
+        }
+        u.uMirrorMap.value = mirror.rt.texture;
         return () => {
-            reflector.geometry.dispose();
-            (reflector.material as THREE.Material).dispose();
-            reflector.dispose?.();
+            u.uMirrorActive.value = 0;
+            u.uMirrorMap.value = null;
+            mirror.rt.dispose();
         };
-    }, [reflector]);
+    }, [mirror]);
 
-    if (!reflector) return null;
-    return <primitive object={reflector} />;
+    // 滑桿即時更新 uniform(不重建)
+    useEffect(() => {
+        planarReflectionUniforms.uMirrorStrength.value = reflectionMirror; // 鏡面強度
+        planarReflectionUniforms.uMirrorBlur.value = reflectionBlur * 0.3; // 滑桿 0–20 → mip LOD 0–6
+    }, [reflectionMirror, reflectionBlur]);
+
+    // 預設優先序(0):在主畫面 / 後製 composer 渲染之前更新反射畫面 → 同一幀內一致(demand 模式不會停在舊畫面)
+    useFrame(({ gl, scene, camera }) => {
+        const u = planarReflectionUniforms;
+        if (!mirror || !(camera as THREE.PerspectiveCamera).isPerspectiveCamera) {
+            u.uMirrorActive.value = 0;
+            return;
+        }
+        _mirrorCamPos.setFromMatrixPosition(camera.matrixWorld);
+        // 相機在平面下方:看不到反射面,跳過渲染
+        if (_mirrorCamPos.y <= planeY + 1e-3) {
+            u.uMirrorActive.value = 0;
+            return;
+        }
+
+        // 反射貼圖解析度跟隨畫布(半解析度,反射本就模糊)
+        gl.getDrawingBufferSize(_mirrorSize);
+        const w = THREE.MathUtils.clamp(Math.round(_mirrorSize.x * 0.5), 256, 2048);
+        const h = THREE.MathUtils.clamp(Math.round(_mirrorSize.y * 0.5), 256, 2048);
+        if (mirror.rt.width !== w || mirror.rt.height !== h) mirror.rt.setSize(w, h);
+        u.uMirrorTexel.value.set(1 / w, 1 / h);
+        u.uMirrorPlaneY.value = planeY;
+
+        // 鏡像相機(移植自 three Reflector:對 y = planeY 平面鏡射主相機)
+        const vc = mirror.camera;
+        _mirrorPlanePos.set(0, planeY, 0);
+        _mirrorRot.extractRotation(camera.matrixWorld);
+        _mirrorView.subVectors(_mirrorPlanePos, _mirrorCamPos).reflect(_mirrorNormal).negate().add(_mirrorPlanePos);
+        _mirrorLook.set(0, 0, -1).applyMatrix4(_mirrorRot).add(_mirrorCamPos);
+        _mirrorTarget.subVectors(_mirrorPlanePos, _mirrorLook).reflect(_mirrorNormal).negate().add(_mirrorPlanePos);
+        vc.position.copy(_mirrorView);
+        vc.up.set(0, 1, 0).applyMatrix4(_mirrorRot).reflect(_mirrorNormal);
+        vc.lookAt(_mirrorTarget);
+        vc.far = camera.far;
+        vc.updateMatrixWorld();
+        vc.projectionMatrix.copy(camera.projectionMatrix);
+
+        // 世界座標 → 反射貼圖投影座標(材質 shader 用)
+        u.uMirrorMatrix.value.copy(MIRROR_BIAS).multiply(vc.projectionMatrix).multiply(vc.matrixWorldInverse);
+
+        // 斜近裁切面:平面以下的物件(例如落地 LED 被舞台板擋住的下半段)不進反射
+        _mirrorPlane.setFromNormalAndCoplanarPoint(_mirrorNormal, _mirrorPlanePos).applyMatrix4(vc.matrixWorldInverse);
+        _mirrorClip.set(_mirrorPlane.normal.x, _mirrorPlane.normal.y, _mirrorPlane.normal.z, _mirrorPlane.constant);
+        const e = vc.projectionMatrix.elements;
+        _mirrorQ.set(
+            (Math.sign(_mirrorClip.x) + e[8]) / e[0],
+            (Math.sign(_mirrorClip.y) + e[9]) / e[5],
+            -1,
+            (1 + e[10]) / e[14]
+        );
+        _mirrorClip.multiplyScalar(2 / _mirrorClip.dot(_mirrorQ));
+        e[2] = _mirrorClip.x;
+        e[6] = _mirrorClip.y;
+        e[10] = _mirrorClip.z + 1;
+        e[14] = _mirrorClip.w;
+        vc.projectionMatrixInverse.copy(vc.projectionMatrix).invert();
+
+        // 渲染(只有 LED 層;背景清成黑色,避免背景色被加到反射上)
+        const prevTarget = gl.getRenderTarget();
+        const prevXr = gl.xr.enabled;
+        const prevShadowAuto = gl.shadowMap.autoUpdate;
+        const prevBackground = scene.background;
+        gl.getClearColor(_mirrorClearColor);
+        const prevClearAlpha = gl.getClearAlpha();
+
+        gl.xr.enabled = false;
+        gl.shadowMap.autoUpdate = false;
+        scene.background = null;
+        gl.setClearColor(0x000000, 1);
+        gl.setRenderTarget(mirror.rt);
+        gl.state.buffers.depth.setMask(true);
+        if (gl.autoClear === false) gl.clear();
+        gl.render(scene, vc);
+
+        gl.setRenderTarget(prevTarget);
+        gl.setClearColor(_mirrorClearColor, prevClearAlpha);
+        scene.background = prevBackground;
+        gl.shadowMap.autoUpdate = prevShadowAuto;
+        gl.xr.enabled = prevXr;
+        u.uMirrorActive.value = 1;
+    });
+
+    return null;
 }
 
 /**
@@ -372,11 +411,7 @@ function NullGroup({
 
             {childObjects.map(obj => {
                 const objRef = objectRefs.current.get(obj.id);
-                const Renderer = obj.model_path === '__box__'
-                    ? BoxPrimitiveRenderer
-                    : obj.model_path === '__projection_screen__'
-                        ? ProjectionScreenRenderer
-                        : StageObjectRenderer;
+                const Renderer = pickRenderer(obj.model_path);
 
                 return (
                     <ErrorBoundary
@@ -409,11 +444,7 @@ function NullGroup({
                 <group position={negDelta.pos} rotation={negDelta.rot}>
                     {mirroredObjects.map(obj => {
                         const objRef = objectRefs.current.get(obj.id);
-                        const Renderer = obj.model_path === '__box__'
-                            ? BoxPrimitiveRenderer
-                            : obj.model_path === '__projection_screen__'
-                                ? ProjectionScreenRenderer
-                                : StageObjectRenderer;
+                        const Renderer = pickRenderer(obj.model_path);
                         return (
                             <ErrorBoundary
                                 key={obj.id}
@@ -667,7 +698,7 @@ export function SceneGraph() {
             {cubeCameraRef.current && <primitive object={cubeCameraRef.current} />}
 
             {/* 3D 機位模型(導播參考) */}
-            <PlanarReflectorPlane />
+            <PlanarMirror />
             <PerfectRenderKickstart />
             <LedSpillLight />
             <CameraMarkers />
@@ -771,11 +802,7 @@ export function SceneGraph() {
                 .filter(obj => (!obj.parentId || !nulls.some(n => n.id === obj.parentId)) && liteVisible(obj, liteModeTop, liteKeepIdsTop))
                 .map((obj) => {
                     const objRef = objectRefsRef.current.get(obj.id);
-                    const Renderer = obj.model_path === '__box__'
-                        ? BoxPrimitiveRenderer
-                        : obj.model_path === '__projection_screen__'
-                            ? ProjectionScreenRenderer
-                            : StageObjectRenderer;
+                    const Renderer = pickRenderer(obj.model_path);
 
                     return (
                         <ErrorBoundary

@@ -53,6 +53,8 @@ lib/
 ├── rig-utils.ts          # rigDelta(略過 visibility)、rigVisibility(AND)、BOUNDS_FEATURES 27 特徵點
 ├── client-auth.ts        # sha256Hex(Web Crypto)— 客戶編輯密碼雜湊
 ├── parallax-envmap.ts    # parallax 校正反射:共享 uniforms + onBeforeCompile 注入(r182 chunk 字串敏感)
+├── planar-reflection.ts # 🪞 舞台板反射:反射注入物件自己的材質(共享 uniforms;只反射朝上且高度=Y 的面)
+├── shader-patch.ts      # addShaderPatch:同材質多個 onBeforeCompile 注入串接(勿再直接賦值 onBeforeCompile)
 ├── device.ts / quality.ts / ktx2.ts  # 行動偵測 / 品質分級 / KTX2(ENABLE_KTX2=1 才啟用)
 components/canvas/
 ├── Scene.tsx             # 動態 frameloop:(影片播放)||攝影機直播||錄影||gizmo||完美渲染||紙片人擺放||walk ? always : demand
@@ -93,6 +95,10 @@ client/
 13. **lookAt 陷阱**:非 Camera 的 Object3D.lookAt 讓 **+Z** 朝目標。
 14. **parallax-envmap**:注入點對 r182 chunk 字串 `reflectVec = inverseTransformDirection(...)`;three 升版要重驗。包圍盒每 60 幀自動算(venues 聯集)。
 15. **getObjectDisplayName(undefined) 會 crash** — `leds.find()` 結果先 guard。
+
+16. **向量建模(程序化場館)**:`model_path = '__proc__:<id>'`,幾何由 `lib/procedural` 從純數字 spec 即時生成(零下載)。只同步參照,不動同步系統;**id 發布後不可改名**。渲染器選擇統一走 `canvas/pick-renderer.ts`(新增 primitive 類型改這一處)。完整慣例見 `docs/procedural-modeling.md`。
+
+17. **🪞 舞台板反射**:SceneGraph `PlanarMirror` 每幀(useFrame 預設優先序,早於後製)以鏡像相機只渲染 REFLECT_LAYER(LED)到 RT,再由 `planar-reflection.ts` 注入被標記物件的材質(受粗糙度/金屬度/凹凸/Fresnel 影響)。全場一個平面,高度 = 第一個標記物件的 `reflectorConfig.y`(未設定取包圍盒底);w/d/x/z 為舊版反射板欄位,已不使用。新材質注入一律走 `addShaderPatch`。
 
 ## 7. 開發工作流(與 AI 協作慣例)
 
